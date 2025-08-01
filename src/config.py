@@ -6,7 +6,7 @@ current_language = 'zh'  # 当前语言 / Current language
 
 
 # 调试模式配置
-debug_mode = False  # 设置为True启用调试模式 / Set to True to enable debug mode
+debug_mode = True  # 设置为True启用调试模式 / Set to True to enable debug mode
 debug_time_factor = 5.0  # 调试模式下的时间流速因子 / Time flow factor in debug mode
 
 # 日志级别配置
@@ -27,6 +27,8 @@ TOAST_FONT_SIZE = 45  # 字体大小 / Font size
 TOAST_FONT_COLOR = 'rgb(0, 191, 255)'  # 字体颜色 / Font color
 
 # 窗体设置项
+MAIN_WINDOW_X = 1029
+MAIN_WINDOW_Y = 1049
 # 主窗口透明度配置 ，最后一个200为透明度，前面三个数是RGB数值，具体可以网上查一下选一个自己喜欢的颜色，0完全透明、255完全不透明 / 0 fully transparent, 255 fully opaque
 MAIN_WINDOW_BG_COLOR = 'rgba(43, 43, 43, 200)' # 主界面背景设置
 COMMANDER_SELECTOR_BG_COLOR = 'rgba(43, 43, 43, 200)'  # 指挥官选择器背景设置
@@ -35,7 +37,7 @@ MAIN_WINDOW_WIDTH = 167  # 主窗口宽度 / Main window width
 
 # 表格字体大小
 TABLE_FONT_SIZE = 12  # 表格字体大小 / Table font size
-TABLE_HEIGHT = 185 # 表格高度
+TABLE_HEIGHT = 150 # 表格高度
 TABLE_NEXT_FONT_COLOR = [0, 255, 128]  # 表格下一个事件字体颜色 绿色/ Table font color
 TABLE_NEXT_FONT_BG_COLOR = [0, 255, 128, 30] # 表格下一个事件背景颜色，最后一个值是透明度
 
@@ -73,7 +75,7 @@ avatar = [
 # 添加格式 如：BLACK_LIST = ['raynor', 'kerrigan']， 这样在替换界面点击随机时，就不会替换到这两个了
 # If you add commanders like: BLACK_LIST = ['raynor', 'kerrigan'], they won't be selected in random replacement
 BLACK_LIST = []
-
+REPLACE_COMMANDER_FLAG = False
 
 #############################
 # 下面配置主要用于图像识别

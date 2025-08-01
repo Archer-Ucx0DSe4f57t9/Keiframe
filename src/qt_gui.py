@@ -194,7 +194,7 @@ class TimerWindow(QMainWindow):
     def init_ui(self):
         """初始化用户界面"""
         self.setWindowTitle('SC2 Timer')
-        self.setGeometry(0, 300, config.MAIN_WINDOW_WIDTH, 30)  # 调整初始窗口位置，x坐标设为0
+        self.setGeometry(config.MAIN_WINDOW_X, config.MAIN_WINDOW_Y, config.MAIN_WINDOW_WIDTH, 30)  # 调整初始窗口位置，x坐标设为0
         
         # 设置窗口样式 - 不设置点击穿透，这将由on_control_state_changed方法控制
         self.setWindowFlags(
@@ -322,7 +322,7 @@ class TimerWindow(QMainWindow):
  
         
         # 调整主窗口大小以适应新添加的控件
-        self.main_container.setGeometry(0, 0, config.MAIN_WINDOW_WIDTH, 335)  # 调整容器高度
+        self.main_container.setGeometry(0, 0, config.MAIN_WINDOW_WIDTH, 300)  # 调整容器高度
         
         # 创建地图标签
         self.map_label = QLabel(self.get_text('map_label'), self.main_container)
@@ -511,7 +511,10 @@ class TimerWindow(QMainWindow):
                 background-color: rgba(43, 43, 43, 200);
             }
         ''')
-        self.replace_commander_btn.setFixedSize(150, 30)
+        if config.REPLACE_COMMANDER_FLAG:
+            self.replace_commander_btn.setFixedSize(150, 30)
+        else:
+            self.replace_commander_btn.setFixedSize(0, 0)
         commander_btn_x = (self.main_container.width() - self.replace_commander_btn.width()) // 2
         self.replace_commander_btn.move(commander_btn_x, self.icon_area.geometry().bottom() + 5)
         self.replace_commander_btn.hide()  # 初始状态为隐藏
@@ -748,7 +751,7 @@ class TimerWindow(QMainWindow):
         
         # 根据解锁状态显示或隐藏替换指挥官按钮
         if hasattr(self, 'replace_commander_btn'):
-            if unlocked:
+            if unlocked and config.REPLACE_COMMANDER_FLAG:
                 self.replace_commander_btn.show()
             else:
                 self.replace_commander_btn.hide()
