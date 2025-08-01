@@ -7,6 +7,7 @@ import config
 from fileutil import get_resources_dir
 from mainfunctions import get_game_screen, get_troop_from_game
 from troop_util import TroopLoader
+from outlined_label import OutlinedLabel
 
 class ToastManager:
     
@@ -114,9 +115,12 @@ class ToastManager:
                 # 截断文本到T标识处
                 display_text = display_text + ' ' + troops_data[0]
 
-        # 添加文本标签
-        text_label = QLabel(display_text)
+         # 添加文本标签 (使用OutlinedLabel)
+        outline_color = config.TOAST_OUTLINE_COLOR
+        text_label = OutlinedLabel(outline_color)
+        text_label.setText(display_text)
         text_label.setFont(QFont('Arial', config.TOAST_FONT_SIZE))
+        text_label.setOutlineWidth(2)
         text_label.setStyleSheet(f'color: {config.TOAST_FONT_COLOR}; background-color: transparent;')
         layout.addWidget(text_label)
 

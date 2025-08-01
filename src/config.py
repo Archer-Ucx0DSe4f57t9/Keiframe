@@ -25,6 +25,7 @@ TOAST_OPACITY = 0  # 背景透明度（0-255）/ Background opacity (0-255)
 TOAST_POSITION = 0.9  # 垂直位置（窗口高度的比例）/ Vertical position (relative to window height)
 TOAST_FONT_SIZE = 45  # 字体大小 / Font size
 TOAST_FONT_COLOR = 'rgb(0, 191, 255)'  # 字体颜色 / Font color
+TOAST_OUTLINE_COLOR = 'rgb(0, 0, 0)' #字体描边颜色/Outline Color
 
 # 窗体设置项
 MAIN_WINDOW_X = 1029

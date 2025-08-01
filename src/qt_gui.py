@@ -20,6 +20,7 @@ from PyQt5.QtGui import (
     QFont, QIcon, QPixmap, QBrush,
     QColor, QCursor
 )
+from outlined_label import OutlinedLabel
 from PyQt5.QtCore import Qt, QTimer, QPoint, pyqtSignal, QRect, QSize
 import config
 from PyQt5 import QtCore
