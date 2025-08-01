@@ -1,53 +1,75 @@
 from PyQt5.QtWidgets import QLabel
-from PyQt5.QtGui import QPainter, QPen, QColor
+from PyQt5.QtGui import QPainter, QPen, QColor, QPainterPath, QFontMetrics # 新增 QFontMetrics
 from PyQt5.QtCore import Qt
+import re
 
 class OutlinedLabel(QLabel):
-    def __init__(self, outline_color = QColor(0, 0, 0), parent=None):
+    def __init__(self, outline_color=QColor(0, 0, 0), outline_width=2, parent=None):
         super(OutlinedLabel, self).__init__(parent)
-        if isinstance(outline_color, str):
-            self.outline_color = QColor(outline_color)
-        else:
-            self.outline_color = outline_color  # 默认描边颜色为黑色
-        self.outline_width = 5  # 默认描边宽度为2
+        
+        self.outline_color = QColor(0, 0, 0)
+        self.outline_width = 2
+        
+        self.setOutlineColor(outline_color)
+        self.setOutlineWidth(outline_width)
 
     def setOutlineColor(self, color):
-        self.outline_color = QColor(color)
+        parsed_color = QColor(0, 0, 0)
+        
+        if isinstance(color, str):
+            match = re.match(r'rgb\((\d+),\s*(\d+),\s*(\d+)\)', color)
+            if match:
+                r, g, b = map(int, match.groups())
+                parsed_color = QColor(r, g, b)
+            else:
+                parsed_color.setNamedColor(color)
+        elif isinstance(color, QColor):
+            parsed_color = color
+        
+        if parsed_color.isValid():
+            self.outline_color = parsed_color
+        else:
+            self.outline_color = QColor(0, 0, 0)
         self.update()
 
     def setOutlineWidth(self, width):
-        self.outline_width = width
+        if isinstance(width, (int, float)):
+            self.outline_width = int(width)
+        else:
+            self.outline_width = 2
         self.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
-        # 字体
         font = self.font()
         font.setPointSize(self.font().pointSize())
         painter.setFont(font)
-        
-        # 文本
+
         text = self.text()
         rect = self.contentsRect()
         
-        # 绘制描边
+        # 使用 QFontMetrics 计算正确的文本位置
+        font_metrics = QFontMetrics(font)
+        # 基线y坐标 = 绘制区域的y + 字体ascender + 描边宽度
+        y_pos = rect.y() + font_metrics.ascent() + self.outline_width
+
+        # 1. 创建文本路径
+        path = QPainterPath()
+        path.addText(rect.x(), y_pos, font, text)
+
+        # 2. 绘制描边
         pen = QPen()
         pen.setColor(self.outline_color)
         pen.setWidth(self.outline_width)
+        pen.setJoinStyle(Qt.RoundJoin) 
+        
         painter.setPen(pen)
         painter.setBrush(Qt.NoBrush)
+        painter.drawPath(path)
         
-        # 移动9个方向绘制描边
-        for dx in range(-1, 2):
-            for dy in range(-1, 2):
-                if dx == 0 and dy == 0:
-                    continue
-                outline_rect = rect.translated(dx, dy)
-                painter.drawText(outline_rect, self.alignment(), text)
-        
-        # 绘制前景文本
-        painter.setPen(QPen(self.palette().text().color()))
+        # 3. 绘制前景文本
+        painter.setPen(Qt.NoPen) 
         painter.setBrush(self.palette().text().color())
-        painter.drawText(rect, self.alignment(), text)
+        painter.drawPath(path)
