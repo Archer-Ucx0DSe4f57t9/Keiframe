@@ -11,12 +11,13 @@ from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QLabel, QSystemTrayIcon, 
     QMenu, QAction, QApplication, QComboBox, 
     QTableWidgetItem, QPushButton, QTableWidget, 
-    QHeaderView, QVBoxLayout, QGraphicsDropShadowEffect, QHBoxLayout  # 从 QtWidgets 导入
+    QHeaderView, QVBoxLayout, QGraphicsDropShadowEffect, QHBoxLayout
+    , QLineEdit # 从 QtWidgets 导入
 )
 from control_window import ControlWindow
 from commander_selector import CommanderSelector
 from PyQt5.QtGui import (
-    QFont, QIcon, QPixmap, QBrush, 
+    QFont, QIcon, QPixmap, QBrush,
     QColor, QCursor
 )
 from PyQt5.QtCore import Qt, QTimer, QPoint, pyqtSignal, QRect, QSize
@@ -192,9 +193,11 @@ class TimerWindow(QMainWindow):
             self.logger.error(traceback.format_exc())
 
     def init_ui(self):
+        #初始化变量
+        self.suppress_auto_selection = False
         """初始化用户界面"""
         self.setWindowTitle('SC2 Timer')
-        self.setGeometry(config.MAIN_WINDOW_X, config.MAIN_WINDOW_Y, config.MAIN_WINDOW_WIDTH, 30)  # 调整初始窗口位置，x坐标设为0
+        self.setGeometry(config.MAIN_WINDOW_X, config.MAIN_WINDOW_Y, config.MAIN_WINDOW_WIDTH, 30)  # 调整初始窗口位置
         
         # 设置窗口样式 - 不设置点击穿透，这将由on_control_state_changed方法控制
         self.setWindowFlags(
@@ -259,7 +262,7 @@ class TimerWindow(QMainWindow):
         
         # 默认隐藏按钮组
         self.map_version_group.hide()
-
+        
         # 创建表格显示区
         from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView
         self.table_area = QTableWidget(self.main_container)
@@ -324,13 +327,21 @@ class TimerWindow(QMainWindow):
         # 调整主窗口大小以适应新添加的控件
         self.main_container.setGeometry(0, 0, config.MAIN_WINDOW_WIDTH, 300)  # 调整容器高度
         
-        # 创建地图标签
-        self.map_label = QLabel(self.get_text('map_label'), self.main_container)
-        self.map_label.setFont(QFont('Arial', 9))  # 修改字体大小为9pt
-        self.map_label.setStyleSheet('color: white; background-color: transparent')
-        self.map_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.map_label.setGeometry(10, 5, 30, 30)
-        self.map_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)  # 添加鼠标事件穿透
+        # 创建搜索框
+        self.search_box = QLineEdit(self.main_container)
+        self.search_box.setPlaceholderText("搜索…")
+        self.search_box.setFixedSize(50, 30)
+        self.search_box.setFont(QFont('Arial', 9))
+        self.search_box.setStyleSheet('''
+            QLineEdit {
+                color: white;
+                background-color: rgba(50, 50, 50, 200);
+                border: 1px solid gray;
+                border-radius: 5px;
+                padding: 5px;
+            }
+        ''')
+        self.search_box.move(10, 5)
     
         # 创建下拉框
         self.combo_box = QComboBox(self.main_container)
@@ -383,6 +394,9 @@ class TimerWindow(QMainWindow):
             files = []
         else:
             files = list_files(resources_dir)
+        self.combo_box.setGeometry(60, 5, 100, 30)  # 右移一点
+        #self.combo_box.setGeometry(40, 5, 117, 30)
+        self.combo_box.setFont(QFont('Arial', 9))
         self.combo_box.addItems(files)
         
         # 连接下拉框选择变化事件
@@ -391,6 +405,65 @@ class TimerWindow(QMainWindow):
         # 如果有文件，自动加载第一个
         if files:
             self.on_map_selected(files[0])
+            
+        ####################
+        #用户输入搜索
+        # 清空搜索框的定时器
+        self.clear_search_timer = QTimer()
+        self.clear_search_timer.setSingleShot(True)
+        
+        #更新搜索内容
+        def update_combo_box(keyword, allow_auto_select=True):
+            
+            keyword = keyword.strip().lower()
+            current_selected = self.combo_box.currentText()
+
+            
+            self.combo_box.blockSignals(True)  # 🚫 禁止选项变化触发 currentTextChanged
+            self.combo_box.clear()
+
+            filtered = [f for f in files if keyword in f.lower()]
+
+            mapped_result = config.MAP_SEARCH_KEYWORDS.get(keyword)
+            if mapped_result and mapped_result not in filtered and mapped_result in files:
+                filtered.insert(0, mapped_result)
+
+            self.combo_box.addItems(filtered)
+            
+            # ✅ 如果不是自动选择场景，恢复原选项
+            if not allow_auto_select and current_selected in filtered:
+                index = self.combo_box.findText(current_selected)
+                if index >= 0:
+                    self.combo_box.setCurrentIndex(index)
+
+            self.combo_box.blockSignals(False)
+
+            # ✅ 只在明确需要时触发地图变更
+            if filtered and allow_auto_select:
+                self.on_map_selected(filtered[0])
+
+        # 用户输入时触发（允许自动选择）
+        def filter_combo_box_user():
+            keyword = self.search_box.text().strip().lower()
+            update_combo_box(keyword, allow_auto_select=True)
+
+        # 自动清除时触发（禁止自动选择）
+        def filter_combo_box_clear():
+            update_combo_box("", allow_auto_select=False)
+            self.search_box.blockSignals(True)
+            self.search_box.setText("")  # 不触发 filter_combo_box_user
+            self.search_box.blockSignals(False)
+        
+        #根据搜索更新可选列表
+        def restart_clear_timer():
+            self.clear_search_timer.stop()
+            self.clear_search_timer.start(30000)  # 30秒
+
+        #搜索框关联
+        self.search_box.textChanged.connect(filter_combo_box_user)
+        self.search_box.textChanged.connect(restart_clear_timer)
+        self.clear_search_timer.timeout.connect(filter_combo_box_clear)
+        self.combo_box.currentTextChanged.connect(self.on_map_selected)
         
         # 调整时间标签的位置和高度
         self.time_label.setGeometry(10, 40, 100, 20)

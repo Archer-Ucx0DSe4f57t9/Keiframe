@@ -185,6 +185,7 @@ class ToastManager:
                     self.logger.error(f'解析部队图标失败: {str(e)}\n{traceback.format_exc()}')
                 
                 # 处理hybrid兵种图标
+                '''
                 for troop_info in troops_data[1:]:
                     if troop_info:
                         troop_parts = troop_info.split('*')
@@ -214,7 +215,7 @@ class ToastManager:
                             hybrid_layout.addWidget(troop_container)
                         else:
                             self.logger.warning(f'Hybrid兵种图标不存在: {icon_path}')
-
+                '''
         # 设置容器大小并显示
         container.adjustSize()
         container.setStyleSheet('background-color: transparent;')

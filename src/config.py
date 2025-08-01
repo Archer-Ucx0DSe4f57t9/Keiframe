@@ -6,7 +6,7 @@ current_language = 'zh'  # 当前语言 / Current language
 
 
 # 调试模式配置
-debug_mode = True  # 设置为True启用调试模式 / Set to True to enable debug mode
+debug_mode = False  # 设置为True启用调试模式 / Set to True to enable debug mode
 debug_time_factor = 5.0  # 调试模式下的时间流速因子 / Time flow factor in debug mode
 
 # 日志级别配置
@@ -77,6 +77,22 @@ avatar = [
 BLACK_LIST = []
 REPLACE_COMMANDER_FLAG = False
 
+
+#搜索特殊关键词
+MAP_SEARCH_KEYWORDS = {
+    "火车": "湮灭快车",
+    "黑杀": "黑暗杀星",
+    "天锁": "天界封锁",
+    "庙a":"往日神庙-A",
+    "庙b":"往日神庙-B",
+    "撕裂a":"虚空撕裂-左",
+    "撕裂b":"虚空撕裂-右",
+    "地勤":"机会渺茫",
+    "零件":"聚铁成兵",
+    "杀毒":"净网行动",
+    "穿梭机":"虚空降临",
+    # 可以继续添加……
+}
 #############################
 # 下面配置主要用于图像识别
 DEBUG_SHOW_ENEMY_INFO_SQUARE = False  # 是否显示敌方单位信息框 / Whether to show enemy unit information boxes
@@ -109,3 +125,4 @@ ARTIFACTS_POS_净网行动 = [398/1496, 688/996, 40, 40]
 ARTIFACTS_POS_营救矿工 = [1080/1755, 391/844, 40, 40]
 ARTIFACTS_POS_亡者之夜 = [468/1242, 495/938, 40, 40]
 ARTIFACTS_POS_熔火危机 = [730/1783, 1200/1334, 40, 40]
+
