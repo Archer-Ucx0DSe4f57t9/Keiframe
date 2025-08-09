@@ -98,9 +98,6 @@ class ToastManager:
         if duration is None:
             duration = config.TOAST_DURATION
 
-         # 在创建新的Toast之前，隐藏旧的Toast
-        self.toast_label.hide()
-        
         # 创建一个水平布局来容纳文本和图标
         container = QWidget()
         layout = QHBoxLayout(container)
@@ -120,10 +117,10 @@ class ToastManager:
 
          # 添加文本标签 (使用OutlinedLabel)
         outline_color = config.TOAST_OUTLINE_COLOR
-        outline_width = config.TOAST_OUTLINE_WIDTH
-        text_label = OutlinedLabel(outline_color,outline_width)
+        text_label = OutlinedLabel(outline_color)
         text_label.setText(display_text)
         text_label.setFont(QFont('Arial', config.TOAST_FONT_SIZE))
+        text_label.setOutlineWidth(2)
         text_label.setStyleSheet(f'color: {config.TOAST_FONT_COLOR}; background-color: transparent;')
         layout.addWidget(text_label)
 
