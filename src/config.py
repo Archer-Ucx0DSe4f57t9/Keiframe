@@ -6,7 +6,7 @@ current_language = 'zh'  # 当前语言 / Current language
 
 
 # 调试模式配置
-debug_mode = False  # 设置为True启用调试模式 / Set to True to enable debug mode
+debug_mode = True  # 设置为True启用调试模式 / Set to True to enable debug mode
 debug_time_factor = 5.0  # 调试模式下的时间流速因子 / Time flow factor in debug mode
 
 # 日志级别配置
@@ -52,6 +52,13 @@ MUTATION_ALERT_TOAST_POSITION = 0.7  # 垂直位置（窗口高度的比例）/ 
 MUTATOR_DEPLOYMENT_COLOR = 'rgb(0, 255, 128)'  # 突变因子部署颜色 / Mutator deployment color
 MUTATOR_RIFTS_COLOR = 'rgb(0, 255, 128)'  # 突变因子裂隙颜色 / Mutator rifts color
 MUTATOR_PROPAGATOR_COLOR = 'rgb(0, 255, 128)'  # 突变因子传播者颜色 / Mutator propagator color
+# 提醒大小(基于“StarCraft II”窗口的尺寸)
+MUTATOR_ALERT_TOP_OFFSET_PERCENT = 0.40  # 提醒区域距离窗口顶部的百分比
+MUTATOR_ALERT_HEIGHT_PERCENT = 0.20       # 提醒区域的总高度百分比
+MUTATOR_ALERT_FONT_SIZE_PERCENT = 0.03    # 字体大小占窗口高度的百分比
+MUTATOR_ALERT_PADDING_PERCENT = 0.01      # 行间距占窗口高度的百分比
+MUTATOR_ALERT_HORIZONTAL_INDENT_PERCENT = 0.01
+
 
 # 突变因子提示位置配置
 MUTATOR_TOAST_POSITION = 0.7  # 垂直位置（窗口高度的比例）/ Vertical position (relative to window height)
