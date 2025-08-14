@@ -6,7 +6,7 @@ current_language = 'zh'  # 当前语言 / Current language
 
 
 # 调试模式配置
-debug_mode = True  # 设置为True启用调试模式 / Set to True to enable debug mode
+debug_mode = False  # 设置为True启用调试模式 / Set to True to enable debug mode
 debug_time_factor = 5.0  # 调试模式下的时间流速因子 / Time flow factor in debug mode
 
 # 日志级别配置
@@ -47,17 +47,18 @@ TIME_ALERT_SECONDS = 30  # 提前提醒时间（秒）/ Time before alert (in se
 
 # 突变因子提醒配置
 MUTATION_FACTOR_ALERT_SECONDS = 30  # 突变因子提前提醒时间（秒）/ Mutation factor alert time (in seconds)
+MUTATION_FACTOR_WARNING_THRESHOLD_SECONDS = 10# 倒计时转为警告颜色的阈值（秒）
 MUTATION_FACTOR_ALERT_DURATION_SECONDS = 5  # 突变因子提醒持续时间（秒）/ Duration of mutation factor alert (in seconds)
+MUTATION_FACTOR_NORMAL_COLOR = 'rgb(255, 255, 255)' # 倒计时提醒的正常颜色
+MUTATION_FACTOR_WARNING_COLOR = 'rgb(255, 69, 0)'# 倒计时提醒的警告颜色
 MUTATION_ALERT_TOAST_POSITION = 0.7  # 垂直位置（窗口高度的比例）/ Vertical position (relative to window height)
 MUTATOR_DEPLOYMENT_COLOR = 'rgb(0, 255, 128)'  # 突变因子部署颜色 / Mutator deployment color
 MUTATOR_RIFTS_COLOR = 'rgb(0, 255, 128)'  # 突变因子裂隙颜色 / Mutator rifts color
 MUTATOR_PROPAGATOR_COLOR = 'rgb(0, 255, 128)'  # 突变因子传播者颜色 / Mutator propagator color
 # 提醒大小(基于“StarCraft II”窗口的尺寸)
 MUTATOR_ALERT_TOP_OFFSET_PERCENT = 0.40  # 提醒区域距离窗口顶部的百分比
-MUTATOR_ALERT_HEIGHT_PERCENT = 0.20       # 提醒区域的总高度百分比
 MUTATOR_ALERT_FONT_SIZE_PERCENT = 0.03    # 字体大小占窗口高度的百分比
-MUTATOR_ALERT_PADDING_PERCENT = 0.01      # 行间距占窗口高度的百分比
-MUTATOR_ALERT_HORIZONTAL_INDENT_PERCENT = 0.01
+MUTATOR_ALERT_HORIZONTAL_INDENT_PERCENT = 0.01 #距离游戏边框左侧的水平缩进
 
 
 # 突变因子提示位置配置
