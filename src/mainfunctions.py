@@ -78,7 +78,6 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
     if data:
 
         players = data.get('players', list())
-        print(data)
         # 更新当前游戏时间
         if 'displayTime' in data:
             current_time = data['displayTime']

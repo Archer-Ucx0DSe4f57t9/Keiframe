@@ -12,6 +12,8 @@ from fileutil import get_resources_dir
 from logging_util import get_logger
 from mainfunctions import get_game_screen
 
+mutator_types = ['deployment', 'propagator', 'voidrifts', 'killbots', 'bombbots']
+mutator_types_to_CHS = {'deployment':'部署', 'propagator':'软', 'voidrifts':'裂隙', 'killbots':'杀戮', 'bombbots':'炸弹'}
 
 class MutatorManager(QWidget):
     def __init__(self, parent=None):
@@ -104,7 +106,7 @@ class MutatorManager(QWidget):
     def init_mutator_alerts(self):
         print(f'run MutatorManager {self.init_mutator_alerts.__name__}')
         """初始化突变因子提醒标签"""
-        mutator_types = ['deployment', 'propagator', 'voidrifts', 'killbots', 'bombbots']
+
         for mutator_type in mutator_types:
             label = QLabel(self.parent())
             label.setWindowFlags(
@@ -190,7 +192,7 @@ class MutatorManager(QWidget):
             
             if next_deployment_time and (next_deployment_time - current_seconds) <= config.MUTATION_FACTOR_ALERT_SECONDS:
                 time_remaining = next_deployment_time - current_seconds
-                message = f"{mutator_type.capitalize()} 倒计时: {int(time_remaining)} 秒"
+                message = f"{mutator_types_to_CHS.get(mutator_type)} 还有: {int(time_remaining)}秒 "
                 self.show_mutator_alert(message, mutator_type, time_remaining)
             else:
                 self.hide_mutator_alert(mutator_type)
@@ -215,7 +217,6 @@ class MutatorManager(QWidget):
         line_height = int(sc2_height * config.MUTATOR_ALERT_FONT_SIZE_PERCENT)
         font_size = int(line_height * 0.8)
 
-        mutator_types = ['deployment', 'propagator', 'voidrifts', 'killbots', 'bombbots']
         try:
             mutator_index = mutator_types.index(mutator_type)
             alert_label_y = alert_area_y + (mutator_index * line_height)
