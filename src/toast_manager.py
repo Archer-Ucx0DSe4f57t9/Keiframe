@@ -3,6 +3,7 @@ from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont, QPixmap
 import os
 import traceback
+import asyncio
 import config
 from fileutil import get_resources_dir
 from mainfunctions import get_game_screen, get_troop_from_game
@@ -89,7 +90,8 @@ class ToastManager:
     def show_toast(self, message, duration=None, force_show=False):
         """显示Toast提示"""
         # 检查游戏状态，非游戏中状态不显示提示
-        if not force_show and (get_game_screen() != 'in_game' or not config.TOAST_ALLOWED):
+        game_screen = asyncio.run(get_game_screen())
+        if not force_show and (game_screen != 'in_game' or not config.TOAST_ALLOWED):
             self.logger.info('非游戏中状态或禁用toast，不显示Toast提示')
             return
         else:

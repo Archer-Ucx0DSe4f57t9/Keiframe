@@ -7,6 +7,7 @@ import keyboard
 import ctypes
 import win32gui
 from ctypes import windll
+import threading, asyncio
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QLabel, QSystemTrayIcon,
     QMenu, QAction, QApplication, QComboBox,
@@ -28,7 +29,7 @@ from PyQt5 import QtCore
 import image_util
 from fileutil import get_resources_dir, list_files
 from mutator_manager import MutatorManager
-
+import mainfunctions
 
 class TimerWindow(QMainWindow):
     # 创建信号用于地图更新
@@ -42,6 +43,9 @@ class TimerWindow(QMainWindow):
         height = user32.GetSystemMetrics(1)  # 主屏幕高度
         return width, height
 
+    def _run_async_game_scheduler(self, progress_signal):
+        """在新线程中启动 asyncio 事件循环"""
+        asyncio.run(mainfunctions.check_for_new_game_scheduler(progress_signal))
     def __init__(self):
         super().__init__()
 
@@ -78,7 +82,7 @@ class TimerWindow(QMainWindow):
         # 初始化定时器
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_game_time)
-        self.timer.start(100)  # 自动开始更新，每100毫秒更新一次
+        self.timer.start(200)  # 自动开始更新，每100毫秒更新一次
 
         # 连接表格区域的双击事件
         self.table_area.mouseDoubleClickEvent = self.on_text_double_click
@@ -104,9 +108,7 @@ class TimerWindow(QMainWindow):
         self.init_global_hotkeys()
 
         # 启动游戏检查线程
-        from mainfunctions import check_for_new_game
-        import threading
-        self.game_check_thread = threading.Thread(target=check_for_new_game, args=(self.progress_signal,), daemon=True)
+        self.game_check_thread = threading.Thread(target=self._run_async_game_scheduler, args=(self.progress_signal,), daemon=True)
         self.game_check_thread.start()
 
         # 初始化时设置为锁定状态（不可点击）
@@ -510,9 +512,8 @@ class TimerWindow(QMainWindow):
 
         try:
             # 从全局变量获取游戏时间
-            from mainfunctions import most_recent_playerdata
-            if most_recent_playerdata and isinstance(most_recent_playerdata, dict):
-                game_time = most_recent_playerdata.get('time', 0)
+            if mainfunctions.state.most_recent_playerdata and isinstance(mainfunctions.state.most_recent_playerdata, dict):
+                game_time = mainfunctions.state.most_recent_playerdata.get('time', 0)
                 self.logger.debug(f'从全局变量获取的原始时间数据: {game_time}')
 
                 # 格式化时间显示
@@ -530,7 +531,7 @@ class TimerWindow(QMainWindow):
                 self.time_label.setText(formatted_time)
 
                 # 更新地图信息（如果有）
-                map_name = most_recent_playerdata.get('map')
+                map_name = mainfunctions.state.most_recent_playerdata.get('map')
                 if map_name:
                     self.logger.debug(f'地图信息更新: {map_name}')
 
