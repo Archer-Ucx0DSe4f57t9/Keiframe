@@ -13,7 +13,9 @@ from logging_util import get_logger
 from mainfunctions import get_game_screen
 
 mutator_types = ['deployment', 'propagator', 'voidrifts', 'killbots', 'bombbots']
-mutator_types_to_CHS = {'deployment':'部署', 'propagator':'软', 'voidrifts':'裂隙', 'killbots':'杀戮', 'bombbots':'炸弹'}
+mutator_types_to_CHS = {'deployment': '部署', 'propagator': '小软', 'voidrifts': '裂隙', 'killbots': '杀戮',
+                        'bombbots': '炸弹'}
+
 
 class MutatorManager(QWidget):
     def __init__(self, parent=None):
@@ -26,7 +28,7 @@ class MutatorManager(QWidget):
         self.mutator_buttons = []
 
         self.active_mutator_time_points = {}
-        
+
         # 增加一个字典来跟踪当前正在显示的提醒时间点，避免重复触发
         self.currently_alerting = {}
 
@@ -189,8 +191,9 @@ class MutatorManager(QWidget):
                 if deployment_time > current_seconds:
                     next_deployment_time = deployment_time
                     break
-            
-            if next_deployment_time and (next_deployment_time - current_seconds) <= config.MUTATION_FACTOR_ALERT_SECONDS:
+
+            if next_deployment_time and (
+                    next_deployment_time - current_seconds) <= config.MUTATION_FACTOR_ALERT_SECONDS:
                 time_remaining = next_deployment_time - current_seconds
                 message = f"{mutator_types_to_CHS.get(mutator_type)} 还有: {int(time_remaining)}秒 "
                 self.show_mutator_alert(message, mutator_type, time_remaining)
@@ -239,21 +242,22 @@ class MutatorManager(QWidget):
             layout = QHBoxLayout(alert_label)
             layout.setContentsMargins(0, 0, 0, 0)
             layout.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-            
+
             icon_name = f'{mutator_type}.png'
             icon_path = os.path.join(get_resources_dir(), 'ico', 'mutator', icon_name)
             if os.path.exists(icon_path):
                 icon_label = QLabel()
                 icon_size = font_size
-                icon_label.setPixmap(QPixmap(icon_path).scaled(icon_size, icon_size, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                icon_label.setPixmap(
+                    QPixmap(icon_path).scaled(icon_size, icon_size, Qt.KeepAspectRatio, Qt.SmoothTransformation))
                 layout.addWidget(icon_label)
-            
+
             text_label = QLabel()
             text_label.setFont(QFont('Arial', font_size))
             layout.addWidget(text_label)
-            
+
             alert_label.setProperty('text_label', text_label)
-        
+
         # 3. 动态更新文本和颜色，不重新创建控件
         text_color = config.MUTATION_FACTOR_NORMAL_COLOR
         if time_remaining is not None and time_remaining <= config.MUTATION_FACTOR_WARNING_THRESHOLD_SECONDS:
@@ -263,7 +267,7 @@ class MutatorManager(QWidget):
         if text_label:
             text_label.setText(message)
             text_label.setStyleSheet(f'color: {text_color}; background-color: transparent;')
-        
+
         alert_label.show()
 
     def hide_mutator_alert(self, mutator_type):
@@ -292,7 +296,7 @@ class MutatorManager(QWidget):
                 y = rect[1]
                 w = rect[2] - x
                 h = rect[3] - y
-                #print(f'found StarCraft II with {x}, {y}, {w}, {h}')
+                # print(f'found StarCraft II with {x}, {y}, {w}, {h}')
                 return x, y, w, h
         except Exception as e:
             self.logger.error(f"获取'StarCraft II'窗口几何信息失败: {e}")
