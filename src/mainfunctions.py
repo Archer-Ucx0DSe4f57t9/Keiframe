@@ -166,9 +166,9 @@ async def check_for_new_game_scheduler(progress_callback: QtCore.pyqtSignal) -> 
         logger.info('游戏初始化等待完成')
 
         while not state.app_closing:
-            # 核心修改：每 0.5 秒创建一个非阻塞任务
+            # 核心修改：每 0.33秒创建一个非阻塞任务
             asyncio.create_task(process_game_data(session, progress_callback))
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.33)
 
 
 async def get_game_screen() -> str:

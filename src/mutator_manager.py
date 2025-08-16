@@ -231,11 +231,13 @@ class MutatorManager(QWidget):
         alert_label_x = sc2_x + horizontal_indent
 
         alert_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        alert_label.setWindowFlags(
-            Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.WA_TranslucentBackground
-        )
-        alert_label.setFixedSize(sc2_width, line_height)
-        alert_label.move(alert_label_x, alert_label_y)
+        if (alert_label.x() != alert_label_x or alert_label.y() != alert_label_y
+                or alert_label.width() != sc2_width or alert_label.height() != line_height):
+            alert_label.setFixedSize(sc2_width, line_height)
+            alert_label.move(alert_label_x, alert_label_y)
+            alert_label.setWindowFlags(
+                Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.WA_TranslucentBackground
+            )
 
         # 2. 确保布局和子控件已创建，只创建一次
         if not alert_label.layout():
@@ -259,16 +261,24 @@ class MutatorManager(QWidget):
             alert_label.setProperty('text_label', text_label)
 
         # 3. 动态更新文本和颜色，不重新创建控件
+
         text_color = config.MUTATION_FACTOR_NORMAL_COLOR
         if time_remaining is not None and time_remaining <= config.MUTATION_FACTOR_WARNING_THRESHOLD_SECONDS:
             text_color = config.MUTATION_FACTOR_WARNING_COLOR
 
         text_label = alert_label.property('text_label')
         if text_label:
-            text_label.setText(message)
-            text_label.setStyleSheet(f'color: {text_color}; background-color: transparent;')
+            last_message = alert_label.property('last_message')
+            last_color = alert_label.property('last_color')
+            if message != last_message or text_color != last_color:
+                text_label.setText(message)
+                text_label.setStyleSheet(f'color: {text_color}; background-color: transparent;')
+                alert_label.setProperty('last_message', message)
+                alert_label.setProperty('last_color', text_color)
 
-        alert_label.show()
+        # --- 避免重复 show ---
+        if not alert_label.isVisible():
+            alert_label.show()
 
     def hide_mutator_alert(self, mutator_type):
         """隐藏突变因子提醒"""
