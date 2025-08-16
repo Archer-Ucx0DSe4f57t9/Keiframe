@@ -11,6 +11,7 @@ import config
 from fileutil import get_resources_dir
 from logging_util import get_logger
 from mainfunctions import get_game_screen
+from countdown_alerter import CountdownAlert
 
 mutator_types = ['deployment', 'propagator', 'voidrifts', 'killbots', 'bombbots']
 mutator_types_to_CHS = {'deployment': '部署', 'propagator': '小软', 'voidrifts': '裂隙', 'killbots': '杀戮',
@@ -110,6 +111,10 @@ class MutatorManager(QWidget):
         """初始化突变因子提醒标签"""
 
         for mutator_type in mutator_types:
+            label = CountdownAlert(self.parent(), icon_name4=f'{mutator_type}.png', font_size=16)
+            self.mutator_alert_labels[mutator_type] = label
+
+            '''
             label = QLabel(self.parent())
             label.setWindowFlags(
                 Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
@@ -117,6 +122,7 @@ class MutatorManager(QWidget):
             label.setAttribute(Qt.WA_TranslucentBackground)
             label.hide()
             self.mutator_alert_labels[mutator_type] = label
+            '''
 
     def on_mutator_toggled(self, button, checked):
         mutator_type = button.property("mutator_type")
@@ -211,9 +217,16 @@ class MutatorManager(QWidget):
 
         sc2_x, sc2_y, sc2_width, sc2_height = sc2_rect
         alert_label = self.mutator_alert_labels.get(mutator_type)
+
         if not alert_label:
             self.logger.warning(f"警告：未找到 mutator_type: {mutator_type} 对应的提醒标签。")
             return
+
+        if not isinstance(alert_label, CountdownAlert):
+            font_size = int(sc2_height * config.MUTATOR_ALERT_FONT_SIZE_PERCENT * 0.8)
+            icon_name = f"{mutator_type}.png"
+            alert_label = CountdownAlert(self.parent(), icon_name=icon_name, font_size=font_size)
+            self.mutator_alert_labels[mutator_type] = alert_label
 
         # 1. 设置标签的几何信息
         alert_area_y = sc2_y + int(sc2_height * config.MUTATOR_ALERT_TOP_OFFSET_PERCENT)
@@ -239,26 +252,6 @@ class MutatorManager(QWidget):
                 Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.WA_TranslucentBackground
             )
 
-        # 2. 确保布局和子控件已创建，只创建一次
-        if not alert_label.layout():
-            layout = QHBoxLayout(alert_label)
-            layout.setContentsMargins(0, 0, 0, 0)
-            layout.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-            icon_name = f'{mutator_type}.png'
-            icon_path = os.path.join(get_resources_dir(), 'ico', 'mutator', icon_name)
-            if os.path.exists(icon_path):
-                icon_label = QLabel()
-                icon_size = font_size
-                icon_label.setPixmap(
-                    QPixmap(icon_path).scaled(icon_size, icon_size, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-                layout.addWidget(icon_label)
-
-            text_label = QLabel()
-            text_label.setFont(QFont('Arial', font_size))
-            layout.addWidget(text_label)
-
-            alert_label.setProperty('text_label', text_label)
 
         # 3. 动态更新文本和颜色，不重新创建控件
 
@@ -266,19 +259,12 @@ class MutatorManager(QWidget):
         if time_remaining is not None and time_remaining <= config.MUTATION_FACTOR_WARNING_THRESHOLD_SECONDS:
             text_color = config.MUTATION_FACTOR_WARNING_COLOR
 
-        text_label = alert_label.property('text_label')
-        if text_label:
-            last_message = alert_label.property('last_message')
-            last_color = alert_label.property('last_color')
-            if message != last_message or text_color != last_color:
-                text_label.setText(message)
-                text_label.setStyleSheet(f'color: {text_color}; background-color: transparent;')
-                alert_label.setProperty('last_message', message)
-                alert_label.setProperty('last_color', text_color)
-
-        # --- 避免重复 show ---
-        if not alert_label.isVisible():
-            alert_label.show()
+        alert_label.update_alert(
+            message,
+            text_color,
+            x=alert_label_x, y=alert_label_y,
+            width=sc2_width, height=line_height
+        )
 
     def hide_mutator_alert(self, mutator_type):
         """隐藏突变因子提醒"""
