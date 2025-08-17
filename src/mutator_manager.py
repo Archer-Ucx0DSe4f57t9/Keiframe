@@ -4,8 +4,8 @@ import traceback
 
 import win32gui
 from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QFont, QIcon, QPixmap, QColor, QPainter
-from PyQt5.QtWidgets import QWidget, QLabel, QHBoxLayout, QPushButton, QGraphicsDropShadowEffect
+from PyQt5.QtGui import QIcon, QPixmap, QColor, QPainter
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton, QGraphicsDropShadowEffect
 
 import config
 from fileutil import get_resources_dir
@@ -111,7 +111,7 @@ class MutatorManager(QWidget):
         """初始化突变因子提醒标签"""
 
         for mutator_type in mutator_types:
-            label = CountdownAlert(self.parent(), icon_name4=f'{mutator_type}.png', font_size=16)
+            label = CountdownAlert(self.parent(), icon_name=f'{mutator_type}.png')
             self.mutator_alert_labels[mutator_type] = label
 
             '''
@@ -222,16 +222,16 @@ class MutatorManager(QWidget):
             self.logger.warning(f"警告：未找到 mutator_type: {mutator_type} 对应的提醒标签。")
             return
 
+        line_height = int(sc2_height * config.MUTATOR_ALERT_LINE_HEIGHT_PERCENT)
+        font_size = int(line_height * config.MUTATOR_ALERT_FONT_SIZE_PERCENT_OF_LINE)
+
         if not isinstance(alert_label, CountdownAlert):
-            font_size = int(sc2_height * config.MUTATOR_ALERT_FONT_SIZE_PERCENT * 0.8)
             icon_name = f"{mutator_type}.png"
             alert_label = CountdownAlert(self.parent(), icon_name=icon_name, font_size=font_size)
             self.mutator_alert_labels[mutator_type] = alert_label
 
-        # 1. 设置标签的几何信息
+        # 1. 设置标签的几何信息 
         alert_area_y = sc2_y + int(sc2_height * config.MUTATOR_ALERT_TOP_OFFSET_PERCENT)
-        line_height = int(sc2_height * config.MUTATOR_ALERT_FONT_SIZE_PERCENT)
-        font_size = int(line_height * 0.8)
 
         try:
             mutator_index = mutator_types.index(mutator_type)
@@ -243,6 +243,7 @@ class MutatorManager(QWidget):
         horizontal_indent = int(sc2_width * config.MUTATOR_ALERT_HORIZONTAL_INDENT_PERCENT)
         alert_label_x = sc2_x + horizontal_indent
 
+        # 设置窗口属性和大小
         alert_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         if (alert_label.x() != alert_label_x or alert_label.y() != alert_label_y
                 or alert_label.width() != sc2_width or alert_label.height() != line_height):
@@ -252,18 +253,18 @@ class MutatorManager(QWidget):
                 Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.WA_TranslucentBackground
             )
 
-
-        # 3. 动态更新文本和颜色，不重新创建控件
-
+        # 动态更新文本、颜色和字体大小
         text_color = config.MUTATION_FACTOR_NORMAL_COLOR
         if time_remaining is not None and time_remaining <= config.MUTATION_FACTOR_WARNING_THRESHOLD_SECONDS:
             text_color = config.MUTATION_FACTOR_WARNING_COLOR
 
+        # 传递计算好的 font_size
         alert_label.update_alert(
             message,
             text_color,
             x=alert_label_x, y=alert_label_y,
-            width=sc2_width, height=line_height
+            width=sc2_width, height=line_height,
+            font_size=font_size
         )
 
     def hide_mutator_alert(self, mutator_type):
