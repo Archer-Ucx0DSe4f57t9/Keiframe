@@ -46,7 +46,7 @@ TABLE_NEXT_FONT_BG_COLOR = [0, 255, 128, 30] # 表格下一个事件背景颜色
 TIME_ALERT_SECONDS = 30  # 提前提醒时间（秒）/ Time before alert (in seconds)
 
 # 突变因子提醒配置
-MUTATION_FACTOR_ALERT_SECONDS = 30  # 突变因子提前提醒时间（秒）/ Mutation factor alert time (in seconds)
+MUTATION_FACTOR_ALERT_SECONDS = 49  # 突变因子提前提醒时间（秒）/ Mutation factor alert time (in seconds)，我还没做多重提醒，最长间隔就是49秒
 MUTATION_FACTOR_WARNING_THRESHOLD_SECONDS = 10# 倒计时转为警告颜色的阈值（秒）
 MUTATION_FACTOR_ALERT_DURATION_SECONDS = 5  # 突变因子提醒持续时间（秒）/ Duration of mutation factor alert (in seconds)
 MUTATION_FACTOR_NORMAL_COLOR = 'rgb(255, 255, 255)' # 倒计时提醒的正常颜色
