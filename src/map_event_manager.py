@@ -115,8 +115,8 @@ class MapEventManager:
                         event_id = f"map_event_{row}"  # 使用行号作为唯一ID
 
                         if time_diff > 0 and time_diff <= config.MAP_ALERT_SECONDS:
-                            toast_message = f"{time_item.text()}\t{event_item.text()}" + (
-                                f"\t{army_item.text()}" if army_item else "") + f'还有{time_diff}秒'
+                            toast_message = f'余{time_diff}秒   ' + f"{time_item.text()}\t{event_item.text()}" + (
+                                f"\t{army_item.text()}" if army_item else "")
                             # 调用 ToastManager 的新方法
                             self.logger.debug(f'正在调用toast_manager播报地图事件')
                             self.toast_manager.show_map_countdown_alert(event_id, time_diff, toast_message, game_screen)

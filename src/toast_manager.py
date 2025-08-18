@@ -47,10 +47,11 @@ class ToastManager:
 
         alert_label = self.map_alerts[event_id]
         if new_event:
-            alert_label.setWindowFlags(
-                Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.WA_TranslucentBackground
-            )
+            #alert_label.setWindowFlags(
+            #    Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.WA_TranslucentBackground
+            #)
             alert_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+            alert_label.setAttribute(Qt.WA_TranslucentBackground, True)
         sc2_rect = get_sc2_window_geometry()
         if not sc2_rect:
             alert_label.hide_alert()

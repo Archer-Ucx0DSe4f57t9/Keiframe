@@ -243,9 +243,9 @@ class MutatorManager(QWidget):
                 or alert_label.width() != sc2_width or alert_label.height() != line_height):
             alert_label.setFixedSize(sc2_width, line_height)
             alert_label.move(alert_label_x, alert_label_y)
-            alert_label.setWindowFlags(
-                Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.WA_TranslucentBackground
-            )
+            #alert_label.setWindowFlags(
+            #    Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.WA_TranslucentBackground
+            #)
 
         # 动态更新文本、颜色和字体大小
         text_color = config.MUTATION_FACTOR_NORMAL_COLOR
