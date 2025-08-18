@@ -25,6 +25,7 @@ class GlobalState:
         self.player_names = []
         self.current_game_id = None
         self.troop = None
+        self.game_screen = None
 
 
 # 创建一个唯一的全局状态实例
@@ -39,8 +40,6 @@ PLAYER_NAMES = []
 current_game_id = None  # 添加新的全局变量用于标识当前游戏
 '''
 
-# 创建session用于HTTP请求
-# session = aiohttp.ClientSession()
 URL = "http://localhost:6119/game/"
 troop = None
 
@@ -57,11 +56,16 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
     try:
         if config.debug_mode:
             # 根据调试模式选择数据来源
-            data = get_mock_data()
+            game_data = get_mock_data()
+            map_data = get_mock_screen_data()
         else:
-            async with session.get(f"{URL}", timeout=2) as resp:
-                resp.raise_for_status()
-                data = await resp.json()
+            async with session.get(f'{URL}', timeout=2) as resp:
+                resp.raise_for_status()  # 处理非200状态码
+                game_data = await resp.json()
+            async with session.get(f'{URL}ui', timeout=2) as resp:
+                resp.raise_for_status()  # 处理非200状态码
+                map_data = await resp.json()
+
     except aiohttp.ClientError:
         logger.debug('SC2请求失败。游戏未运行。')
         return
@@ -75,20 +79,19 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
         logger.info(traceback.format_exc())
         return
 
-    if data:
+    # 更新游戏数据相关
+    if game_data:
 
-        players = data.get('players', list())
+        players = game_data.get('players', list())
         # 更新当前游戏时间
-        if 'displayTime' in data:
-            current_time = data['displayTime']
+        if 'displayTime' in game_data:
+            current_time = game_data['displayTime']
             # 更新全局变量中的时间
             if state.most_recent_playerdata is None:
                 state.most_recent_playerdata = {'time': current_time}
             else:
                 state.most_recent_playerdata['time'] = current_time
             logger.debug(f'更新游戏时间: {current_time}')
-            print(f'更新游戏时间: {current_time}')
-            print(state.most_recent_playerdata)
 
         # 生成当前游戏的唯一标识（使用玩家列表的哈希值）
         new_game_id = hash(json.dumps(players, sort_keys=True))
@@ -105,8 +108,8 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
 
             # 更新全局变量
             state.most_recent_playerdata = {
-                'time': data['displayTime'],
-                'map': data.get('map')
+                'time': game_data['displayTime'],
+                'map': game_data.get('map')
             }
             logger.info(f'更新全局变量: {state.most_recent_playerdata}')
             print(f'更新全局变量: {state.most_recent_playerdata}')
@@ -119,8 +122,8 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
                     player_position = 2 if player['id'] == 1 else 1
                     break
 
-            formatted_time = time.strftime("%M:%S", time.gmtime(data['displayTime']))
-            logger.info(f'游戏时间更新: {formatted_time}, 原始数据: {data["displayTime"]}')
+            formatted_time = time.strftime("%M:%S", time.gmtime(game_data['displayTime']))
+            logger.info(f'游戏时间更新: {formatted_time}, 原始数据: {game_data["displayTime"]}')
 
             # 识别地图
             try:
@@ -152,6 +155,15 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
 
             show_fence.detect_troop(troop_detection_callback)
 
+    # 更新地图相关
+    active_screens = map_data.get('activeScreens', [])
+    # 获取activeScreens数组
+    # 判断界面状态：数组不为空表示在匹配界面，为空表示在游戏中
+    if active_screens:
+        state.game_screen = 'matchmaking'
+    else:
+        state.game_screen = 'in_game'
+
 
 async def check_for_new_game_scheduler(progress_callback: QtCore.pyqtSignal) -> None:
     logger.info('check_for_new_game_scheduler函数启动')
@@ -166,11 +178,11 @@ async def check_for_new_game_scheduler(progress_callback: QtCore.pyqtSignal) -> 
         logger.info('游戏初始化等待完成')
 
         while not state.app_closing:
-            # 核心修改：每 0.33秒创建一个非阻塞任务
+            # 每 0.33秒创建一个非阻塞任务更新游戏状态
             asyncio.create_task(process_game_data(session, progress_callback))
             await asyncio.sleep(0.33)
 
-
+'''
 async def get_game_screen() -> str:
     async with aiohttp.ClientSession() as session:
         screen_status = await _async_get_game_screen(session)
@@ -216,7 +228,4 @@ async def _async_get_game_screen(session: aiohttp.ClientSession) -> str:
     except Exception:
         logger.error(f'获取游戏界面状态出错: {traceback.format_exc()}')
         return 'unknown'
-
-
-def check_for_new_game():
-    return None
+'''

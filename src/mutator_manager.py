@@ -10,8 +10,8 @@ from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton, QGraphicsDropShad
 import config
 from fileutil import get_resources_dir
 from logging_util import get_logger
-from mainfunctions import get_game_screen
 from countdown_alerter import CountdownAlert
+from window_utils import get_sc2_window_geometry
 
 mutator_types = ['deployment', 'propagator', 'voidrifts', 'killbots', 'bombbots']
 mutator_types_to_CHS = {'deployment': '部署', 'propagator': '小软', 'voidrifts': '裂隙', 'killbots': '杀戮',
@@ -20,7 +20,6 @@ mutator_types_to_CHS = {'deployment': '部署', 'propagator': '小软', 'voidrif
 
 class MutatorManager(QWidget):
     def __init__(self, parent=None):
-        print(f'run MutatorManager {self.__init__.__name__}')
         super().__init__(parent)
         self.logger = get_logger(__name__)
 
@@ -37,7 +36,6 @@ class MutatorManager(QWidget):
         self.init_mutator_alerts()
 
     def init_mutator_ui(self):
-        print(f'run MutatorManager {self.init_mutator_ui.__name__}')
         """初始化突变因子按钮UI"""
         layout = QHBoxLayout(self)
         layout.setSpacing(8)
@@ -84,7 +82,6 @@ class MutatorManager(QWidget):
         layout.addStretch()
 
     def create_transparent_pixmap(self, pixmap, opacity):
-        print(f'run MutatorManager {self.create_transparent_pixmap.__name__}')
         """创建半透明的QPixmap"""
         transparent_pixmap = QPixmap(pixmap.size())
         transparent_pixmap.fill(Qt.transparent)
@@ -95,7 +92,6 @@ class MutatorManager(QWidget):
         return transparent_pixmap
 
     def create_gray_pixmap(self, pixmap):
-        print(f'run MutatorManager {self.create_gray_pixmap.__name__}')
         """创建灰度的QPixmap"""
         gray_image = pixmap.toImage()
         for y in range(gray_image.height()):
@@ -107,7 +103,6 @@ class MutatorManager(QWidget):
         return QPixmap.fromImage(gray_image)
 
     def init_mutator_alerts(self):
-        print(f'run MutatorManager {self.init_mutator_alerts.__name__}')
         """初始化突变因子提醒标签"""
 
         for mutator_type in mutator_types:
@@ -149,7 +144,6 @@ class MutatorManager(QWidget):
             self.hide_mutator_alert(mutator_type)
 
     def load_mutator_config(self, mutator_name):
-        print(f'run MutatorManager {self.load_mutator_config.__name__}')
         """加载突变因子配置文件"""
         try:
             config_path = os.path.join('resources', 'mutator', f'{mutator_name}.txt')
@@ -178,14 +172,13 @@ class MutatorManager(QWidget):
             self.logger.error(traceback.format_exc())
             return []
 
-    def check_alerts(self, current_seconds):
+    def check_alerts(self, current_seconds, game_screen):
         """
         检查所有激活的突变因子，并持续更新倒计时提醒。
         此函数将由 qt_tui 中的 update_game_time 周期性调用。
         """
-        sc2_rect = self._get_sc2_window_geometry()
-        game_screen = asyncio.run(get_game_screen())
-        if not sc2_rect:
+        sc2_rect = get_sc2_window_geometry()
+        if not sc2_rect or game_screen != 'in_game':
             # 如果找不到SC2窗口，则隐藏所有提醒
             for label in self.mutator_alert_labels.values():
                 label.hide()
@@ -210,7 +203,8 @@ class MutatorManager(QWidget):
         """
         显示/更新突变因子提醒，并根据剩余时间动态改变颜色。
         """
-        sc2_rect = self._get_sc2_window_geometry()
+        sc2_rect = get_sc2_window_geometry()
+
         if not sc2_rect:
             self.hide_mutator_alert(mutator_type)
             return
@@ -273,7 +267,6 @@ class MutatorManager(QWidget):
             self.mutator_alert_labels[mutator_type].hide()
 
     def get_current_screen(self):
-        print(f'run MutatorManager {self.get_current_screen.__name__}')
         return self.parent().get_current_screen()
 
     def on_control_state_changed(self, unlocked):
@@ -284,17 +277,4 @@ class MutatorManager(QWidget):
             else:
                 btn.setIcon(btn.gray_icon)
 
-    def _get_sc2_window_geometry(self):
-        try:
-            hwnd = win32gui.FindWindow(None, "StarCraft II")
-            if hwnd:
-                rect = win32gui.GetWindowRect(hwnd)
-                x = rect[0]
-                y = rect[1]
-                w = rect[2] - x
-                h = rect[3] - y
-                # print(f'found StarCraft II with {x}, {y}, {w}, {h}')
-                return x, y, w, h
-        except Exception as e:
-            self.logger.error(f"获取'StarCraft II'窗口几何信息失败: {e}")
-        return None
+

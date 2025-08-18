@@ -6,88 +6,95 @@ import traceback
 import asyncio
 import config
 from fileutil import get_resources_dir
-from mainfunctions import get_game_screen, get_troop_from_game
+from mainfunctions import get_troop_from_game
 from troop_util import TroopLoader
 from outlined_label import OutlinedLabel
 from countdown_alerter import CountdownAlert
+from window_utils import get_sc2_window_geometry
+from logging_util import get_logger
 
 class ToastManager:
     
     def __init__(self, parent_window):
         self.parent = parent_window
         self.logger = parent_window.logger
-        self.init_toast()
-
-    def init_toast(self):
-        self.troop_loader = TroopLoader()
-        """初始化Toast提示组件"""
-        # 创建Toast标签
-        self.toast_label = QLabel(self.parent)
-        self.toast_label.setFont(QFont('Arial', config.TOAST_FONT_SIZE))
-        self.toast_label.setStyleSheet(
-            'QLabel {'
-            '   color: ' + config.TOAST_FONT_COLOR + ';'
-            '   padding: 10px;'
-            '   background-color: transparent;'
-            '   border: none;'
-            '}'
-        )
-        self.toast_label.setAttribute(Qt.WA_TranslucentBackground)
-        self.toast_label.setAlignment(Qt.AlignCenter)
-        self.toast_label.hide()
-        
-        self.toast_label.setAttribute(Qt.WA_TransparentForMouseEvents)
-        self.toast_label.setWindowFlags(
-            Qt.FramelessWindowHint |
-            Qt.WindowStaysOnTopHint |
-            Qt.Tool
-        )
-        
-        # 创建Toast定时器
-        self.toast_timer = QTimer(self.parent)
-        self.toast_timer.timeout.connect(self.hide_toast)
-
-        # 创建Mutator Alert标签
-        self.mutator_alert_label = QLabel()
-        # 设置字体大小为普通toast的2/3
-        mutator_font_size = int(config.TOAST_FONT_SIZE * 2/3) # 强制设置成小一些
-        self.mutator_alert_label.setFont(QFont('Arial', mutator_font_size))
-        self.mutator_alert_label.setStyleSheet(
-            'QLabel {'
-            '   color: ' + config.MUTATOR_DEPLOYMENT_COLOR + ';'
-            '   padding: 10px;'
-            '   background-color: transparent;'
-            '   border: none;'
-            '}'
-        )
-        self.mutator_alert_label.setAttribute(Qt.WA_TranslucentBackground)
-        self.mutator_alert_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        # 设置窗口标志
-        self.mutator_alert_label.setWindowFlags(
-            Qt.FramelessWindowHint |
-            Qt.WindowStaysOnTopHint |
-            Qt.Tool
-        )
-        self.mutator_alert_label.hide()
-        
-        # 创建Mutator Alert定时器
-        self.mutator_alert_timer = QTimer(self.parent)
-        self.mutator_alert_timer.timeout.connect(self.hide_mutator_alert)
+        self.map_alerts = {}  # 用于存储地图事件的 CountdownAlert 实例
 
     def hide_toast(self):
         """隐藏Toast提示"""
-        self.toast_label.hide()
-        self.toast_timer.stop()
+        for alert in self.map_alerts.values():
+            alert.hide_alert()
 
-    def hide_mutator_alert(self):
-        """隐藏Mutator提示"""
-        self.mutator_alert_label.hide()
-        self.mutator_alert_timer.stop()
+    def show_map_countdown_alert(self, event_id, time_diff, message, game_screen):
 
-    def show_map_toast(self, message, duration=None, force_show=False):
-        """显示地图相关的Toast提示"""
-        self.show_toast(message, duration, force_show)
+        new_event = False
+        """
+        根据事件ID显示或更新地图倒计时提示
+        event_id: 地图事件的唯一标识符
+        message: 显示的文本
+        time_diff: 剩余的秒数，用于确定颜色
+        """
+        # 检查游戏状态，非游戏中状态不显示提示
+        if game_screen != 'in_game':
+            self.hide_toast()
+            return
 
+        # 根据事件ID获取或创建 CountdownAlert 实例
+        if event_id not in self.map_alerts:
+            # 如果是新事件，创建一个新的 CountdownAlert
+            self.map_alerts[event_id] = CountdownAlert(icon_name=None)
+            new_event = True
+
+        alert_label = self.map_alerts[event_id]
+        if new_event:
+            alert_label.setWindowFlags(
+                Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.WA_TranslucentBackground
+            )
+            alert_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        sc2_rect = get_sc2_window_geometry()
+        if not sc2_rect:
+            alert_label.hide_alert()
+            return
+
+
+        sc2_x, sc2_y, sc2_width, sc2_height = sc2_rect
+
+        # 动态计算字体大小和行高
+        line_height = int(sc2_height * config.MAP_ALERT_LINE_HEIGHT_PERCENT)
+        font_size = int(line_height * config.MAP_ALERT_FONT_SIZE_PERCENT_OF_LINE)
+
+        # 根据事件ID确定垂直位置
+        # 例如，可以创建一个列表来维护事件的显示顺序
+        # 假设你的事件ID可以按顺序排列
+        event_ids = sorted(self.map_alerts.keys())
+        try:
+            event_index = event_ids.index(event_id)
+            alert_label_y = sc2_y + int(sc2_height * config.MAP_ALERT_TOP_OFFSET_PERCENT) + (event_index * line_height)
+        except ValueError:
+            return  # 如果事件不在列表中，则不显示
+
+        # 确定水平位置
+        alert_label_x = sc2_x + int(sc2_width * config.MAP_ALERT_HORIZONTAL_INDENT_PERCENT)
+
+        # 根据时间差设置颜色
+        text_color = config.MAP_ALERT_NORMAL_COLOR  # 默认颜色
+        if time_diff is not None and time_diff <= config.MAP_ALERT_WARNING_THRESHOLD_SECONDS:
+            text_color = config.MAP_ALERT_WARNING_COLOR
+
+        # 更新 CountdownAlert 的内容
+        alert_label.update_alert(
+            message,
+            text_color,
+            x=alert_label_x, y=alert_label_y,
+            width=sc2_width, height=line_height,
+            font_size=font_size
+        )
+
+    # 临时保留原来的show_toast()，方便以后作为参考
+    '''
+    
+    
+    
     def show_toast(self, message, duration=None, force_show=False):
         """显示Toast提示"""
         # 检查游戏状态，非游戏中状态不显示提示
@@ -192,7 +199,7 @@ class ToastManager:
                     self.logger.error(f'解析部队图标失败: {str(e)}\n{traceback.format_exc()}')
                 
                 # 处理hybrid兵种图标
-                '''
+               
                 for troop_info in troops_data[1:]:
                     if troop_info:
                         troop_parts = troop_info.split('*')
@@ -222,7 +229,7 @@ class ToastManager:
                             hybrid_layout.addWidget(troop_container)
                         else:
                             self.logger.warning(f'Hybrid兵种图标不存在: {icon_path}')
-                '''
+                
         # 设置容器大小并显示
         container.adjustSize()
         container.setStyleSheet('background-color: transparent;')
@@ -245,3 +252,4 @@ class ToastManager:
         self.toast_label = container
         self.toast_label.show()
         self.toast_timer.start(duration)
+        '''

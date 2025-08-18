@@ -10,7 +10,7 @@ debug_mode = False  # 设置为True启用调试模式 / Set to True to enable de
 debug_time_factor = 5.0  # 调试模式下的时间流速因子 / Time flow factor in debug mode
 
 # 日志级别配置
-LOG_LEVEL = 'DEBUG'  # 日志级别，可选值：DEBUG, INFO, WARNING, ERROR, CRITICAL / Log level, available values: DEBUG, INFO, WARNING, ERROR, CRITICAL
+LOG_LEVEL = 'ERROR'  # 日志级别，可选值：DEBUG, INFO, WARNING, ERROR, CRITICAL / Log level, available values: DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 # 快捷键
 MAP_SHORTCUT = 'ctrl + shift + ['  # 地图快捷键 / Map shortcut key
@@ -42,8 +42,15 @@ TABLE_HEIGHT = 150 # 表格高度
 TABLE_NEXT_FONT_COLOR = [0, 255, 128]  # 表格下一个事件字体颜色 绿色/ Table font color
 TABLE_NEXT_FONT_BG_COLOR = [0, 255, 128, 30] # 表格下一个事件背景颜色，最后一个值是透明度
 
-# 时间提醒配置
-TIME_ALERT_SECONDS = 30  # 提前提醒时间（秒）/ Time before alert (in seconds)
+# 地图提醒配置
+MAP_ALERT_SECONDS = 30  # 提前提醒时间（秒）/ Time before alert (in seconds)
+MAP_ALERT_WARNING_THRESHOLD_SECONDS = 10# 倒计时转为警告颜色的阈值（秒）
+MAP_ALERT_NORMAL_COLOR = 'rgb(239, 255, 238)' # 倒计时提醒的正常颜色
+MAP_ALERT_WARNING_COLOR = 'rgb(255, 0, 0)'# 倒计时提醒的警告颜色
+MAP_ALERT_TOP_OFFSET_PERCENT = 0.30  # 提醒区域距离窗口顶部的百分比
+MAP_ALERT_LINE_HEIGHT_PERCENT = 0.03    # 每行提醒占窗口高度的百分比
+MAP_ALERT_FONT_SIZE_PERCENT_OF_LINE = 0.6 #字体大小占每行高度的百分比
+MAP_ALERT_HORIZONTAL_INDENT_PERCENT = 0.01  #距离游戏边框左侧的水平缩进
 
 # 突变因子提醒配置
 MUTATION_FACTOR_ALERT_SECONDS = 49  # 突变因子提前提醒时间（秒）/ Mutation factor alert time (in seconds)，我还没做多重提醒，最长间隔就是49秒
@@ -56,12 +63,13 @@ MUTATOR_RIFTS_COLOR = 'rgb(0, 255, 128)'  # 突变因子裂隙颜色 / Mutator r
 MUTATOR_PROPAGATOR_COLOR = 'rgb(0, 255, 128)'  # 突变因子传播者颜色 / Mutator propagator color
 # 提醒大小(基于“StarCraft II”窗口的尺寸)
 MUTATOR_ALERT_TOP_OFFSET_PERCENT = 0.40  # 提醒区域距离窗口顶部的百分比
-MUTATOR_ALERT_LINE_HEIGHT_PERCENT = 0.04    # 每行提醒占窗口高度的百分比
+MUTATOR_ALERT_LINE_HEIGHT_PERCENT = 0.03    # 每行提醒占窗口高度的百分比
 MUTATOR_ALERT_FONT_SIZE_PERCENT_OF_LINE = 0.6 #字体大小占每行高度的百分比
 MUTATOR_ALERT_HORIZONTAL_INDENT_PERCENT = 0.01 #距离游戏边框左侧的水平缩进
 
 
 # 突变因子提示位置配置
+#以下废案中
 MUTATOR_TOAST_POSITION = 0.7  # 垂直位置（窗口高度的比例）/ Vertical position (relative to window height)
 MUTATOR_ICON_TRANSPARENCY = 0.7  # 突变因子图标透明度 / Mutator icon transparency
 TOAST_MUTATOR_FONT_SIZE = 30  # 突变因子提示字体大小 / Mutator toast font size

@@ -77,6 +77,7 @@ class CountdownAlert(QLabel):
 
         # 文本
         self.text_label = OutlinedLabel(outline_color='black')
+        self.text_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         self.text_label.setOutlineWidth(2)  # 设置描边宽度
         self.text_label.setAlignment(Qt.AlignVCenter)
         layout.addWidget(self.text_label)

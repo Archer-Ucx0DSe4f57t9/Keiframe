@@ -29,6 +29,8 @@ from PyQt5 import QtCore
 import image_util
 from fileutil import get_resources_dir, list_files
 from mutator_manager import MutatorManager
+from map_event_manager import MapEventManager
+from toast_manager import ToastManager
 import mainfunctions
 
 class TimerWindow(QMainWindow):
@@ -69,6 +71,7 @@ class TimerWindow(QMainWindow):
         # 初始化状态
         self.current_time = ""
         self.drag_position = QPoint(0, 0)
+        self.game_state = mainfunctions.state
 
         # 添加一个标志来追踪地图选择的来源
         self.manual_map_selection = False
@@ -76,8 +79,9 @@ class TimerWindow(QMainWindow):
         # 初始化UI
         self.init_ui()
 
-        # 初始化Toast提示
-        self.init_toast()
+        #初始化地图管理模块
+        self.toast_manager = ToastManager(self)
+        self.map_event_manager = MapEventManager(self.table_area, self.toast_manager, self.logger)
 
         # 初始化定时器
         self.timer = QTimer()
@@ -512,8 +516,8 @@ class TimerWindow(QMainWindow):
 
         try:
             # 从全局变量获取游戏时间
-            if mainfunctions.state.most_recent_playerdata and isinstance(mainfunctions.state.most_recent_playerdata, dict):
-                game_time = mainfunctions.state.most_recent_playerdata.get('time', 0)
+            if self.game_state.most_recent_playerdata and isinstance(self.game_state.most_recent_playerdata, dict):
+                game_time = self.game_state.most_recent_playerdata.get('time', 0)
                 self.logger.debug(f'从全局变量获取的原始时间数据: {game_time}')
 
                 # 格式化时间显示
@@ -531,7 +535,7 @@ class TimerWindow(QMainWindow):
                 self.time_label.setText(formatted_time)
 
                 # 更新地图信息（如果有）
-                map_name = mainfunctions.state.most_recent_playerdata.get('map')
+                map_name = self.game_state.most_recent_playerdata.get('map')
                 if map_name:
                     self.logger.debug(f'地图信息更新: {map_name}')
 
@@ -544,125 +548,17 @@ class TimerWindow(QMainWindow):
                     current_seconds = current_minutes * 60 + seconds
 
                     # === 突变信息相关 ===
+
                     if hasattr(self, 'mutator_manager'):
-                        self.mutator_manager.check_alerts(current_seconds)
+                        self.logger.debug(f'正在检查突变: {formatted_time} (格式化后), 原始数据: {game_time}')
+                        self.mutator_manager.check_alerts(current_seconds, self.game_state.game_screen)
 
                     # ===地图信息相关===
-                    # 遍历表格找到最接近的时间点并更新颜色
-                    closest_row = 0
-                    min_diff = float('inf')
+                    # 将地图事件的更新任务委托给 MapEventManager
+                    if hasattr(self, 'map_event_manager'):
+                        self.logger.debug(f'正在检查地图事件: {formatted_time} (格式化后), 原始数据: {game_time}')
+                        self.map_event_manager.update_events(current_seconds, self.game_state.game_screen)
 
-                    # 找出下一个即将触发的事件
-                    next_event_row = -1
-                    next_event_seconds = float('inf')
-
-                    # 第一次遍历：找出下一个即将触发的事件
-                    for row in range(self.table_area.rowCount()):
-                        time_item = self.table_area.item(row, 0)
-                        if time_item and time_item.text():
-                            try:
-                                # 解析表格中的时间（格式可能是MM:SS或HH:MM:SS）
-                                time_parts = time_item.text().split(':')
-                                row_seconds = 0
-                                if len(time_parts) == 2:  # MM:SS格式
-                                    row_seconds = int(time_parts[0]) * 60 + int(time_parts[1])
-                                elif len(time_parts) == 3:  # HH:MM:SS格式
-                                    row_seconds = int(time_parts[0]) * 3600 + int(time_parts[1]) * 60 + int(
-                                        time_parts[2])
-
-                                # 找出下一个即将触发的事件（未来的最近事件）
-                                if row_seconds > current_seconds and row_seconds < next_event_seconds:
-                                    next_event_seconds = row_seconds
-                                    next_event_row = row
-
-                                # 计算时间差（秒）
-                                diff = abs(current_seconds - row_seconds)
-                                if diff < min_diff:
-                                    min_diff = diff
-                                    closest_row = row
-                            except ValueError:
-                                continue
-
-                    # 第二次遍历：设置颜色
-                    for row in range(self.table_area.rowCount()):
-                        time_item = self.table_area.item(row, 0)
-                        event_item = self.table_area.item(row, 1)
-                        army_item = self.table_area.item(row, 2)
-                        if time_item and time_item.text():
-                            try:
-                                # 解析表格中的时间（格式可能是MM:SS或HH:MM:SS）
-                                time_parts = time_item.text().split(':')
-                                row_seconds = 0
-                                if len(time_parts) == 2:  # MM:SS格式
-                                    row_seconds = int(time_parts[0]) * 60 + int(time_parts[1])
-                                elif len(time_parts) == 3:  # HH:MM:SS格式
-                                    row_seconds = int(time_parts[0]) * 3600 + int(time_parts[1]) * 60 + int(
-                                        time_parts[2])
-
-                                # 根据时间差设置颜色
-                                if row_seconds < current_seconds:  # 已过去的时间
-                                    time_item.setForeground(QBrush(QColor(128, 128, 128, 255)))
-                                    time_item.setBackground(QBrush(QColor(0, 0, 0, 0)))
-                                    if event_item:
-                                        event_item.setForeground(QBrush(QColor(128, 128, 128, 255)))
-                                        event_item.setBackground(QBrush(QColor(0, 0, 0, 0)))
-                                elif row == next_event_row:  # 下一个即将触发的事件
-                                    time_item.setForeground(QBrush(
-                                        QColor(config.TABLE_NEXT_FONT_COLOR[0], config.TABLE_NEXT_FONT_COLOR[1],
-                                               config.TABLE_NEXT_FONT_COLOR[2])))  # 使用绿色高亮
-                                    time_item.setBackground(QBrush(
-                                        QColor(config.TABLE_NEXT_FONT_BG_COLOR[0], config.TABLE_NEXT_FONT_BG_COLOR[1],
-                                               config.TABLE_NEXT_FONT_BG_COLOR[2], config.TABLE_NEXT_FONT_BG_COLOR[3])))
-                                    if event_item:
-                                        event_item.setForeground(QBrush(
-                                            QColor(config.TABLE_NEXT_FONT_COLOR[0], config.TABLE_NEXT_FONT_COLOR[1],
-                                                   config.TABLE_NEXT_FONT_COLOR[2])))  # 使用绿色高亮
-                                        event_item.setBackground(QBrush(QColor(config.TABLE_NEXT_FONT_BG_COLOR[0],
-                                                                               config.TABLE_NEXT_FONT_BG_COLOR[1],
-                                                                               config.TABLE_NEXT_FONT_BG_COLOR[2],
-                                                                               config.TABLE_NEXT_FONT_BG_COLOR[3])))
-
-                                        # 显示完整的时间和事件信息作为Toast提醒
-                                        # 检查是否需要显示Toast提示
-                                        # 计算距离事件的时间差（秒）
-                                        time_diff = row_seconds - current_seconds
-                                        # 只在事件即将发生前的特定时间段内（30秒内）才显示Toast提示，并避免重复触发
-                                        if time_diff > 0 and time_diff <= config.TIME_ALERT_SECONDS and not self.toast_manager.toast_label.isVisible():
-                                            toast_message = f"{time_item.text()}\t{event_item.text()}" + (
-                                                f"\t{army_item.text()}" if army_item else "")
-                                            self.show_toast(toast_message, config.TOAST_DURATION)
-                                elif abs(row_seconds - current_seconds) <= 30:  # 即将到来的时间（30秒内）
-                                    time_item.setForeground(QBrush(QColor(0, 191, 255)))
-                                    time_item.setBackground(QBrush(QColor(0, 191, 255, 30)))
-                                    # 确保事件项存在且设置正确的颜色
-                                    if event_item:
-                                        event_item.setForeground(QBrush(QColor(0, 191, 255)))
-                                        event_item.setBackground(QBrush(QColor(0, 191, 255, 30)))
-                                        # 强制更新表格项
-                                        self.table_area.update()
-                                        # 强制更新表格视图
-                                        self.table_area.viewport().update()
-                                        # 刷新特定单元格
-                                        model_index = self.table_area.model().index(row, 1)
-                                        self.table_area.dataChanged(model_index, model_index)
-                                else:  # 未来的时间
-                                    time_item.setForeground(QBrush(QColor(255, 255, 255)))
-                                    time_item.setBackground(QBrush(QColor(0, 0, 0, 0)))
-                                    if event_item:
-                                        event_item.setForeground(QBrush(QColor(255, 255, 255)))
-                                        event_item.setBackground(QBrush(QColor(0, 0, 0, 0)))
-                            except ValueError:
-                                continue
-
-                    # 计算滚动位置，使最接近的时间点位于可见区域中间
-                    if self.table_area.rowHeight(0) == 0:
-                        return  # 或者返回你需要的其他值
-                    else:
-                        visible_rows = self.table_area.height() // self.table_area.rowHeight(0)
-                    scroll_position = max(0, closest_row - (visible_rows // 2))
-
-                    # 设置滚动位置
-                    self.table_area.verticalScrollBar().setValue(scroll_position)
                 except Exception as e:
                     self.logger.error(f'调整表格滚动位置和颜色失败: {str(e)}\n{traceback.format_exc()}')
 
@@ -980,18 +876,6 @@ class TimerWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f'加载地图文件时出错: {str(e)}\n{traceback.format_exc()}')
 
-    def init_toast(self):
-        """初始化Toast提示组件"""
-        from toast_manager import ToastManager
-        self.toast_manager = ToastManager(self)
-
-    def show_toast(self, message, duration=None, force_show=False):
-        """显示Toast提示"""
-        self.toast_manager.show_map_toast(message, duration, force_show)
-
-    def hide_toast(self):
-        """隐藏Toast提示"""
-        self.toast_manager.hide_toast()
 
     def on_text_double_click(self, event):
         """处理表格区域双击事件"""
@@ -1009,7 +893,7 @@ class TimerWindow(QMainWindow):
                     army_text = army_item.text().strip() if army_item else ""
                     selected_text = f"{time_text}\t{event_text}\t{army_text}" if time_text and army_text.strip() else (
                         f"{time_text}\t{event_text}" if time_text else event_text)
-                    self.show_toast(selected_text, config.TOAST_DURATION, force_show=True)  # 设置5000毫秒（5秒）后自动消失
+                    #self.show_toast(selected_text, config.TOAST_DURATION, force_show=True)  # 设置5000毫秒（5秒）后自动消失
             event.accept()
 
     def init_global_hotkeys(self):
