@@ -64,7 +64,6 @@ class SoundManager(QObject):
             if not d:
                 continue
             p = os.path.join(d, filename)
-            print(p)
             if os.path.isfile(p):
                 return os.path.abspath(p)
         return None

@@ -83,7 +83,7 @@ class ToastManager:
             text_color = config.MAP_ALERT_WARNING_COLOR
 
         # 更新 MessagePresenter 的内容
-        alert_label.update_alert(
+        alert_label.update_message(
             message,
             text_color,
             x=alert_label_x, y=alert_label_y,

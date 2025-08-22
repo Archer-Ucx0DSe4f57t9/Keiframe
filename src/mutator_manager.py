@@ -249,13 +249,13 @@ class MutatorManager(QWidget):
 
         # 动态更新文本、颜色和字体大小
         text_color = config.MUTATION_FACTOR_NORMAL_COLOR
-        sound_filename = 'Default.mp3'
+        sound_filename = None
         if time_remaining is not None and time_remaining <= config.MUTATION_FACTOR_WARNING_THRESHOLD_SECONDS:
             text_color = config.MUTATION_FACTOR_WARNING_COLOR
             sound_filename = 'Default.mp3'
 
         # 传递计算好的 font_size
-        alert_label.update_alert(
+        alert_label.update_message(
             message,
             text_color,
             x=alert_label_x, y=alert_label_y,

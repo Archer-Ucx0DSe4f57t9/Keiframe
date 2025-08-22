@@ -192,7 +192,7 @@ class OutlinedLabel(QLabel):
             painter.drawPixmap(0, 0, self._cached_pixmap)
         painter.end()
 
-# 负责将输入的文本消息转换成屏幕消息
+# 负责将输入的文本消息转换成屏幕消息，如果有提示语音也播放。
 class MessagePresenter(QLabel):
     def __init__(self, parent=None, icon_name=None):
         super().__init__(parent)
@@ -241,7 +241,7 @@ class MessagePresenter(QLabel):
             win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE,
                                    ex_style | win32con.WS_EX_TRANSPARENT | win32con.WS_EX_LAYERED)
 
-    def update_alert(self, message, color, x=None, y=None, width=None, height=None, font_size=16, sound_filename:str = None):
+    def update_message(self, message, color, x=None, y=None, width=None, height=None, font_size=16, sound_filename:str = None):
 
         # 仅在发生变化时设置 text / style（OutlinedLabel 会缓存渲染）
         if message != self._last_message or color != self._last_color:
@@ -278,6 +278,7 @@ class MessagePresenter(QLabel):
     def hide_alert(self):
         self.hide()
 
+    # 以下3保证点击穿透
     def mousePressEvent(self, event):
         event.ignore()
 
