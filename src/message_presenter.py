@@ -5,7 +5,11 @@ from PyQt5.QtWidgets import QLabel, QHBoxLayout
 
 from fileutil import get_resources_dir
 import sys
+import config
 
+from sound_player import shared_sound_manager
+
+# 将屏幕提示优化，减少帧数影响
 class OutlinedLabel(QLabel):
     def __init__(self, outline_color='black', parent=None):
         super().__init__(parent)
@@ -188,8 +192,8 @@ class OutlinedLabel(QLabel):
             painter.drawPixmap(0, 0, self._cached_pixmap)
         painter.end()
 
-
-class CountdownAlert(QLabel):
+# 负责将输入的文本消息转换成屏幕消息
+class MessagePresenter(QLabel):
     def __init__(self, parent=None, icon_name=None):
         super().__init__(parent)
         self.hide()
@@ -237,7 +241,7 @@ class CountdownAlert(QLabel):
             win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE,
                                    ex_style | win32con.WS_EX_TRANSPARENT | win32con.WS_EX_LAYERED)
 
-    def update_alert(self, message, color, x=None, y=None, width=None, height=None, font_size=16):
+    def update_alert(self, message, color, x=None, y=None, width=None, height=None, font_size=16, sound_filename:str = None):
 
         # 仅在发生变化时设置 text / style（OutlinedLabel 会缓存渲染）
         if message != self._last_message or color != self._last_color:
@@ -263,8 +267,13 @@ class CountdownAlert(QLabel):
                     self.setFixedSize(width, height)
             self.move(x, y)
 
+        if sound_filename is not None:
+            shared_sound_manager.play(sound_filename)
+
         if not self.isVisible():
             self.show()
+
+
 
     def hide_alert(self):
         self.hide()
