@@ -1,8 +1,9 @@
 from PyQt5.QtWidgets import QWidget, QLabel, QGraphicsOpacityEffect, QFrame
 from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtCore import Qt
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 from fileutil import get_file_path, get_resources_dir
-import os, sys
 import config
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt

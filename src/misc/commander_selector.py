@@ -1,8 +1,8 @@
 from PyQt5.QtWidgets import QWidget, QGridLayout, QPushButton, QLabel, QRadioButton, QButtonGroup, QHBoxLayout, QVBoxLayout, QFrame, QGraphicsDropShadowEffect
 from PyQt5.QtCore import Qt, QPoint, QTimer, QSize
 from PyQt5.QtGui import QIcon, QPixmap, QFont, QCursor, QColor, QPalette, QMovie
-import os
-import sys
+import os, sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 import logging
 from PyQt5.QtWidgets import QApplication
 from config import avatar
@@ -381,9 +381,10 @@ class CommanderSelector(QWidget):
         # 更新config.py中的current_region
         try:
             if getattr(sys, 'frozen', False):  # 是否为打包的 exe
-                config_path = os.path.join(os.path.dirname(sys.executable), 'config.py')  # exe 所在目录
+                config_path = os.path.join(os.path.dirname(sys.executable), '../config.py')  # exe 所在目录
             else:
-                config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src', 'config.py')  # 源码所在目录
+                config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src',
+                                           '../config.py')  # 源码所在目录
 
             self.logger.info(f"load config: {config_path}")
             

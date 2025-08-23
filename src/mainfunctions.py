@@ -4,13 +4,11 @@ import aiohttp
 import asyncio
 import traceback
 from PyQt5 import QtCore
-from map_processor import MapProcessor
-from IdentifyMap import identify_map
+from map_handlers.IdentifyMap import identify_map
 import config
 from debug_utils import get_mock_data, reset_mock, get_mock_screen_data
 from logging_util import get_logger
 import show_fence
-import hashlib
 
 logger = get_logger(__name__)
 
@@ -112,7 +110,6 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
                 'map': game_data.get('map')
             }
             logger.info(f'更新全局变量: {state.most_recent_playerdata}')
-            print(f'更新全局变量: {state.most_recent_playerdata}')
 
             player_names = list()
             player_position = 1

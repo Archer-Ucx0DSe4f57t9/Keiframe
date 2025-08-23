@@ -2,8 +2,11 @@
 import traceback
 from PyQt5.QtGui import QBrush, QColor
 from PyQt5.QtCore import Qt
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import config
 import time  # 添加 time 模块用于调试
+
 
 
 class MapEventManager:

@@ -5,31 +5,26 @@ import time
 import traceback
 import keyboard
 import ctypes
-import win32gui
-from ctypes import windll
 import threading, asyncio
 from PyQt5.QtWidgets import (
-    QMainWindow, QWidget, QLabel, QSystemTrayIcon,
-    QMenu, QAction, QApplication, QComboBox,
-    QTableWidgetItem, QPushButton, QTableWidget,
-    QHeaderView, QVBoxLayout, QGraphicsDropShadowEffect, QHBoxLayout
+    QMainWindow, QWidget, QLabel, QApplication, QComboBox,
+    QTableWidgetItem, QPushButton, QHBoxLayout
 , QLineEdit  # 从 QtWidgets 导入
 )
 from control_window import ControlWindow
-from commander_selector import CommanderSelector
+from misc.commander_selector import CommanderSelector
 from PyQt5.QtGui import (
-    QFont, QIcon, QPixmap, QBrush,
-    QColor, QCursor
+    QFont, QBrush,
+    QColor
 )
-from outlined_label import OutlinedLabel
-from PyQt5.QtCore import Qt, QTimer, QPoint, pyqtSignal, QRect, QSize
+from PyQt5.QtCore import Qt, QTimer, QPoint, pyqtSignal, QRect
 import config
 from PyQt5 import QtCore
 
 import image_util
 from fileutil import get_resources_dir, list_files
 from mutator_manager import MutatorManager
-from map_event_manager import MapEventManager
+from map_handlers.map_event_manager import MapEventManager
 from toast_manager import ToastManager
 import mainfunctions
 
@@ -52,7 +47,7 @@ class TimerWindow(QMainWindow):
         super().__init__()
 
         # 初始化artifact_window
-        from artifacts import ArtifactWindow
+        from misc.artifacts import ArtifactWindow
         self.artifact_window = ArtifactWindow(self)
 
         # 设置窗口属性以支持DPI缩放
@@ -253,7 +248,7 @@ class TimerWindow(QMainWindow):
         self.map_version_group.hide()
 
         # 创建表格显示区
-        from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView
+        from PyQt5.QtWidgets import QTableWidget
         self.table_area = QTableWidget(self.main_container)
         self.table_area.setGeometry(0, 65, config.MAIN_WINDOW_WIDTH, config.TABLE_HEIGHT)  # 保持表格区域位置不变
         self.table_area.setColumnCount(3)
