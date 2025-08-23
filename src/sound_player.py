@@ -19,11 +19,10 @@ class SoundManager(QObject):
     - cooldown_seconds: 同名文件播放的冷却时间（默认 10s）
     - volume: 0.0 - 1.0
     """
-    def __init__(self, search_paths: Optional[List[str]] = None,
-                 cooldown_seconds: float = 10.0, volume: float = 0.9, parent=None):
+    def __init__(self, search_paths: Optional[List[str]] = None, parent=None):
         super().__init__(parent)
         self.cooldown_seconds = float(config.ALERT_SOUND_COOLDOWN)
-        self.volume = float(max(config.ALERT_SOUND_VOLUME / 100, 1.0))
+        self.volume = float(min(config.ALERT_SOUND_VOLUME / 100, 1.0))
         self._last_played = {}   # filename -> last play timestamp (float)
         self._players = {}       # filename -> QMediaPlayer (cached)
         self.search_paths = list(search_paths) if search_paths else self._default_search_paths()

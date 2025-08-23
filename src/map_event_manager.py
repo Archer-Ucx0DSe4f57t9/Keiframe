@@ -124,7 +124,6 @@ class MapEventManager:
                             if self.toast_manager.has_alert(event_id):
                                 self.toast_manager.remove_alert(event_id)
 
-
                     except ValueError:
                         continue
 
