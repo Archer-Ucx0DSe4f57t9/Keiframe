@@ -6,7 +6,7 @@ import traceback
 import asyncio
 import config
 from fileutil import get_resources_dir
-from mainfunctions import get_troop_from_game
+from game_monitor import get_troop_from_game
 from troop_util import TroopLoader
 from outlined_label import OutlinedLabel
 from message_presenter import MessagePresenter

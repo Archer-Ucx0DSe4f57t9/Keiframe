@@ -26,7 +26,7 @@ from fileutil import get_resources_dir, list_files
 from mutator_manager import MutatorManager
 from map_handlers.map_event_manager import MapEventManager
 from toast_manager import ToastManager
-import mainfunctions
+import game_monitor
 
 class TimerWindow(QMainWindow):
     # 创建信号用于地图更新
@@ -42,7 +42,7 @@ class TimerWindow(QMainWindow):
 
     def _run_async_game_scheduler(self, progress_signal):
         """在新线程中启动 asyncio 事件循环"""
-        asyncio.run(mainfunctions.check_for_new_game_scheduler(progress_signal))
+        asyncio.run(game_monitor.check_for_new_game_scheduler(progress_signal))
     def __init__(self):
         super().__init__()
 
@@ -66,7 +66,7 @@ class TimerWindow(QMainWindow):
         # 初始化状态
         self.current_time = ""
         self.drag_position = QPoint(0, 0)
-        self.game_state = mainfunctions.state
+        self.game_state = game_monitor.state
 
         # 添加一个标志来追踪地图选择的来源
         self.manual_map_selection = False
