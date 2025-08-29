@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QLabel
 from PyQt5.QtGui import QPainter, QPen, QColor
 from PyQt5.QtCore import Qt
 
-class OutlinedLabel(QLabel):
+class LOutlinedLabel(QLabel):
     def __init__(self, outline_color = QColor(0, 0, 0), parent=None):
         super(OutlinedLabel, self).__init__(parent)
         if isinstance(outline_color, str):

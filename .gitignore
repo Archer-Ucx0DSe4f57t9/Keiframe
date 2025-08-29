@@ -32,3 +32,6 @@ Desktop.ini
 ext-exe/obj/
 ext-exe/bin/
 src/monkey.js
+/src/map_handlers/debugpath/
+/tests/debug_out/
+/tests/samples/

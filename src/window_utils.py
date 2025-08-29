@@ -12,7 +12,6 @@ def get_sc2_window_geometry() -> object:
             y = rect[1]
             w = rect[2] - x
             h = rect[3] - y
-            # print(f'found StarCraft II with {x}, {y}, {w}, {h}')
             return x, y, w, h
     except Exception as e:
         logger.error(f"获取'StarCraft II'窗口几何信息失败: {e}")
