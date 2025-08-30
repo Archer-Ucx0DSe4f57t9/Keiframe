@@ -10,38 +10,36 @@ import os
 # 自带模块
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 BASE_DIR = os.path.dirname(__file__)
-import window_utils
 from window_utils import get_sc2_window_geometry
 import config
 
 # --- 定义坐标 ---
-MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD = (306, 164)
-MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD = (342, 183)
+MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD = config.MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD 
+MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD = config.MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD
 
-MALWARFARE_TIME_TOP_LFET_COORD = (439, 165)
-MALWARFARE_TIME_BOTTOM_RIGHT_COORD = (483, 183)
+MALWARFARE_TIME_TOP_LFET_COORD = config.MALWARFARE_TIME_TOP_LFET_COORD
+MALWARFARE_TIME_BOTTOM_RIGHT_COORD = config.MALWARFARE_TIME_BOTTOM_RIGHT_COORD
 
-MALWARFARE_PAUSED_TOP_LFET_COORD = (351, 165)
-MALWARFARE_PAUSED_BOTTOM_RIGHT_COORD = (428, 183)
+MALWARFARE_PAUSED_TOP_LFET_COORD = config.MALWARFARE_PAUSED_TOP_LFET_COORD
+MALWARFARE_PAUSED_BOTTOM_RIGHT_COORD = config.MALWARFARE_PAUSED_BOTTOM_RIGHT_COORD
+
 
 class MalwarfareMapHandler:
     """
     用于处理星际争霸II自定义地图“恶意软件战争”特定UI元素的识别器。
     通过屏幕捕捉、图像处理和模板匹配，实时识别游戏内的关键信息。
     """
-    def __init__(self, table_area, toast_manager, get_window_geometry_func, logger, debug=False):
+    def __init__(self, table_area, toast_manager, logger, debug=False):
         """
         初始化处理器。
 
         :param table_area: (未使用) 为兼容旧接口保留的参数。
         :param toast_manager: 用于显示toast通知的对象。
-        :param get_window_geometry_func: 一个用于获取游戏窗口位置和大小的函数。
         :param logger: 日志记录器对象。
         :param debug: 是否开启调试模式，开启后会保存处理过程中的图像。
         """
         self.table_area = table_area
         self.toast_manager = toast_manager
-        self.get_window_geometry = get_window_geometry_func
         self.logger = logger
         self.debug = debug
         
@@ -100,7 +98,9 @@ class MalwarfareMapHandler:
         self._last_valid_parsed = None
         
     def _load_templates(self, template_dir):
-        """加载并预处理所有字符模板。"""
+        """
+        加载并预处理所有字符模板 (已修正 grayscale/alpha channel bug)。
+        """
         templates = {}
         base_dir = os.path.dirname(__file__)
         real_template_dir = os.path.join(base_dir, template_dir)
@@ -113,22 +113,31 @@ class MalwarfareMapHandler:
             if filename.endswith('.png'):
                 char_name = os.path.splitext(filename)[0]
                 path = os.path.join(real_template_dir, filename)
+                
+                # 使用 IMREAD_UNCHANGED 读取图像，以保留可能的Alpha通道
                 template_img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
                 
                 if template_img is None:
                     self.logger.warning(f"加载模板失败: {path}")
                     continue
 
-                # --- 智能模板处理 ---
-                # 检查图像是否有Alpha通道（透明背景）
-                if template_img.shape[2] == 4:
-                    # 如果有，直接使用Alpha通道作为模板 (白字黑底)
+                # --- 关键修正点 ---
+                # 首先检查图像的维度，然后再访问特定维度，避免IndexError
+                if len(template_img.shape) == 3 and template_img.shape[2] == 4:
+                    # 情况1: 图像是 BGRA (带Alpha通道)
+                    # 直接使用Alpha通道作为模板 (白字黑底)
                     template_binary = template_img[:, :, 3]
                 else:
-                    # 如果没有，则假定是白底黑字图，进行灰度转换和反色
+                    # 情况2: 图像是 BGR (彩色) 或 Grayscale (灰度)
+                    # 如果是彩色的，先转为灰度
                     if len(template_img.shape) == 3:
-                         template_img = cv2.cvtColor(template_img, cv2.COLOR_BGR2GRAY)
-                    _, template_binary = cv2.threshold(template_img, 127, 255, cv2.THRESH_BINARY)
+                        gray_img = cv2.cvtColor(template_img, cv2.COLOR_BGR2GRAY)
+                    else:
+                        # 如果本身就是灰度图，直接使用
+                        gray_img = template_img
+                    
+                    # 对灰度图执行标准流程：二值化后反色
+                    _, template_binary = cv2.threshold(gray_img, 127, 255, cv2.THRESH_BINARY)
                     template_binary = cv2.bitwise_not(template_binary)
 
                 templates[char_name] = template_binary
@@ -265,7 +274,7 @@ class MalwarfareMapHandler:
             while self._running:
                 start_time = time.perf_counter()
                 
-                sc2_rect = self.get_window_geometry()
+                sc2_rect = get_sc2_window_geometry()
                 if not sc2_rect:
                     time.sleep(1)
                     continue
