@@ -81,7 +81,7 @@ class TimerWindow(QMainWindow):
         # 初始化定时器
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_game_time)
-        self.timer.start(200)  # 自动开始更新，每100毫秒更新一次
+        self.timer.start(200)  # 自动开始更新，每200毫秒更新一次
 
         # 连接表格区域的双击事件
         self.table_area.mouseDoubleClickEvent = self.on_text_double_click

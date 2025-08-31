@@ -29,7 +29,7 @@ print(info)
 def get_sc2_window_geometry() -> object:
     try:
         if hwnd:
-            # 内容区大小（不含边框+标题栏）
+            # 内容区大小（如果为窗口模式不含边框+标题栏）
             content_rect = win32gui.GetClientRect(hwnd)
             #
             content_left_top = win32gui.ClientToScreen(hwnd, (content_rect[0], content_rect[1]))
@@ -39,7 +39,6 @@ def get_sc2_window_geometry() -> object:
             y = content_left_top[1]
             w = content_right_bottom[0] - x
             h = content_right_bottom[1] - y
-            print(f'{x},{y},{w},{h}')
             return x, y, w, h
     except Exception as e:
         logger.error(f"获取'StarCraft II'窗口几何信息失败: {e}")

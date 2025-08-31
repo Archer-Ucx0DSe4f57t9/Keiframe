@@ -75,10 +75,10 @@ class MalwarfareMapHandler:
 
         # --- 加载模板 ---
         # 基准分辨率，所有模板都是在该分辨率下制作的
-        self.BASE_RESOLUTION_WIDTH = 1936.0
+        self.BASE_RESOLUTION_WIDTH = 1920.0
         
         # 模板文件夹路径
-        template_dir = 'char_templates_1936w' # 建议文件夹名与基准分辨率一致
+        template_dir = 'char_templates_1920w' # 建议文件夹名与基准分辨率一致
         self.templates = self._load_templates(template_dir)
 
         # --- 状态变量初始化 ---
