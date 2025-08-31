@@ -58,11 +58,9 @@ def main():
         # --- 初始化Handler ---
         # 注意：这里传入的是真实的 get_sc2_window_geometry 函数
         handler = MalwarfareMapHandler(
-            config=config,
             toast_manager=toast_manager,
-            get_window_geometry_func=lambda: get_sc2_window_geometry('StarCraft II'),
             logger=logger,
-            debug=True # 开启Debug模式，会保存中间图像
+            debug=False # 开启Debug模式，会保存中间图像
         )
         
         # 启动后台识别线程
