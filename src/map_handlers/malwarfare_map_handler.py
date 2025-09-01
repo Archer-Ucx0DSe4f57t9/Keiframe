@@ -13,20 +13,8 @@ BASE_DIR = os.path.dirname(__file__)
 from window_utils import get_sc2_window_geometry
 import config
 
-# --- 定义坐标 ---
-MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD = config.MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD 
-MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD = config.MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD
-
-MALWARFARE_TIME_TOP_LFET_COORD = config.MALWARFARE_TIME_TOP_LFET_COORD
-MALWARFARE_TIME_BOTTOM_RIGHT_COORD = config.MALWARFARE_TIME_BOTTOM_RIGHT_COORD
-
-MALWARFARE_PAUSED_TOP_LFET_COORD = config.MALWARFARE_PAUSED_TOP_LFET_COORD
-MALWARFARE_PAUSED_BOTTOM_RIGHT_COORD = config.MALWARFARE_PAUSED_BOTTOM_RIGHT_COORD
-
-
 class MalwarfareMapHandler:
     """
-    用于处理星际争霸II自定义地图“恶意软件战争”特定UI元素的识别器。
     通过屏幕捕捉、图像处理和模板匹配，实时识别游戏内的关键信息。
     """
     def __init__(self, table_area, toast_manager, logger, debug=False):
@@ -55,16 +43,16 @@ class MalwarfareMapHandler:
 
         # --- 定义各UI元素的感兴趣区域 (Region of Interest, ROI) ---
         self._count_roi = (
-            MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD[0], MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD[1],
-            MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD[0], MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD[1]
+            config.MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD[0], config.MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD[1],
+            config.MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD[0], config.MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD[1]
         )
         self._paused_roi = (
-            MALWARFARE_PAUSED_TOP_LFET_COORD[0], MALWARFARE_PAUSED_TOP_LFET_COORD[1],
-            MALWARFARE_PAUSED_BOTTOM_RIGHT_COORD[0], MALWARFARE_PAUSED_BOTTOM_RIGHT_COORD[1]
+            config.MALWARFARE_PAUSED_TOP_LFET_COORD[0], config.MALWARFARE_PAUSED_TOP_LFET_COORD[1],
+            config.MALWARFARE_PAUSED_BOTTOM_RIGHT_COORD[0], config.MALWARFARE_PAUSED_BOTTOM_RIGHT_COORD[1]
         )
         self._time_roi = (
-            MALWARFARE_TIME_TOP_LFET_COORD[0], MALWARFARE_TIME_TOP_LFET_COORD[1],
-            MALWARFARE_TIME_BOTTOM_RIGHT_COORD[0], MALWARFARE_TIME_BOTTOM_RIGHT_COORD[1]
+            config.MALWARFARE_TIME_TOP_LFET_COORD[0], config.MALWARFARE_TIME_TOP_LFET_COORD[1],
+            config.MALWARFARE_TIME_BOTTOM_RIGHT_COORD[0], config.MALWARFARE_TIME_BOTTOM_RIGHT_COORD[1]
         )
         
         # --- 定义用于颜色提取的HSV颜色范围 ---
@@ -384,25 +372,37 @@ class MalwarfareMapHandler:
             self.logger.error(f"Count区域OCR出错: {e}", exc_info=True)
 
     def _ocr_and_process_time_and_paused(self, img_bgr, scale_factor):
-        """识别时间和暂停状态，采用3位数时间逻辑。"""
+        """
+        1. 识别3位数时间。
+        2. 对PAUSED状态进行模糊匹配，增强鲁棒性。
+        """
         try:
             time_text = self._recognize_text_from_roi(img_bgr, self._time_roi, scale_factor, 'yellow', 
-                                                      threshold=0.75, ocr_scale_factor=2.0, debug_name="time")
+                                                    threshold=0.75, ocr_scale_factor=2.0, debug_name="time")
             self.logger.debug(f"Time区域OCR(3位数): '{time_text}'")
             parsed_time = None
-            
             if time_text and time_text.isdigit() and len(time_text) == 3:
                 parsed_time = time_text
             
             with self._time_lock:
                 self._latest_time = parsed_time
-
+            
             if parsed_time is None:
                 paused_text = self._recognize_text_from_roi(img_bgr, self._paused_roi, scale_factor, 'yellow', 
                                                             threshold=0.75, ocr_scale_factor=2.0, debug_name="paused")
                 self.logger.debug(f"Paused区域OCR: '{paused_text}'")
-                parsed_paused = "PAUSED" if "PAUSED" in paused_text.upper() else None
+                parsed_paused = None
                 
+                # --- 关键修改：PAUSED模糊匹配逻辑 ---
+                # 不再要求完整识别"PAUSED"，只要关键字母出现足够多即可
+                required_chars = {'P', 'A', 'U', 'S', 'E', 'D'}
+                found_chars = set(paused_text.upper())
+                
+                # 如果识别出的字符中，包含了"PAUSED"中至少4个不同的字母，就认为是暂停
+                if len(required_chars.intersection(found_chars)) >= 4:
+                    parsed_paused = "PAUSED"
+                    self.logger.debug(f"模糊匹配成功: 在'{paused_text}'中找到了足够多的PAUSED特征字母。")
+
                 with self._paused_lock:
                     self._latest_paused = parsed_paused
             else:
@@ -414,29 +414,26 @@ class MalwarfareMapHandler:
 
     def _update_latest_result(self):
         """
-        组合来自不同识别线程的结果，进行最终校验并生成最终状态字典。
+        最终版：
+        1. 组合结果。
+        2. 增加状态保持逻辑：当游戏进行中OCR短暂失效时，不更新结果。
         """
         parsed = None
         with self._count_lock, self._paused_lock, self._time_lock:
-            latest_count = self._latest_count
-            latest_paused = self._latest_paused
-            latest_time = self._latest_time
+            latest_count=self._latest_count; latest_paused=self._latest_paused; latest_time=self._latest_time
         
-        # 逻辑1: 优先处理3位数时间
         if latest_time and latest_count is not None:
             try:
-                min_val = int(latest_time[0])
-                sec_val = int(latest_time[1:])
-                
+                min_val = int(latest_time[0]); sec_val = int(latest_time[1:])
                 if min_val > 3 or sec_val > 59:
-                    self.logger.warning(f"时间值超出范围，忽略: M={min_val}, S={sec_val}")
+                    self.logger.warning(f"时间值超出范围: M={min_val}, S={sec_val}")
                 else:
                     current_total_seconds = min_val * 60 + sec_val
                     is_valid_update = True
                     if self._last_valid_parsed and self._last_valid_parsed.get('time') and self._last_valid_parsed['time'] not in ["PAUSED", ""]:
                         if latest_count == self._last_valid_parsed.get('n'):
-                            last_min_str, last_sec_str = self._last_valid_parsed['time'].split(':')
-                            last_total_seconds = int(last_min_str) * 60 + int(last_sec_str)
+                            last_min,last_sec=map(int,self._last_valid_parsed['time'].split(':'))
+                            last_total_seconds=last_min*60+last_sec
                             if current_total_seconds > last_total_seconds:
                                 is_valid_update = False
                                 self.logger.debug(f"时间未减小，忽略: {current_total_seconds}s > {last_total_seconds}s")
@@ -446,20 +443,31 @@ class MalwarfareMapHandler:
             except (ValueError, IndexError) as e:
                 self.logger.warning(f"时间字符串格式错误 '{latest_time}': {e}")
 
-        # 逻辑2: 若无时间，则检查暂停状态
         if parsed is None and latest_paused == "PAUSED" and latest_count is not None:
             parsed = {"lang": "en", "n": latest_count, "time": "PAUSED"}
-
-        # 逻辑3: 若以上皆无，但有计数值，则生成结果（解决None问题）
         if parsed is None and latest_count is not None:
             parsed = {"lang": "en", "n": latest_count, "time": ""}
+        
+        # --- 关键修改：状态保持逻辑 ---
+        # 如果这次识别的结果是“仅有Count”，我们需要检查上次的结果
+        if parsed and parsed.get('time') == "" and self._last_valid_parsed:
+            last_time = self._last_valid_parsed.get('time')
+            # 如果上次的结果是一个有效的、正在进行中的时间
+            if last_time and last_time not in ["PAUSED", ""]:
+                try:
+                    last_min, last_sec = map(int, last_time.split(':'))
+                    last_total_seconds = last_min * 60 + last_sec
+                    # 并且这个时间大于5秒（表示游戏正在活跃进行中）
+                    if last_total_seconds > 5:
+                        # 那么这次的“仅有Count”很可能是OCR的短暂失灵，我们选择不更新结果
+                        self.logger.debug(f"OCR短暂丢失了活跃时间(>0:05)，保留上一次有效结果: {self._last_valid_parsed}")
+                        return # 直接返回，跳过下面的更新步骤
+                except (ValueError, IndexError):
+                    pass # 如果上次的时间格式有问题，则正常更新
 
-        # 更新最终结果，并触发通知
         if parsed:
             if self._last_valid_parsed is None or parsed != self._last_valid_parsed:
-                 self.logger.info(f"状态更新: {parsed}")
-                 self._last_valid_parsed = parsed
-                 if self.toast_manager: self.toast_manager.show_simple_toast(str(parsed))
-
-        with self._result_lock:
-            self._latest_result = self._last_valid_parsed
+                self.logger.info(f"状态更新: {parsed}")
+                self._last_valid_parsed = parsed
+                if self.toast_manager: self.toast_manager.show_simple_toast(str(parsed))
+        with self._result_lock: self._latest_result = self._last_valid_parsed

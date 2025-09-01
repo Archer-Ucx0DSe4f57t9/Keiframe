@@ -8,30 +8,13 @@ logger = get_logger('window_utils')
 hwnd = win32gui.FindWindow(None, "StarCraft II")
 
 
-def get_user_window_info():
-
-    # 客户区大小（内容区，不含边框+标题栏）
-    client_rect = win32gui.GetClientRect(hwnd)
-
-    # 客户区左上角相对坐标 -> 转换为屏幕绝对坐标
-    client_left_top = win32gui.ClientToScreen(hwnd, (client_rect[0], client_rect[1]))
-    client_right_bottom = win32gui.ClientToScreen(hwnd, (client_rect[2], client_rect[3]))
-    client_rect_screen = (*client_left_top, *client_right_bottom)
-
-    return {             # 包含边框
-        "客户区矩形": client_rect_screen,  # 实际内容区域
-        "客户区大小": (client_rect[2]-client_rect[0], client_rect[3]-client_rect[1])
-    }
-
-info = get_user_window_info()
-print(info)
 #获取窗口内容区的左上角和坐标
 def get_sc2_window_geometry() -> object:
     try:
         if hwnd:
             # 内容区大小（如果为窗口模式不含边框+标题栏）
             content_rect = win32gui.GetClientRect(hwnd)
-            #
+            
             content_left_top = win32gui.ClientToScreen(hwnd, (content_rect[0], content_rect[1]))
             content_right_bottom = win32gui.ClientToScreen(hwnd, (content_rect[2], content_rect[3]))
             
@@ -41,7 +24,7 @@ def get_sc2_window_geometry() -> object:
             h = content_right_bottom[1] - y
             return x, y, w, h
     except Exception as e:
-        logger.error(f"获取'StarCraft II'窗口几何信息失败: {e}")
+        logger.info(f"获取'StarCraft II'窗口几何信息失败: {e}")
     return None
 
 #判断是不是全屏游戏

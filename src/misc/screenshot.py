@@ -32,7 +32,7 @@ def screenshot_client_area():
     print(f"已保存客户区截图: {save_path}")
 
 if __name__ == "__main__":
-    print("程序已启动，按 Ctrl+Alt+S 截图（按 Ctrl+C 退出）")
+    print("程序已启动，按 Alt+S 截图（按 Ctrl+C 退出）")
 
     # 监听全局热键 Alt+S
     keyboard.add_hotkey("alt+s", screenshot_client_area)
