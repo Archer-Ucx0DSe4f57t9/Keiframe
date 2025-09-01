@@ -15,18 +15,12 @@ import config
 
 class MalwarfareMapHandler:
     """
-    通过屏幕捕捉、图像处理和模板匹配，实时识别游戏内的关键信息。
+    通过屏幕捕捉、图像处理和模板匹配，实时识别净网的当前已净化的节点数，倒计时，和是否处于暂停状态。
     """
-    def __init__(self, table_area, toast_manager, logger, debug=False):
+    def __init__(self, toast_manager, logger, debug=True):
         """
         初始化处理器。
-
-        :param table_area: (未使用) 为兼容旧接口保留的参数。
-        :param toast_manager: 用于显示toast通知的对象。
-        :param logger: 日志记录器对象。
-        :param debug: 是否开启调试模式，开启后会保存处理过程中的图像。
         """
-        self.table_area = table_area
         self.toast_manager = toast_manager
         self.logger = logger
         self.debug = debug
@@ -41,35 +35,65 @@ class MalwarfareMapHandler:
         self._running = False
         self._running_thread = None
 
-        # --- 定义各UI元素的感兴趣区域 (Region of Interest, ROI) ---
-        self._count_roi = (
+        # --- 1. 定义所有可能的HSV颜色范围 ---
+        
+        # 黄色 (对应倒计时和暂停的颜色)
+        self.yellow_lower = np.array([20, 80, 80])
+        self.yellow_upper = np.array([40, 255, 255])
+        
+        #用于统计三种已净化的节点的颜色
+        # 绿色 (对应人族)
+        self.green_lower = np.array([60, 70, 70])
+        self.green_upper = np.array([90, 255, 255])
+        # 蓝色 (对应神族)
+        self.blue_lower = np.array([100, 100, 100])
+        self.blue_upper = np.array([125, 255, 255])
+        # 橙色 (对应虫族)
+        self.orange_lower = np.array([10, 150, 150])
+        self.orange_upper = np.array([25, 255, 255])
+
+        # 将所有颜色处理器打包管理，用于颜色校准
+        self.count_color_processors = {
+            'green': (self.green_lower, self.green_upper),
+            'blue': (self.blue_lower, self.blue_upper),
+            'orange': (self.orange_lower, self.orange_upper)
+        }
+        # 用于颜色校准的状态变量
+        self._detected_count_color = None 
+
+        # --- 2. 动态ROI定位相关定义 ---
+        # 定义三种UI状态对应的精确垂直偏移像素
+
+        self.UI_STATE_OFFSETS = [0, config.MALWARFARE_HERO_OFFSET, config.MALWARFARE_ZWEIHAKA_OFFSET] 
+        
+        # 存储“基准”ROI (状态0: 0偏移时的坐标)
+        self._base_count_roi = (
             config.MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD[0], config.MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD[1],
             config.MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD[0], config.MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD[1]
         )
-        self._paused_roi = (
+        self._base_paused_roi = (
             config.MALWARFARE_PAUSED_TOP_LFET_COORD[0], config.MALWARFARE_PAUSED_TOP_LFET_COORD[1],
             config.MALWARFARE_PAUSED_BOTTOM_RIGHT_COORD[0], config.MALWARFARE_PAUSED_BOTTOM_RIGHT_COORD[1]
         )
-        self._time_roi = (
+        self._base_time_roi = (
             config.MALWARFARE_TIME_TOP_LFET_COORD[0], config.MALWARFARE_TIME_TOP_LFET_COORD[1],
             config.MALWARFARE_TIME_BOTTOM_RIGHT_COORD[0], config.MALWARFARE_TIME_BOTTOM_RIGHT_COORD[1]
         )
         
-        # --- 定义用于颜色提取的HSV颜色范围 ---
-        self.yellow_lower = np.array([20, 80, 80])
-        self.yellow_upper = np.array([40, 255, 255])
-        self.green_lower = np.array([60, 70, 70])
-        self.green_upper = np.array([90, 255, 255])
-
-        # --- 加载模板 ---
-        # 基准分辨率，所有模板都是在该分辨率下制作的
-        self.BASE_RESOLUTION_WIDTH = 1920.0
+        # UI状态变量, -1 代表未知，需要探测
+        self._current_ui_offset_state = -1 
         
-        # 模板文件夹路径
-        template_dir = 'char_templates_1920w' # 建议文件夹名与基准分辨率一致
+        # 当前生效的ROI，会在探测后被设置
+        self._count_roi = None
+        self._paused_roi = None
+        self._time_roi = None
+
+        # --- 3. 加载模板 ---
+        self.BASE_RESOLUTION_WIDTH = 1920.0
+        template_dir = 'char_templates_1920w'
         self.templates = self._load_templates(template_dir)
 
-        # --- 状态变量初始化 ---
+        # --- 4. 状态变量初始化 ---
         self._latest_count = None
         self._latest_paused = None
         self._latest_time = None
@@ -84,7 +108,63 @@ class MalwarfareMapHandler:
         self._latest_result = None
         self._result_lock = threading.Lock()
         self._last_valid_parsed = None
+    
+    def _detect_and_set_ui_state(self, img_bgr):
+        """
+        探测UI的当前垂直偏移状态。
+        它会检查 `count` 区域的所有可能位置，找到有效信息后，设置全局的ROI。
+        """
+        self.logger.info("正在探测UI偏移状态...")
         
+        # 遍历所有定义好的偏移状态
+        for state_index, y_offset in enumerate(self.UI_STATE_OFFSETS):
+            
+            # 计算当前探测的ROI坐标
+            probe_roi_coords = (
+                self._base_count_roi[0], self._base_count_roi[1] + y_offset,
+                self._base_count_roi[2], self._base_count_roi[3] + y_offset
+            )
+            
+            x0, y0, x1, y1 = probe_roi_coords
+            # 安全检查，确保ROI在图像范围内
+            if y1 > img_bgr.shape[0] or x1 > img_bgr.shape[1]: continue
+            roi_img = img_bgr[y0:y1, x0:x1]
+
+            if roi_img.size == 0:
+                continue
+
+            # 使用所有可能的颜色进行快速、低成本的探测
+            hsv_img = cv2.cvtColor(roi_img, cv2.COLOR_BGR2HSV)
+            
+            # 将所有颜色mask合并，只要有任何一个颜色存在即可
+            mask_green = cv2.inRange(hsv_img, self.green_lower, self.green_upper)
+            mask_blue = cv2.inRange(hsv_img, self.blue_lower, self.blue_upper)
+            mask_orange = cv2.inRange(hsv_img, self.orange_lower, self.orange_upper)
+            combined_mask = cv2.bitwise_or(mask_green, mask_blue)
+            combined_mask = cv2.bitwise_or(combined_mask, mask_orange)
+
+            # 如果在这个ROI里找到了超过一定数量的有效颜色像素，就认为找到了
+            if cv2.countNonZero(combined_mask) > 50: # 阈值可以根据实际情况调整
+                self.logger.info(f"UI状态探测成功！当前状态: {state_index} (偏移: {y_offset}px)")
+                
+                # 锁定状态
+                self._current_ui_offset_state = state_index
+                
+                # 根据探测到的状态，设置所有实际使用的ROI
+                self._count_roi = probe_roi_coords
+                self._paused_roi = (
+                    self._base_paused_roi[0], self._base_paused_roi[1] + y_offset,
+                    self._base_paused_roi[2], self._base_paused_roi[3] + y_offset
+                )
+                self._time_roi = (
+                    self._base_time_roi[0], self._base_time_roi[1] + y_offset,
+                    self._base_time_roi[2], self._base_time_roi[3] + y_offset
+                )
+                return True # 探测成功，结束函数
+
+        self.logger.warning("UI状态探测失败，所有预设位置均未找到有效信息。")
+        return False
+    
     def _load_templates(self, template_dir):
         """
         加载并预处理所有字符模板 (已修正 grayscale/alpha channel bug)。
@@ -257,42 +337,53 @@ class MalwarfareMapHandler:
             self.logger.info("MalwarfareMapHandler 已停止。")
 
     def _run_loop(self):
-        """后台线程的主循环，负责定时截图和调度识别任务。"""
-        with mss.mss() as sct:
-            while self._running:
-                start_time = time.perf_counter()
-                
-                sc2_rect = get_sc2_window_geometry()
-                if not sc2_rect:
-                    time.sleep(1)
-                    continue
-                
-                x, y, w, h = sc2_rect
-                if w == 0 or h == 0:
-                    time.sleep(1)
-                    continue
-                
-                current_width = float(w)
-                scale_factor = current_width / self.BASE_RESOLUTION_WIDTH
-                
-                monitor = {"top": y, "left": x, "width": w, "height": h}
-                game_screen_bgr = cv2.cvtColor(np.array(sct.grab(monitor)), cv2.COLOR_BGRA2BGR)
+            """后台线程的主循环，负责定时截图和调度识别任务。"""
+            with mss.mss() as sct:
+                while self._running:
+                    start_time = time.perf_counter()
+                    
+                    sc2_rect = get_sc2_window_geometry()
+                    if not sc2_rect:
+                        time.sleep(1)
+                        # 当游戏窗口关闭时，重置状态以便下次启动时重新探测
+                        self._current_ui_offset_state = -1
+                        self._detected_count_color = None
+                        continue
+                    
+                    x, y, w, h = sc2_rect
+                    if w == 0 or h == 0:
+                        time.sleep(1)
+                        continue
+                    
+                    current_width = float(w)
+                    scale_factor = current_width / self.BASE_RESOLUTION_WIDTH
+                    
+                    monitor = {"top": y, "left": x, "width": w, "height": h}
+                    game_screen_bgr = cv2.cvtColor(np.array(sct.grab(monitor)), cv2.COLOR_BGRA2BGR)
 
-                current_time = time.perf_counter()
-                
-                if current_time - self._last_count_update >= 1.0:
-                    self._executor.submit(self._ocr_and_process_count, game_screen_bgr, scale_factor)
-                    self._last_count_update = current_time
-                if current_time - self._last_status_update >= 0.33:
-                    self._executor.submit(self._ocr_and_process_time_and_paused, game_screen_bgr, scale_factor)
-                    self._last_status_update = current_time
+                    # --- 核心修改：如果UI状态未知，则先进行探测 ---
+                    if self._current_ui_offset_state == -1:
+                        if not self._detect_and_set_ui_state(game_screen_bgr):
+                            # 如果探测失败，则等待下一轮，不进行OCR
+                            time.sleep(0.5)
+                            continue
+                    
+                    # 正常调度OCR任务，此时 self._count_roi 等已经是正确的值了
+                    current_time = time.perf_counter()
+                    
+                    if current_time - self._last_count_update >= 1.0:
+                        self._executor.submit(self._ocr_and_process_count, game_screen_bgr, scale_factor)
+                        self._last_count_update = current_time
+                    if current_time - self._last_status_update >= 0.33:
+                        self._executor.submit(self._ocr_and_process_time_and_paused, game_screen_bgr, scale_factor)
+                        self._last_status_update = current_time
 
-                self._update_latest_result()
+                    self._update_latest_result()
 
-                elapsed_time = time.perf_counter() - start_time
-                sleep_time = max(0, 0.1 - elapsed_time)
-                if sleep_time > 0:
-                    time.sleep(sleep_time)
+                    elapsed_time = time.perf_counter() - start_time
+                    sleep_time = max(0, 0.1 - elapsed_time)
+                    if sleep_time > 0:
+                        time.sleep(sleep_time)
 
     def _post_process_n_value(self, n_value):
         """对识别出的n值进行后处理，修正已知的特定识别错误。"""
@@ -305,14 +396,20 @@ class MalwarfareMapHandler:
 
     def _ocr_and_process_count(self, img_bgr, scale_factor):
         """
-        1. 优先尝试匹配完整的 "n/5" 词组模板。
-        2. 如果词组匹配失败，则回退到识别单个字符。
+        自动校准颜色并识别count。
+        1. 如果颜色未知，则遍历所有可能的颜色，选择匹配度最高的作为当前局的颜色。
+        2. 之后只使用已确定的颜色进行识别。
+        3. 在Debug模式下，会将预处理的mask图像保存到debugpath。
         """
         parsed_n = None
         try:
-            phrase_templates = {name: tmpl for name, tmpl in self.templates.items() if name.startswith('c')}
-            
-            if phrase_templates:
+            # --- 步骤1: 颜色校准 (仅在颜色未知时运行) ---
+            if self._detected_count_color is None:
+                self.logger.info("正在尝试自动校准'Count'区域的颜色...")
+                best_score = 0
+                best_color = None
+                
+                # 准备用于校准的图像区域
                 x0, y0, x1, y1 = self._count_roi
                 roi_img = img_bgr[y0:y1, x0:x1]
 
@@ -320,43 +417,94 @@ class MalwarfareMapHandler:
                     h, w = roi_img.shape[:2]
                     ocr_scale_factor = 2.5
                     enlarged_roi = cv2.resize(roi_img, (int(w * ocr_scale_factor), int(h * ocr_scale_factor)), interpolation=cv2.INTER_CUBIC)
-                    processed_roi = self._preprocess_image(enlarged_roi, 'green')
-                    
-                    best_score = 0
-                    best_match = None
+                    hsv_img = cv2.cvtColor(enlarged_roi, cv2.COLOR_BGR2HSV) ### FIXED ###
 
+                    phrase_templates = {name: tmpl for name, tmpl in self.templates.items() if name.startswith('c')}
+                    
+                    # 优化：先循环颜色，再循环模板，避免重复生成mask
+                    for color_name, (lower, upper) in self.count_color_processors.items():
+                        mask = cv2.inRange(hsv_img, lower, upper)
+                        
+                        # --- DEBUG SAVE ---
+                        if self.debug and cv2.countNonZero(mask) > 20:
+                            timestamp = int(time.time() * 1000)
+                            filename = f"{timestamp}_count_CALIBRATE_{color_name}.png"
+                            filepath = os.path.join(self.debug_path, filename)
+                            cv2.imwrite(filepath, cv2.bitwise_not(mask))
+                        # --- END DEBUG SAVE ---
+
+                        # 使用生成的mask与所有词组模板进行匹配
+                        for name, tmpl in phrase_templates.items():
+                            th, tw = tmpl.shape[:2]
+                            final_template_scale = scale_factor
+                            if int(tw * final_template_scale) < 1 or int(th * final_template_scale) < 1: continue
+                            
+                            scaled_template = cv2.resize(tmpl, (int(tw * final_template_scale), int(th * final_template_scale)), interpolation=cv2.INTER_CUBIC)
+                            _, scaled_template_binary = cv2.threshold(scaled_template, 127, 255, cv2.THRESH_BINARY)
+                            
+                            if scaled_template_binary.shape[0] > mask.shape[0] or scaled_template_binary.shape[1] > mask.shape[1]: continue
+                            
+                            res = cv2.matchTemplate(mask, scaled_template_binary, cv2.TM_CCOEFF_NORMED)
+                            _, max_val, _, _ = cv2.minMaxLoc(res)
+                            
+                            if max_val > best_score:
+                                best_score = max_val
+                                best_color = color_name
+                
+                if best_score > 0.75:
+                    self._detected_count_color = best_color
+                    self.logger.info(f"颜色校准成功！本局游戏'Count'颜色为: {self._detected_count_color.upper()}")
+                else:
+                    self.logger.warning(f"颜色校准失败 (最高分: {best_score:.2f})，将在下一轮继续尝试。")
+                    return
+
+            # --- 步骤2: 使用已确定的颜色进行常规识别 ---
+            if self._detected_count_color:
+                color_to_use = self.count_color_processors[self._detected_count_color]
+                
+                x0, y0, x1, y1 = self._count_roi
+                roi_img = img_bgr[y0:y1, x0:x1]
+                if roi_img.size > 0:
+                    h, w = roi_img.shape[:2]
+                    ocr_scale_factor = 2.5
+                    enlarged_roi = cv2.resize(roi_img, (int(w * ocr_scale_factor), int(h * ocr_scale_factor)), interpolation=cv2.INTER_CUBIC)
+                    hsv_img = cv2.cvtColor(enlarged_roi, cv2.COLOR_BGR2HSV) ### FIXED ###
+                    processed_roi = cv2.inRange(hsv_img, color_to_use[0], color_to_use[1])
+                    
+                    # --- DEBUG SAVE ---
+                    if self.debug and cv2.countNonZero(processed_roi) > 20:
+                        timestamp = int(time.time() * 1000)
+                        filename = f"{timestamp}_count_RECOGNIZE_{self._detected_count_color}.png"
+                        filepath = os.path.join(self.debug_path, filename)
+                        cv2.imwrite(filepath, cv2.bitwise_not(processed_roi))
+                    # --- END DEBUG SAVE ---
+                    
+                    phrase_templates = {name: tmpl for name, tmpl in self.templates.items() if name.startswith('c')}
+                    best_match_score = 0; best_match_name = None
                     for name, tmpl in phrase_templates.items():
                         th, tw = tmpl.shape[:2]
-                        final_template_scale = scale_factor
-                        
-                        if int(tw * final_template_scale) < 1 or int(th * final_template_scale) < 1:
-                            continue
-                        
-                        scaled_template = cv2.resize(tmpl, (int(tw * final_template_scale), int(th * final_template_scale)), interpolation=cv2.INTER_CUBIC)
+                        scaled_template = cv2.resize(tmpl, (int(tw * scale_factor), int(th * scale_factor)), cv2.INTER_CUBIC)
                         _, scaled_template_binary = cv2.threshold(scaled_template, 127, 255, cv2.THRESH_BINARY)
-
-                        if scaled_template_binary.shape[0] > processed_roi.shape[0] or scaled_template_binary.shape[1] > processed_roi.shape[1]:
-                            continue
-                        
+                        if scaled_template_binary.shape[0] > processed_roi.shape[0] or scaled_template_binary.shape[1] > processed_roi.shape[1]: continue
                         res = cv2.matchTemplate(processed_roi, scaled_template_binary, cv2.TM_CCOEFF_NORMED)
                         _, max_val, _, _ = cv2.minMaxLoc(res)
-
-                        if max_val > best_score:
-                            best_score = max_val
-                            best_match = name
+                        if max_val > best_match_score: best_match_score = max_val; best_match_name = name
                     
-                    if best_score > 0.8:
-                        parsed_n = int(best_match[1:])
-                        self.logger.debug(f"词组匹配成功: '{best_match}'，分数 {best_score:.2f}")
+                    if best_match_score > 0.8:
+                        parsed_n = int(best_match_name[1:])
+                        self.logger.debug(f"词组匹配成功: '{best_match_name}'，分数 {best_match_score:.2f}")
 
-            if parsed_n is None:
+            if parsed_n is None and self._detected_count_color:
                 self.logger.debug("词组匹配失败或跳过，回退到单字符识别。")
                 single_char_templates = {name: tmpl for name, tmpl in self.templates.items() if not name.startswith('c')}
+                # --- Small fix for fallback recognition ---
+                # The original _recognize_text_from_roi takes 'green' or 'yellow' as color_type.
+                # We should pass the actual detected color name.
                 text = self._recognize_text_from_roi(
-                    img_bgr, self._count_roi, scale_factor, 'green', 
+                    img_bgr, self._count_roi, scale_factor, self._detected_count_color,
                     threshold=0.75, ocr_scale_factor=2.5,
                     templates_to_use=single_char_templates,
-                    debug_name="count_fallback"
+                    debug_name=f"count_fallback_{self._detected_count_color}"
                 )
                 self.logger.debug(f"单字符识别结果: '{text}'")
                 if '/' in text:
@@ -365,12 +513,12 @@ class MalwarfareMapHandler:
                         parsed_n = int(parts[0])
 
             parsed_n = self._post_process_n_value(parsed_n)
-            
             with self._count_lock:
                 self._latest_count = parsed_n
+
         except Exception as e:
             self.logger.error(f"Count区域OCR出错: {e}", exc_info=True)
-
+                
     def _ocr_and_process_time_and_paused(self, img_bgr, scale_factor):
         """
         1. 识别3位数时间。
@@ -412,11 +560,13 @@ class MalwarfareMapHandler:
         except Exception as e:
             self.logger.error(f"Time/Paused区域OCR出错: {e}", exc_info=True)
 
+    
     def _update_latest_result(self):
         """
         最终版：
         1. 组合结果。
         2. 增加状态保持逻辑：当游戏进行中OCR短暂失效时，不更新结果。
+        3. 增加延迟补偿：将最终有效时间减去1秒。
         """
         parsed = None
         with self._count_lock, self._paused_lock, self._time_lock:
@@ -437,9 +587,20 @@ class MalwarfareMapHandler:
                             if current_total_seconds > last_total_seconds:
                                 is_valid_update = False
                                 self.logger.debug(f"时间未减小，忽略: {current_total_seconds}s > {last_total_seconds}s")
+                    
                     if is_valid_update:
-                        formatted_time = f"{min_val}:{str(sec_val).zfill(2)}"
+                        # --- 关键修改：延迟补偿 ---
+                        # 将总秒数减一，并确保不会低于0
+                        adjusted_total_seconds = max(0, current_total_seconds - 1)
+                        
+                        # 从调整后的总秒数重新计算分钟和秒
+                        adjusted_min = adjusted_total_seconds // 60
+                        adjusted_sec = adjusted_total_seconds % 60
+                        
+                        # 使用调整后的时间来格式化最终结果
+                        formatted_time = f"{adjusted_min}:{str(adjusted_sec).zfill(2)}"
                         parsed = {"lang": "en", "n": latest_count, "time": formatted_time}
+
             except (ValueError, IndexError) as e:
                 self.logger.warning(f"时间字符串格式错误 '{latest_time}': {e}")
 
@@ -448,22 +609,18 @@ class MalwarfareMapHandler:
         if parsed is None and latest_count is not None:
             parsed = {"lang": "en", "n": latest_count, "time": ""}
         
-        # --- 关键修改：状态保持逻辑 ---
-        # 如果这次识别的结果是“仅有Count”，我们需要检查上次的结果
+        # 状态保持逻辑
         if parsed and parsed.get('time') == "" and self._last_valid_parsed:
             last_time = self._last_valid_parsed.get('time')
-            # 如果上次的结果是一个有效的、正在进行中的时间
             if last_time and last_time not in ["PAUSED", ""]:
                 try:
                     last_min, last_sec = map(int, last_time.split(':'))
                     last_total_seconds = last_min * 60 + last_sec
-                    # 并且这个时间大于5秒（表示游戏正在活跃进行中）
                     if last_total_seconds > 5:
-                        # 那么这次的“仅有Count”很可能是OCR的短暂失灵，我们选择不更新结果
                         self.logger.debug(f"OCR短暂丢失了活跃时间(>0:05)，保留上一次有效结果: {self._last_valid_parsed}")
-                        return # 直接返回，跳过下面的更新步骤
+                        return
                 except (ValueError, IndexError):
-                    pass # 如果上次的时间格式有问题，则正常更新
+                    pass
 
         if parsed:
             if self._last_valid_parsed is None or parsed != self._last_valid_parsed:
