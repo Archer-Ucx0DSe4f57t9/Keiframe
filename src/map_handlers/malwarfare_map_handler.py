@@ -117,7 +117,15 @@ class MalwarfareMapHandler:
         self.logger.info("正在探测UI偏移状态...")
         
         # 遍历所有定义好的偏移状态
-        for state_index, y_offset in enumerate(self.UI_STATE_OFFSETS):
+        if self.debug:
+            possible_offsets = self.UI_STATE_OFFSETS.copy()
+            for an_offset in self.UI_STATE_OFFSETS:
+                an_offset = an_offset + config.MALWARFARE_REPLAY_OFFSET
+                possible_offsets.append(an_offset)
+        else:
+            possible_offsets = self.UI_STATE_OFFSETS
+            
+        for state_index, y_offset in enumerate(possible_offsets):
             
             # 计算当前探测的ROI坐标
             probe_roi_coords = (
@@ -161,7 +169,9 @@ class MalwarfareMapHandler:
                     self._base_time_roi[2], self._base_time_roi[3] + y_offset
                 )
                 return True # 探测成功，结束函数
-
+        
+        
+        
         self.logger.warning("UI状态探测失败，所有预设位置均未找到有效信息。")
         return False
     
@@ -425,6 +435,11 @@ class MalwarfareMapHandler:
                     for color_name, (lower, upper) in self.count_color_processors.items():
                         mask = cv2.inRange(hsv_img, lower, upper)
                         
+                        
+                        # 创建一个内核, (3,3) 是一个常用的大小，可以根据效果调整
+                        kernel = np.ones((3, 3), np.uint8)
+                        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=1)
+                        
                         # --- DEBUG SAVE ---
                         if self.debug and cv2.countNonZero(mask) > 20:
                             timestamp = int(time.time() * 1000)
@@ -470,6 +485,11 @@ class MalwarfareMapHandler:
                     enlarged_roi = cv2.resize(roi_img, (int(w * ocr_scale_factor), int(h * ocr_scale_factor)), interpolation=cv2.INTER_CUBIC)
                     hsv_img = cv2.cvtColor(enlarged_roi, cv2.COLOR_BGR2HSV) ### FIXED ###
                     processed_roi = cv2.inRange(hsv_img, color_to_use[0], color_to_use[1])
+                    
+                    
+                    # +++ 新增：形态学闭操作 +++
+                    kernel = np.ones((3, 3), np.uint8)
+                    processed_roi = cv2.morphologyEx(processed_roi, cv2.MORPH_CLOSE, kernel, iterations=1)
                     
                     # --- DEBUG SAVE ---
                     if self.debug and cv2.countNonZero(processed_roi) > 20:
