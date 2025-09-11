@@ -53,3 +53,26 @@ def get_window_style():
 
     return has_titlebar
 
+#判断游戏窗口是否已经激活
+def is_game_active() -> bool:
+
+    # 1. 获取当前前景窗口的句柄
+    foreground_hwnd = win32gui.GetForegroundWindow()
+
+    # 2. 检查窗口是否最小化
+    # IsIconic 函数用于判断窗口是否最小化
+    is_minimized = win32gui.IsIconic(hwnd)
+
+    # 3. 检查窗口是否可见
+    # isWindowVisible 函数用于判断窗口是否可见（不是隐藏状态）
+    # 注意：即使窗口被其他窗口完全遮挡，只要它没有被设置为隐藏，这个函数也会返回 True
+    is_visible = win32gui.IsWindowVisible(hwnd)
+    
+    # 综合判断:
+    # - 目标窗口必须是当前的前景窗口 (hwnd == foreground_hwnd)
+    # - 目标窗口不能是最小化状态 (not is_minimized)
+    # - 目标窗口本身是可见的 (is_visible)
+    if hwnd == foreground_hwnd and not is_minimized and is_visible:
+        return True
+    else:
+        return False

@@ -10,7 +10,7 @@ import os
 # 自带模块
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 BASE_DIR = os.path.dirname(__file__)
-from window_utils import get_sc2_window_geometry
+from window_utils import get_sc2_window_geometry, is_game_active
 import config
 
 class MalwarfareMapHandler:
@@ -24,6 +24,8 @@ class MalwarfareMapHandler:
         self.toast_manager = toast_manager
         self.logger = logger
         self.debug = debug
+        self._consecutive_failures = 0 #连续获取数据失败一定次数后重定位
+        self._shutdown_condition_counter = 0 #在n=4(最后一个锁)时，如果时间小于20秒持续一定时间，结束运行（最后一波在倒计时还剩30秒时发出，10秒已经很足够）
         
         # 获取当前文件所在目录，用于构建绝对路径
         base_dir = os.path.dirname(__file__)
@@ -92,6 +94,19 @@ class MalwarfareMapHandler:
         self.BASE_RESOLUTION_WIDTH = 1920.0
         template_dir = 'char_templates_1920w'
         self.templates = self._load_templates(template_dir)
+        #人族和rep用
+        self.templates_green = self._load_templates('char_templates_1920w')
+        #神族和虫族count用
+        self.templates_orange = self._load_templates('char_templates_1920w_orange')
+        self.templates_blue = self._load_templates('char_templates_1920w_blue')
+        
+        self.template_sets = {
+        'green': self.templates_green,
+        'orange': self.templates_orange,
+        'blue': self.templates_blue
+        }
+        self.templates = self.templates_green
+        
 
         # --- 4. 状态变量初始化 ---
         self._latest_count = None
@@ -117,14 +132,12 @@ class MalwarfareMapHandler:
         self.logger.info("正在探测UI偏移状态...")
         
         # 遍历所有定义好的偏移状态
-        if self.debug:
-            possible_offsets = self.UI_STATE_OFFSETS.copy()
-            for an_offset in self.UI_STATE_OFFSETS:
-                an_offset = an_offset + config.MALWARFARE_REPLAY_OFFSET
-                possible_offsets.append(an_offset)
-        else:
-            possible_offsets = self.UI_STATE_OFFSETS
-            
+
+        possible_offsets = self.UI_STATE_OFFSETS.copy()
+        for an_offset in self.UI_STATE_OFFSETS:
+            an_offset = an_offset + config.MALWARFARE_REPLAY_OFFSET
+            possible_offsets.append(an_offset)
+
         for state_index, y_offset in enumerate(possible_offsets):
             
             # 计算当前探测的ROI坐标
@@ -351,13 +364,13 @@ class MalwarfareMapHandler:
             with mss.mss() as sct:
                 while self._running:
                     start_time = time.perf_counter()
-                    
                     sc2_rect = get_sc2_window_geometry()
-                    if not sc2_rect:
-                        time.sleep(1)
+                    
+                    if not sc2_rect or not is_game_active():
                         # 当游戏窗口关闭时，重置状态以便下次启动时重新探测
                         self._current_ui_offset_state = -1
                         self._detected_count_color = None
+                        time.sleep(1)
                         continue
                     
                     x, y, w, h = sc2_rect
@@ -369,9 +382,18 @@ class MalwarfareMapHandler:
                     scale_factor = current_width / self.BASE_RESOLUTION_WIDTH
                     
                     monitor = {"top": y, "left": x, "width": w, "height": h}
-                    game_screen_bgr = cv2.cvtColor(np.array(sct.grab(monitor)), cv2.COLOR_BGRA2BGR)
-
-                    # --- 核心修改：如果UI状态未知，则先进行探测 ---
+                    
+                     # 1. 原始 mss.grab() 返回的是一个 MSS.Image 对象
+                    sct_img = sct.grab(monitor)
+                    
+                    # 2. 将其转换为numpy数组时，明确指定数据类型为 uint8。
+                    #    这会“净化”数据，使其与 cv2.imread() 读取的数组格式完全一致，解决颜色校准失败的问题。
+                    img_array = np.array(sct_img, dtype=np.uint8)
+                    
+                    # 3. 现在再进行颜色空间转换
+                    game_screen_bgr = cv2.cvtColor(img_array, cv2.COLOR_BGRA2BGR)
+                    
+                    # 如果UI状态未知，则先进行探测 
                     if self._current_ui_offset_state == -1:
                         if not self._detect_and_set_ui_state(game_screen_bgr):
                             # 如果探测失败，则等待下一轮，不进行OCR
@@ -419,7 +441,6 @@ class MalwarfareMapHandler:
                 best_score = 0
                 best_color = None
                 
-                # 准备用于校准的图像区域
                 x0, y0, x1, y1 = self._count_roi
                 roi_img = img_bgr[y0:y1, x0:x1]
 
@@ -427,29 +448,26 @@ class MalwarfareMapHandler:
                     h, w = roi_img.shape[:2]
                     ocr_scale_factor = 2.5
                     enlarged_roi = cv2.resize(roi_img, (int(w * ocr_scale_factor), int(h * ocr_scale_factor)), interpolation=cv2.INTER_CUBIC)
-                    hsv_img = cv2.cvtColor(enlarged_roi, cv2.COLOR_BGR2HSV) ### FIXED ###
-
-                    phrase_templates = {name: tmpl for name, tmpl in self.templates.items() if name.startswith('c')}
+                    hsv_img = cv2.cvtColor(enlarged_roi, cv2.COLOR_BGR2HSV)
                     
-                    # 优化：先循环颜色，再循环模板，避免重复生成mask
                     for color_name, (lower, upper) in self.count_color_processors.items():
                         mask = cv2.inRange(hsv_img, lower, upper)
                         
-                        
-                        # 创建一个内核, (3,3) 是一个常用的大小，可以根据效果调整
                         kernel = np.ones((3, 3), np.uint8)
                         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=1)
                         
-                        # --- DEBUG SAVE ---
                         if self.debug and cv2.countNonZero(mask) > 20:
                             timestamp = int(time.time() * 1000)
                             filename = f"{timestamp}_count_CALIBRATE_{color_name}.png"
                             filepath = os.path.join(self.debug_path, filename)
                             cv2.imwrite(filepath, cv2.bitwise_not(mask))
-                        # --- END DEBUG SAVE ---
 
-                        # 使用生成的mask与所有词组模板进行匹配
-                        for name, tmpl in phrase_templates.items():
+                        # ### 修正点 1: 在校准时，为当前测试的颜色选择其对应的模板集 ###
+                        current_templates_for_test = self.template_sets.get(color_name, self.templates)
+                        phrase_templates_for_test = {name: tmpl for name, tmpl in current_templates_for_test.items() if name.startswith('c')}
+                        
+                        # 使用与颜色匹配的模板进行匹配测试
+                        for name, tmpl in phrase_templates_for_test.items():
                             th, tw = tmpl.shape[:2]
                             final_template_scale = scale_factor
                             if int(tw * final_template_scale) < 1 or int(th * final_template_scale) < 1: continue
@@ -468,13 +486,18 @@ class MalwarfareMapHandler:
                 
                 if best_score > 0.75:
                     self._detected_count_color = best_color
-                    self.logger.info(f"颜色校准成功！本局游戏'Count'颜色为: {self._detected_count_color.upper()}")
+                    self.logger.info(f"颜色校准成功！本局游戏'Count'颜色为: {self._detected_count_color.upper()} (分数: {best_score:.2f})")
                 else:
                     self.logger.warning(f"颜色校准失败 (最高分: {best_score:.2f})，将在下一轮继续尝试。")
                     return
 
             # --- 步骤2: 使用已确定的颜色进行常规识别 ---
             if self._detected_count_color:
+                active_templates = self.template_sets.get(self._detected_count_color, self.templates)
+                if not active_templates:
+                    self.logger.warning(f"未找到颜色 '{self._detected_count_color}' 的专属模板集，将使用默认模板。")
+                    active_templates = self.templates
+                    
                 color_to_use = self.count_color_processors[self._detected_count_color]
                 
                 x0, y0, x1, y1 = self._count_roi
@@ -483,23 +506,20 @@ class MalwarfareMapHandler:
                     h, w = roi_img.shape[:2]
                     ocr_scale_factor = 2.5
                     enlarged_roi = cv2.resize(roi_img, (int(w * ocr_scale_factor), int(h * ocr_scale_factor)), interpolation=cv2.INTER_CUBIC)
-                    hsv_img = cv2.cvtColor(enlarged_roi, cv2.COLOR_BGR2HSV) ### FIXED ###
+                    hsv_img = cv2.cvtColor(enlarged_roi, cv2.COLOR_BGR2HSV)
                     processed_roi = cv2.inRange(hsv_img, color_to_use[0], color_to_use[1])
                     
-                    
-                    # +++ 新增：形态学闭操作 +++
                     kernel = np.ones((3, 3), np.uint8)
                     processed_roi = cv2.morphologyEx(processed_roi, cv2.MORPH_CLOSE, kernel, iterations=1)
                     
-                    # --- DEBUG SAVE ---
                     if self.debug and cv2.countNonZero(processed_roi) > 20:
                         timestamp = int(time.time() * 1000)
                         filename = f"{timestamp}_count_RECOGNIZE_{self._detected_count_color}.png"
                         filepath = os.path.join(self.debug_path, filename)
                         cv2.imwrite(filepath, cv2.bitwise_not(processed_roi))
-                    # --- END DEBUG SAVE ---
                     
-                    phrase_templates = {name: tmpl for name, tmpl in self.templates.items() if name.startswith('c')}
+                    # ### 修正点 2: 使用 active_templates 而不是 self.templates ###
+                    phrase_templates = {name: tmpl for name, tmpl in active_templates.items() if name.startswith('c')}
                     best_match_score = 0; best_match_name = None
                     for name, tmpl in phrase_templates.items():
                         th, tw = tmpl.shape[:2]
@@ -516,10 +536,11 @@ class MalwarfareMapHandler:
 
             if parsed_n is None and self._detected_count_color:
                 self.logger.debug("词组匹配失败或跳过，回退到单字符识别。")
-                single_char_templates = {name: tmpl for name, tmpl in self.templates.items() if not name.startswith('c')}
-                # --- Small fix for fallback recognition ---
-                # The original _recognize_text_from_roi takes 'green' or 'yellow' as color_type.
-                # We should pass the actual detected color name.
+
+                # ### 修正点 3: 这里同样要使用 active_templates ###
+                active_templates = self.template_sets.get(self._detected_count_color, self.templates)
+                single_char_templates = {name: tmpl for name, tmpl in active_templates.items() if not name.startswith('c')}
+
                 text = self._recognize_text_from_roi(
                     img_bgr, self._count_roi, scale_factor, self._detected_count_color,
                     threshold=0.75, ocr_scale_factor=2.5,
@@ -538,73 +559,108 @@ class MalwarfareMapHandler:
 
         except Exception as e:
             self.logger.error(f"Count区域OCR出错: {e}", exc_info=True)
-                
+            
+            
     def _ocr_and_process_time_and_paused(self, img_bgr, scale_factor):
         """
-        1. 识别3位数时间。
-        2. 对PAUSED状态进行模糊匹配，增强鲁棒性。
+        识别时间和暂停状态。
+        - 如果识别到3位数时间，则设置 time 并将 paused 状态设为 False。
+        - 否则，将 paused 状态设为 True。
         """
         try:
+            # 优先尝试识别时间
             time_text = self._recognize_text_from_roi(img_bgr, self._time_roi, scale_factor, 'yellow', 
-                                                    threshold=0.75, ocr_scale_factor=2.0, debug_name="time")
+                                                      threshold=0.75, ocr_scale_factor=2.0, debug_name="time")
             self.logger.debug(f"Time区域OCR(3位数): '{time_text}'")
-            parsed_time = None
-            if time_text and time_text.isdigit() and len(time_text) == 3:
-                parsed_time = time_text
-            
-            with self._time_lock:
-                self._latest_time = parsed_time
-            
-            if parsed_time is None:
-                paused_text = self._recognize_text_from_roi(img_bgr, self._paused_roi, scale_factor, 'yellow', 
-                                                            threshold=0.75, ocr_scale_factor=2.0, debug_name="paused")
-                self.logger.debug(f"Paused区域OCR: '{paused_text}'")
-                parsed_paused = None
-                
-                # --- 关键修改：PAUSED模糊匹配逻辑 ---
-                # 不再要求完整识别"PAUSED"，只要关键字母出现足够多即可
-                required_chars = {'P', 'A', 'U', 'S', 'E', 'D'}
-                found_chars = set(paused_text.upper())
-                
-                # 如果识别出的字符中，包含了"PAUSED"中至少4个不同的字母，就认为是暂停
-                if len(required_chars.intersection(found_chars)) >= 4:
-                    parsed_paused = "PAUSED"
-                    self.logger.debug(f"模糊匹配成功: 在'{paused_text}'中找到了足够多的PAUSED特征字母。")
 
+            # 条件1：成功识别到3位数字时间
+            if time_text and time_text.isdigit() and len(time_text) == 3:
+                with self._time_lock:
+                    self._latest_time = time_text
                 with self._paused_lock:
-                    self._latest_paused = parsed_paused
-            else:
+                    self._latest_paused = False # 只要有时间，就没有暂停
+                return # 成功识别，结束函数
+
+            # 条件2 & 3：未能识别到有效时间，则判定为暂停状态
+            # 这包含了两种情况：a) 明确识别到"PAUSED"文本 b) 时间区域为空
+            # 两种情况都意味着游戏计时器没有在走
+            
+            paused_text = self._recognize_text_from_roi(img_bgr, self._paused_roi, scale_factor, 'yellow', 
+                                                          threshold=0.75, ocr_scale_factor=2.0, debug_name="paused")
+            self.logger.debug(f"Paused区域OCR: '{paused_text}' (因时间识别失败而检查)")
+            
+            required_chars = {'P', 'A', 'U', 'S', 'E', 'D'}
+            found_chars = set(paused_text.upper())
+            
+            if len(required_chars.intersection(found_chars)) >= 4:
+                # 成功识别到"PAUSED" -> 状态：真暂停
+                with self._time_lock:
+                    self._latest_time = None
                 with self._paused_lock:
-                    self._latest_paused = None
+                    self._latest_paused = True
+                return
+            
+            # 如果时间和"PAUSED"都未识别到 -> 状态：间歇期
+            with self._time_lock:
+                self._latest_time = None # 没有有效时间
+            with self._paused_lock:
+                self._latest_paused = False # 间歇期不是暂停
 
         except Exception as e:
             self.logger.error(f"Time/Paused区域OCR出错: {e}", exc_info=True)
+            # 出错时也设定为暂停状态，作为一种安全默认值
+            with self._time_lock:
+                self._latest_time = None
+            with self._paused_lock:
+                self._latest_paused = True
 
     
     def _update_latest_result(self):
         """
-        最终版：
         1. 组合结果。
         2. 增加状态保持逻辑：当游戏进行中OCR短暂失效时，不更新结果。
-        3. 增加延迟补偿：将最终有效时间减去1秒。
+        3. 暂停时，'time' 字段保持上一次的有效时间。
+        4. 增加延迟补偿：将最终有效时间减去1秒。
         """
         parsed = None
         with self._count_lock, self._paused_lock, self._time_lock:
-            latest_count=self._latest_count; latest_paused=self._latest_paused; latest_time=self._latest_time
+            latest_count=self._latest_count; 
+            latest_paused=self._latest_paused; 
+            latest_time=self._latest_time
         
-        if latest_time and latest_count is not None:
+        # 如果没有识别到节点数，则无法构成有效结果，直接处理失败计数并返回
+        if latest_count is None:
+            if self._current_ui_offset_state != -1:
+                self._consecutive_failures += 1
+                if self._consecutive_failures > 10:
+                    self.logger.warning("已连续识别失败超过10次，可能UI状态已改变。将重置状态并重新探测...")
+                    self._current_ui_offset_state = -1 # 触发重新探测
+                    self._detected_count_color = None # 触发重新校准颜色
+                    self._consecutive_failures = 0 # 重置计数器
+                    self._last_valid_parsed = None # 清空最后结果
+            return
+         # --- Section 1: 统一处理时间和暂停状态 ---
+        
+        final_time_str = None
+        
+        # Case 1: 游戏正在运行 (检测到时间且未暂停)
+        if latest_paused is False and latest_time is not None:
+            
             try:
                 min_val = int(latest_time[0]); sec_val = int(latest_time[1:])
                 if min_val > 3 or sec_val > 59:
                     self.logger.warning(f"时间值超出范围: M={min_val}, S={sec_val}")
                 else:
                     current_total_seconds = min_val * 60 + sec_val
+                    
+                    # 检查时间是否倒退的逻辑
                     is_valid_update = True
                     if self._last_valid_parsed and self._last_valid_parsed.get('time') and self._last_valid_parsed['time'] not in ["PAUSED", ""]:
                         if latest_count == self._last_valid_parsed.get('n'):
                             last_min,last_sec=map(int,self._last_valid_parsed['time'].split(':'))
                             last_total_seconds=last_min*60+last_sec
-                            if current_total_seconds > last_total_seconds:
+                            
+                            if current_total_seconds - 1  > last_total_seconds: #实际时间快进1秒
                                 is_valid_update = False
                                 self.logger.debug(f"时间未减小，忽略: {current_total_seconds}s > {last_total_seconds}s")
                     
@@ -618,21 +674,30 @@ class MalwarfareMapHandler:
                         adjusted_sec = adjusted_total_seconds % 60
                         
                         # 使用调整后的时间来格式化最终结果
-                        formatted_time = f"{adjusted_min}:{str(adjusted_sec).zfill(2)}"
-                        parsed = {"lang": "en", "n": latest_count, "time": formatted_time}
+                        final_time_str = f"{adjusted_min}:{str(adjusted_sec).zfill(2)}"
+                    else:
+                        self.logger.warning(f"时间值超出范围: {latest_time}")
 
             except (ValueError, IndexError) as e:
                 self.logger.warning(f"时间字符串格式错误 '{latest_time}': {e}")
-
-        if parsed is None and latest_paused == "PAUSED" and latest_count is not None:
-            parsed = {"lang": "en", "n": latest_count, "time": "PAUSED"}
-        if parsed is None and latest_count is not None:
-            parsed = {"lang": "en", "n": latest_count, "time": ""}
         
+        # Case 2: 游戏暂停或时间识别失败
+        elif latest_paused:
+            if self._last_valid_parsed and self._last_valid_parsed.get('time'):
+                final_time_str = self._last_valid_parsed.get('time')
+        
+        #输出结果        
+        parsed = {
+                    "lang": "en",
+                    "n": latest_count,
+                    "time": final_time_str,
+                    "is_paused": latest_paused
+                }
+            
         # 状态保持逻辑
-        if parsed and parsed.get('time') == "" and self._last_valid_parsed:
+        if parsed and parsed.get('is_paused') and self._last_valid_parsed:
             last_time = self._last_valid_parsed.get('time')
-            if last_time and last_time not in ["PAUSED", ""]:
+            if last_time:
                 try:
                     last_min, last_sec = map(int, last_time.split(':'))
                     last_total_seconds = last_min * 60 + last_sec
@@ -641,10 +706,40 @@ class MalwarfareMapHandler:
                         return
                 except (ValueError, IndexError):
                     pass
-
+                
+        # --- 自我修复 与 状态更新 --
         if parsed:
+            self._consecutive_failures = 0
             if self._last_valid_parsed is None or parsed != self._last_valid_parsed:
                 self.logger.info(f"状态更新: {parsed}")
                 self._last_valid_parsed = parsed
                 if self.toast_manager: self.toast_manager.show_simple_toast(str(parsed))
-        with self._result_lock: self._latest_result = self._last_valid_parsed
+        
+        # --- 处理最后节点时的自动关闭机制 ---
+        if parsed and self._running: # 确保在有有效结果且线程仍在运行时检查
+            is_shutdown_condition_met = False
+            # 检查 n 是否为 4，以及 time 是否存在且有效
+            if parsed.get('n') == 4 and parsed.get('time') and parsed.get('time') not in ["PAUSED", ""]:
+                try:
+                    minutes, seconds = map(int, parsed['time'].split(':'))
+                    total_seconds = minutes * 60 + seconds
+                    if total_seconds < 20:
+                        is_shutdown_condition_met = True
+                except (ValueError, IndexError):
+                    pass # 时间格式错误则不满足条件
+
+            if is_shutdown_condition_met:
+                # 如果条件满足，计数器加1
+                self._shutdown_condition_counter += 1
+                self.logger.debug(f"自动关闭条件满足，连续计数: {self._shutdown_condition_counter}/10")
+            else:
+                # 如果条件中断（比如n不再是4，或者时间超过20秒），则必须重置计数器
+                self._shutdown_condition_counter = 0
+
+            # 当计数器达到10次时，执行关闭操作
+            if self._shutdown_condition_counter >= 10:
+                self.logger.info("检测到 n=4 且 时间<20秒 的状态已连续满足10次,自动退出净网检测")
+                self._running = False # 设置标志位，让 _run_loop 线程在下一次循环时优雅地退出
+        
+        with self._result_lock:
+            self._latest_result = self._last_valid_parsed
