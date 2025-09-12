@@ -11,21 +11,24 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 BASE_DIR = os.path.dirname(__file__)
 from window_utils import get_sc2_window_geometry, is_game_active
+from logging_util import get_logger
 import config
+
 
 class MalwarfareMapHandler:
     """
     通过屏幕捕捉、图像处理和模板匹配，实时识别净网的当前已净化的节点数，倒计时，和是否处于暂停状态。
     """
-    def __init__(self, toast_manager, logger, debug=True):
+    def __init__(self, toast_manager, debug=True):
         """
         初始化处理器。
         """
         self.toast_manager = toast_manager
-        self.logger = logger
+        self.logger = get_logger(__name__)
         self.debug = debug
         self._consecutive_failures = 0 #连续获取数据失败一定次数后重定位
         self._shutdown_condition_counter = 0 #在n=4(最后一个锁)时，如果时间小于20秒持续一定时间，结束运行（最后一波在倒计时还剩30秒时发出，10秒已经很足够）
+        self._time_recognition_failures = 0 #时间识别的连续失败计数器
         
         # 获取当前文件所在目录，用于构建绝对路径
         base_dir = os.path.dirname(__file__)
@@ -567,13 +570,15 @@ class MalwarfareMapHandler:
         - 如果识别到3位数时间，则设置 time 并将 paused 状态设为 False。
         - 否则，将 paused 状态设为 True。
         """
+        FAILURE_THRESHOLD = 10  # 约等于 5 * 33ms ~= 165ms 的容忍窗口
+        
         try:
             # 优先尝试识别时间
             time_text = self._recognize_text_from_roi(img_bgr, self._time_roi, scale_factor, 'yellow', 
                                                       threshold=0.75, ocr_scale_factor=2.0, debug_name="time")
             self.logger.debug(f"Time区域OCR(3位数): '{time_text}'")
 
-            # 条件1：成功识别到3位数字时间
+            # Case A: 时间识别成功 (游戏运行中)
             if time_text and time_text.isdigit() and len(time_text) == 3:
                 with self._time_lock:
                     self._latest_time = time_text
@@ -581,10 +586,10 @@ class MalwarfareMapHandler:
                     self._latest_paused = False # 只要有时间，就没有暂停
                 return # 成功识别，结束函数
 
-            # 条件2 & 3：未能识别到有效时间，则判定为暂停状态
+            # Case B：未能识别到有效时间，则判定为暂停状态
             # 这包含了两种情况：a) 明确识别到"PAUSED"文本 b) 时间区域为空
             # 两种情况都意味着游戏计时器没有在走
-            
+            #2. 检查是否为“真暂停”
             paused_text = self._recognize_text_from_roi(img_bgr, self._paused_roi, scale_factor, 'yellow', 
                                                           threshold=0.75, ocr_scale_factor=2.0, debug_name="paused")
             self.logger.debug(f"Paused区域OCR: '{paused_text}' (因时间识别失败而检查)")
@@ -600,19 +605,50 @@ class MalwarfareMapHandler:
                     self._latest_paused = True
                 return
             
-            # 如果时间和"PAUSED"都未识别到 -> 状态：间歇期
-            with self._time_lock:
-                self._latest_time = None # 没有有效时间
-            with self._paused_lock:
-                self._latest_paused = False # 间歇期不是暂停
+            # 如果既没识别到时间，也没识别到暂停，则应用“25秒规则”
+            # 安全地获取上一次的有效结果
+            last_result = self._last_valid_parsed
+            if not last_result:
+                # 如果连上一次的结果都没有（比如刚启动），则默认为间歇期
+                with self._time_lock: self._latest_time = None
+                with self._paused_lock: self._latest_paused = False
+                return
+
+            last_time_str = last_result.get('time')
+
+            # 如果上次没有时间记录，或者n>=5，也视为间歇期
+            if not last_time_str:
+                with self._time_lock: self._latest_time = None
+                with self._paused_lock: self._latest_paused = False
+                return
+
+            try:
+                last_min, last_sec = map(int, last_time_str.split(':'))
+                last_total_seconds = last_min * 60 + last_sec
+
+                # 如果上次时间 > 25秒，则判定为OCR“闪烁”，保持状态不变
+                if last_total_seconds > 25:
+                    self.logger.debug(f"时间识别失败，但上次时间为 {last_time_str} (>25s)，判定为闪烁，保持状态不变。")
+                    # 直接返回，不修改 _latest_time 和 _latest_paused
+                    return
+
+                # 如果上次时间 <= 25秒 (且n<5)，则判定为正常的“间歇期”
+                else:
+                    self.logger.debug(f"时间识别失败，上次时间为 {last_time_str} (<=25s)，判定为间歇期。")
+                    with self._time_lock:
+                        self._latest_time = None
+                    with self._paused_lock:
+                        self._latest_paused = False
+                    return
+
+            except (ValueError, IndexError, TypeError):
+                # 如果解析上次时间出错，安全起见，判定为间歇期
+                self.logger.warning(f"解析上次时间'{last_time_str}'失败，默认进入间歇期。")
+                with self._time_lock: self._latest_time = None
+                with self._paused_lock: self._latest_paused = False
 
         except Exception as e:
             self.logger.error(f"Time/Paused区域OCR出错: {e}", exc_info=True)
-            # 出错时也设定为暂停状态，作为一种安全默认值
-            with self._time_lock:
-                self._latest_time = None
-            with self._paused_lock:
-                self._latest_paused = True
 
     
     def _update_latest_result(self):
@@ -628,26 +664,27 @@ class MalwarfareMapHandler:
             latest_paused=self._latest_paused; 
             latest_time=self._latest_time
         
-        # 如果没有识别到节点数，则无法构成有效结果，直接处理失败计数并返回
+        # 如果没有识别已净化的节点数，则无法构成有效结果，直接处理失败计数并返回
         if latest_count is None:
             if self._current_ui_offset_state != -1:
                 self._consecutive_failures += 1
-                if self._consecutive_failures > 10:
-                    self.logger.warning("已连续识别失败超过10次，可能UI状态已改变。将重置状态并重新探测...")
-                    self._current_ui_offset_state = -1 # 触发重新探测
-                    self._detected_count_color = None # 触发重新校准颜色
-                    self._consecutive_failures = 0 # 重置计数器
-                    self._last_valid_parsed = None # 清空最后结果
+                if self._consecutive_failures > 30: # 阈值可调整
+                    self.logger.warning("已连续识别失败超过阈值，可能UI状态已改变。将重置状态...")
+                    self._current_ui_offset_state = -1
+                    self._detected_count_color = None
+                    self._consecutive_failures = 0
+                    self._last_valid_parsed = None
             return
+
          # --- Section 1: 统一处理时间和暂停状态 ---
-        
         final_time_str = None
         
         # Case 1: 游戏正在运行 (检测到时间且未暂停)
         if latest_paused is False and latest_time is not None:
-            
             try:
-                min_val = int(latest_time[0]); sec_val = int(latest_time[1:])
+                min_val = int(latest_time[0]); 
+                sec_val = int(latest_time[1:])
+                
                 if min_val > 3 or sec_val > 59:
                     self.logger.warning(f"时间值超出范围: M={min_val}, S={sec_val}")
                 else:
@@ -657,12 +694,16 @@ class MalwarfareMapHandler:
                     is_valid_update = True
                     if self._last_valid_parsed and self._last_valid_parsed.get('time') and self._last_valid_parsed['time'] not in ["PAUSED", ""]:
                         if latest_count == self._last_valid_parsed.get('n'):
-                            last_min,last_sec=map(int,self._last_valid_parsed['time'].split(':'))
-                            last_total_seconds=last_min*60+last_sec
-                            
-                            if current_total_seconds - 1  > last_total_seconds: #实际时间快进1秒
-                                is_valid_update = False
-                                self.logger.debug(f"时间未减小，忽略: {current_total_seconds}s > {last_total_seconds}s")
+                            try:
+                                last_min,last_sec=map(int,self._last_valid_parsed['time'].split(':'))
+                                last_total_seconds=last_min*60+last_sec
+
+                                if current_total_seconds - 1  > last_total_seconds: #实际时间快进1秒
+                                    is_valid_update = False
+                                    self.logger.debug(f"时间未减小，忽略: {current_total_seconds}s > {last_total_seconds}s")
+                                    
+                            except (ValueError, IndexError, TypeError):
+                                pass # 解析上次时间失败，则允许本次更新 
                     
                     if is_valid_update:
                         # --- 关键修改：延迟补偿 ---
@@ -676,7 +717,7 @@ class MalwarfareMapHandler:
                         # 使用调整后的时间来格式化最终结果
                         final_time_str = f"{adjusted_min}:{str(adjusted_sec).zfill(2)}"
                     else:
-                        self.logger.warning(f"时间值超出范围: {latest_time}")
+                        final_time_str = self._last_valid_parsed.get('time')
 
             except (ValueError, IndexError) as e:
                 self.logger.warning(f"时间字符串格式错误 '{latest_time}': {e}")
@@ -686,6 +727,8 @@ class MalwarfareMapHandler:
             if self._last_valid_parsed and self._last_valid_parsed.get('time'):
                 final_time_str = self._last_valid_parsed.get('time')
         
+        # Case 3: 间歇期，final_time_str 保持为 None
+        
         #输出结果        
         parsed = {
                     "lang": "en",
@@ -693,20 +736,7 @@ class MalwarfareMapHandler:
                     "time": final_time_str,
                     "is_paused": latest_paused
                 }
-            
-        # 状态保持逻辑
-        if parsed and parsed.get('is_paused') and self._last_valid_parsed:
-            last_time = self._last_valid_parsed.get('time')
-            if last_time:
-                try:
-                    last_min, last_sec = map(int, last_time.split(':'))
-                    last_total_seconds = last_min * 60 + last_sec
-                    if last_total_seconds > 5:
-                        self.logger.debug(f"OCR短暂丢失了活跃时间(>0:05)，保留上一次有效结果: {self._last_valid_parsed}")
-                        return
-                except (ValueError, IndexError):
-                    pass
-                
+
         # --- 自我修复 与 状态更新 --
         if parsed:
             self._consecutive_failures = 0
@@ -719,7 +749,7 @@ class MalwarfareMapHandler:
         if parsed and self._running: # 确保在有有效结果且线程仍在运行时检查
             is_shutdown_condition_met = False
             # 检查 n 是否为 4，以及 time 是否存在且有效
-            if parsed.get('n') == 4 and parsed.get('time') and parsed.get('time') not in ["PAUSED", ""]:
+            if parsed.get('n') == 4 and not parsed.get('is_paused') and parsed.get('time'):
                 try:
                     minutes, seconds = map(int, parsed['time'].split(':'))
                     total_seconds = minutes * 60 + seconds
@@ -743,3 +773,6 @@ class MalwarfareMapHandler:
         
         with self._result_lock:
             self._latest_result = self._last_valid_parsed
+
+    def shutdown_malwarfare_handler(self):
+        self._running = False # 设置标志位，让 _run_loop 线程在下一次循环时优雅地退出

@@ -57,7 +57,6 @@ def main():
         # 最新版的Handler内部逻辑已非常复杂，但初始化接口保持不变
         handler = MalwarfareMapHandler(
             toast_manager=toast_manager,
-            logger=logger,
             debug=False # 设为True可在 'debugpath' 看到中间图像，用于诊断
         )
         
