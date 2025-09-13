@@ -59,11 +59,12 @@ def main():
             toast_manager=toast_manager,
             debug=False # 设为True可在 'debugpath' 看到中间图像，用于诊断
         )
-        
+
         # 启动后台识别线程
         # handler内部会自动处理UI状态探测、颜色校准等所有复杂逻辑
         handler.start()
 
+        
         # --- 主循环，用于周期性获取和打印结果 ---
         logger.info("识别程序已启动。按 Ctrl+C 停止。")
         last_printed_result = None
@@ -72,7 +73,7 @@ def main():
             current_result = None
             with handler._result_lock:
                 current_result = handler._latest_result
-            
+
             # 只有当结果变化时才更新显示，减少控制台闪烁
             if current_result != last_printed_result:
                 if current_result:

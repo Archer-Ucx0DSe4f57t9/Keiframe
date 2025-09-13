@@ -767,6 +767,8 @@ class TimerWindow(QMainWindow):
                         variant_type = 'LR'
                     elif other_suffix in ['A', 'B'] and suffix in ['A', 'B']:
                         variant_type = 'AB'
+                    elif other_suffix in ['神', '人虫'] and suffix in ['神', '人虫']:
+                        variant_type = 'PZT'
                     break
 
             if has_variant and variant_type:
@@ -774,9 +776,12 @@ class TimerWindow(QMainWindow):
                 if variant_type == 'LR':
                     self.version_buttons[0].setText('左')
                     self.version_buttons[1].setText('右')
-                else:  # AB
+                elif variant_type == 'AB':  # AB
                     self.version_buttons[0].setText('A')
                     self.version_buttons[1].setText('B')
+                else:  # PZT （地勤图）
+                    self.version_buttons[0].setText('神')
+                    self.version_buttons[1].setText('人虫')
 
                 # 设置当前选中的按钮
                 current_suffix = suffix

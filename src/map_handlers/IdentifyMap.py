@@ -76,7 +76,7 @@ map_checks = {
         },
         'total_players': 11
     },
-    '机会渺茫': {
+    '机会渺茫-人虫': {
         'check': {
             4: {'Terracino', 'Terrazine', 'Terrazingas', 'Terrazino', 'Terrazyt', 'Терразин', '地嗪', '態化氫', '테라진'},
             5: {'Egon Stetmann', 'Игон Стетманн', '伊崗‧斯特曼', '艾贡·斯台特曼', '이곤 스텟먼'}
