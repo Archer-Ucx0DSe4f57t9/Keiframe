@@ -126,7 +126,7 @@ map_checks = {
         },
         'total_players': 8
     },
-    '往日神庙-A': {
+    '往日神庙-B': {
         'check': {
             6: {'Tempel', 'Tempio', 'Temple', 'Templo', 'Świątynia', 'Храм', '神庙', '神殿', '사원'},
             8: {'Felsen', 'Rocas', 'Rocce', 'Rochas', 'Rochers', 'Rocks', 'Skały', 'Камни', '岩石', '바위'}
