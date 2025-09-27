@@ -25,6 +25,8 @@ import image_util
 from fileutil import get_resources_dir, list_files
 from mutator_manager import MutatorManager
 from map_handlers.map_event_manager import MapEventManager
+from map_handlers.malwarfare_event_manager import MapwarfareEventManager
+from map_handlers.malwarfare_map_handler import MalwarfareMapHandler
 from toast_manager import ToastManager
 import game_monitor
 
@@ -71,12 +73,14 @@ class TimerWindow(QMainWindow):
         # 添加一个标志来追踪地图选择的来源
         self.manual_map_selection = False
 
-        # 初始化UI
-        self.init_ui()
-
         #初始化地图管理模块
         self.toast_manager = ToastManager(self)
-        self.map_event_manager = MapEventManager(self.table_area, self.toast_manager, self.logger)
+        self.map_event_manager = None
+        self.is_map_Malwarfare = False
+        self.malwarfare_handler = None
+        
+        # 初始化UI
+        self.init_ui()
 
         # 初始化定时器
         self.timer = QTimer()
@@ -552,7 +556,39 @@ class TimerWindow(QMainWindow):
                     # 将地图事件的更新任务委托给 MapEventManager
                     if hasattr(self, 'map_event_manager'):
                         self.logger.debug(f'正在检查地图事件: {formatted_time} (格式化后), 原始数据: {game_time}')
-                        self.map_event_manager.update_events(current_seconds, self.game_state.game_screen)
+                        if self.is_map_Malwarfare:
+                            if self.malwarfare_handler:
+                                ocr_data = self.malwarfare_handler.get_latest_data()
+
+                                # 只有在获取到有效数据，且游戏未暂停时，才更新事件
+                                if ocr_data and not ocr_data.get('is_paused') and ocr_data.get('time'):
+                                    current_count = ocr_data.get('n', 1)
+                                    time_str = ocr_data.get('time')
+
+                                    try:
+                                        # 将 "M:SS" 格式的时间字符串转换为总秒数
+                                        parts = time_str.split(':')
+                                        if len(parts) == 2:
+                                            minutes = int(parts[0])
+                                            seconds = int(parts[1])
+                                            countdown_seconds = minutes * 60 + seconds
+
+                                            # 将数据传递给 SpecialLevelEventManager
+                                            self.map_event_manager.update_events(
+                                                current_count,
+                                                countdown_seconds,
+                                                self.game_state.game_screen
+                                            )
+                                        else:
+                                            self.logger.warning(f"从OCR接收到无效的时间格式: {time_str}")
+                                    except (ValueError, TypeError) as e:
+                                            self.logger.error(f"解析OCR时间 '{time_str}' 失败: {e}")
+                            else:
+                                # 如果游戏暂停或未识别到时间，则不更新事件UI，让其保持在上一状态
+                                self.logger.debug(f"游戏暂停或无有效OCR数据，跳过地图事件更新。数据: {ocr_data}")
+                        else:
+                            #地图不是净网行动，使用普通的地图事件管理器即可
+                            self.map_event_manager.update_events(current_seconds, self.game_state.game_screen)
 
                 except Exception as e:
                     self.logger.error(f'调整表格滚动位置和颜色失败: {str(e)}\n{traceback.format_exc()}')
@@ -749,6 +785,42 @@ class TimerWindow(QMainWindow):
         if not self.manual_map_selection and self.sender() == self.combo_box:
             self.manual_map_selection = True
             self.logger.info('用户手动选择了地图')
+            
+        # 根据地图名称实例化正确的事件管理器
+        if map_name == '净网行动':
+            self.logger.warning("检测到特殊地图 '净网行动'，正在启用 MalwarfareEventManager。")
+            self.map_event_manager = MapwarfareEventManager(self.table_area, self.toast_manager, self.logger)
+            self.is_map_Malwarfare = True
+            
+            if self.malwarfare_handler is None:
+                self.logger.info("创建并启动 MalwarfareMapHandler 实例。")
+                self.malwarfare_handler = MalwarfareMapHandler()
+                self.malwarfare_handler.start()
+                
+            # 净网行动需要额外多一列显示计数
+            self.table_area.setColumnCount(4)
+            self.table_area.setColumnWidth(0, 40)  # Count
+            self.table_area.setColumnWidth(1, 50)  # Time
+            self.table_area.setColumnWidth(2, config.MAIN_WINDOW_WIDTH - 95) # Event
+            self.table_area.setColumnWidth(3, 5) # Army (placeholder)
+
+        else:
+            self.logger.warning(f"使用标准地图 '{map_name}'，正在启用 MapEventManager。")
+            self.map_event_manager = MapEventManager(self.table_area, self.toast_manager, self.logger)
+            self.is_map_Malwarfare = False
+            
+            if self.malwarfare_handler is not None:
+                self.logger.info("切换到其他地图，正在关闭 MalwarfareMapHandler。")
+                self.malwarfare_handler.shutdown()
+                self.malwarfare_handler = None # 释放实例
+            
+            # 标准地图是3列
+            self.table_area.setColumnCount(3)
+            self.table_area.setColumnWidth(0, 50)  # Time
+            self.table_area.setColumnWidth(1, config.MAIN_WINDOW_WIDTH - 55) # Event
+            self.table_area.setColumnWidth(2, 5) # Army (placeholder)
+        # <--- MODIFICATION END --->
+        
 
         # 处理地图版本按钮组的显示
         if '-' in map_name:
@@ -825,39 +897,63 @@ class TimerWindow(QMainWindow):
                     # 按tab分隔符拆分时间和事件
                     parts = line.split('\t')
                     self.logger.info(f'处理第{row + 1}行: {line}, 拆分结果: {parts}')
+                    if self.is_map_Malwarfare:
+                        # 净网行动处理逻辑 (4列)
+                        if len(parts) >= 4:
+                            count_item = QTableWidgetItem(parts[0])
+                            time_item = QTableWidgetItem(parts[1])
+                            event_item = QTableWidgetItem(parts[2])
+                            army_item = QTableWidgetItem(parts[3])
 
-                    if len(parts) >= 2:
-                        # 创建时间单元格
-                        time_item = QTableWidgetItem(parts[0])
-                        time_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                        time_item.setForeground(QBrush(QColor(255, 255, 255)))  # 修改时间列文字颜色为白色
-                        self.table_area.setItem(row, 0, time_item)
+                            # 设置颜色和对齐
+                            for item in [count_item, time_item, event_item, army_item]:
+                                item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                                item.setForeground(QBrush(QColor(255, 255, 255)))
 
-                        # 创建事件单元格
-                        event_item = QTableWidgetItem(parts[1])
-                        event_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                        event_item.setForeground(QBrush(QColor(255, 255, 255)))  # 设置事件列文字颜色为白色
-                        self.table_area.setItem(row, 1, event_item)
-
-                        if len(parts) == 3:
-                            army_item = QTableWidgetItem(parts[2])
-                            army_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                            army_item.setForeground(QBrush(QColor(255, 255, 255)))  # 设置事件
-                            self.table_area.setItem(row, 2, army_item)
-                            self.logger.info(
-                                f'已添加表格内容 - 行{row + 1}: 时间={parts[0]}, 事件={parts[1]}, {parts[2]}')
+                            self.table_area.setItem(row, 0, count_item)
+                            self.table_area.setItem(row, 1, time_item)
+                            self.table_area.setItem(row, 2, event_item)
+                            self.table_area.setItem(row, 3, army_item)
+                            self.logger.info(f'已添加净网表格内容 - 行{row+1}: Count={parts[0]}, Time={parts[1]}, Event={parts[2]}, Army={parts[3]}')
                         else:
-                            self.logger.info(f'已添加表格内容 - 行{row + 1}: 时间={parts[0]}, 事件={parts[1]}')
+                            self.logger.warning(f"行 {row+1} 格式不符合净网地图要求 (需要4列): {line}")
                     else:
-                        # 对于不符合格式的行，将整行内容显示在事件列
-                        event_item = QTableWidgetItem(line)
-                        event_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                        event_item.setForeground(QBrush(QColor(255, 255, 255)))  # 设置事件列文字颜色为白色
+                         # 标准地图处理逻辑 (2或3列)
+                        if len(parts) >= 2:
+                            # 创建时间单元格
+                            time_item = QTableWidgetItem(parts[0])
+                            time_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                            time_item.setForeground(QBrush(QColor(255, 255, 255)))  # 修改时间列文字颜色为白色
+                            self.table_area.setItem(row, 0, time_item)
 
-                        self.table_area.setItem(row, 0, event_item)
-                        self.table_area.setSpan(row, 0, 1, 3)  # 将当前行的两列合并为一列
+                            # 创建事件单元格
+                            event_item = QTableWidgetItem(parts[1])
+                            event_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                            event_item.setForeground(QBrush(QColor(255, 255, 255)))  # 设置事件列文字颜色为白色
+                            self.table_area.setItem(row, 1, event_item)
 
-                        self.logger.info(f'已添加不规范行内容到合并单元格 - 行{row + 1}: {line}')
+                            if len(parts) == 3:
+                                army_item = QTableWidgetItem(parts[2])
+                                army_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                                army_item.setForeground(QBrush(QColor(255, 255, 255)))  # 设置事件
+                                self.table_area.setItem(row, 2, army_item)
+                                self.logger.info(
+                                    f'已添加表格内容 - 行{row + 1}: 时间={parts[0]}, 事件={parts[1]}, {parts[2]}')
+                            elif len(parts) ==4:
+                                self.logger.info(
+                                    f'已添加净网表格内容 - 行{row + 1}: 压制塔={parts[0]}, 时间={parts[1]}, 事件={parts[2]} {parts[3]}')
+                            else:
+                                self.logger.info(f'已添加表格内容 - 行{row + 1}: 时间={parts[0]}, 事件={parts[1]}')
+                        else:
+                            # 对于不符合格式的行，将整行内容显示在事件列
+                            event_item = QTableWidgetItem(line)
+                            event_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                            event_item.setForeground(QBrush(QColor(255, 255, 255)))  # 设置事件列文字颜色为白色
+
+                            self.table_area.setItem(row, 0, event_item)
+                            self.table_area.setSpan(row, 0, 1, 3)  # 将当前行的两列合并为一列
+
+                            self.logger.info(f'已添加不规范行内容到合并单元格 - 行{row + 1}: {line}')
 
                 # 验证表格内容
                 row_count = self.table_area.rowCount()
@@ -1034,6 +1130,10 @@ class TimerWindow(QMainWindow):
     def closeEvent(self, event):
         """窗口关闭事件处理"""
         try:
+            if self.malwarfare_handler is not None:
+                self.logger.info("应用关闭，正在关闭 MalwarfareMapHandler。")
+                self.malwarfare_handler.shutdown()
+                self.malwarfare_handler = None
             # 清理全局快捷键
             keyboard.unhook_all()
             self.logger.info('已清理所有全局快捷键')

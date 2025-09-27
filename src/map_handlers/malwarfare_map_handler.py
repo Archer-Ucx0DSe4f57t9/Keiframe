@@ -19,11 +19,10 @@ class MalwarfareMapHandler:
     """
     通过屏幕捕捉、图像处理和模板匹配，实时识别净网的当前已净化的节点数，倒计时，和是否处于暂停状态。
     """
-    def __init__(self, toast_manager, debug=True):
+    def __init__(self, debug=True):
         """
         初始化处理器。
         """
-        self.toast_manager = toast_manager
         self.logger = get_logger(__name__)
         self.debug = debug
         self._consecutive_failures = 0 #连续获取数据失败一定次数后重定位
@@ -743,7 +742,7 @@ class MalwarfareMapHandler:
             if self._last_valid_parsed is None or parsed != self._last_valid_parsed:
                 self.logger.info(f"状态更新: {parsed}")
                 self._last_valid_parsed = parsed
-                if self.toast_manager: self.toast_manager.show_simple_toast(str(parsed))
+
         
         # --- 处理最后节点时的自动关闭机制 ---
         if parsed and self._running: # 确保在有有效结果且线程仍在运行时检查
@@ -770,9 +769,16 @@ class MalwarfareMapHandler:
             if self._shutdown_condition_counter >= 10:
                 self.logger.info("检测到 n=4 且 时间<20秒 的状态已连续满足10次,自动退出净网检测")
                 self._running = False # 设置标志位，让 _run_loop 线程在下一次循环时优雅地退出
-        
+
         with self._result_lock:
             self._latest_result = self._last_valid_parsed
 
-    def shutdown_malwarfare_handler(self):
-        self._running = False # 设置标志位，让 _run_loop 线程在下一次循环时优雅地退出
+
+    def get_latest_data(self):
+        with self._result_lock:
+            # 返回 self._latest_result 的一个浅拷贝，防止外部修改影响内部状态
+            return self._latest_result.copy() if self._latest_result else None
+
+    def shutdown(self):
+        self.logger.info("正在请求关闭 MalwarfareMapHandler...")
+        self.cleanup()

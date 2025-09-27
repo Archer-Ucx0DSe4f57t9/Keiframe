@@ -111,7 +111,6 @@ def main():
         return
 
     handler = MalwarfareMapHandler(
-        toast_manager=MockToastManager(),
         logger=MockLogger()
     )
 
