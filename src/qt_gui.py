@@ -214,6 +214,17 @@ class TimerWindow(QMainWindow):
         self.time_label.setGeometry(10, 40, 100, 20)  # 调整宽度为100px
         self.time_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)  # 添加鼠标事件穿透
 
+        # 创建倒计时显示标签
+        self.countdown_label = QLabel("", self.main_container)
+        self.countdown_label.setFont(QFont('Consolas', 11))
+        # 使用不同的颜色（例如黄色）以作区分
+        self.countdown_label.setStyleSheet('color: rgb(255, 255, 0); background-color: transparent')
+        self.countdown_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        # 放置在主计时器旁边
+        self.countdown_label.setGeometry(80, 40, 100, 20)
+        self.countdown_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.countdown_label.hide() # 默认隐藏
+        
         # 创建地图版本选择按钮组
         self.map_version_group = QWidget(self.main_container)
         self.map_version_group.setGeometry(60, 40, 100, 20)  # 增加总宽度到100px
@@ -557,9 +568,27 @@ class TimerWindow(QMainWindow):
                     if hasattr(self, 'map_event_manager'):
                         self.logger.debug(f'正在检查地图事件: {formatted_time} (格式化后), 原始数据: {game_time}')
                         if self.is_map_Malwarfare:
+                            if not self.countdown_label.isVisible():
+                                self.countdown_label.show()
                             if self.malwarfare_handler:
                                 ocr_data = self.malwarfare_handler.get_latest_data()
 
+                                if ocr_data:
+                                    time_str = ocr_data.get('time')
+                                    is_paused = ocr_data.get('is_paused')
+
+                                    if is_paused:
+                                        self.countdown_label.setText("(暂停)")
+                                    elif time_str:
+                                        # 使用括号包围，使其更像一个补充信息
+                                        self.countdown_label.setText(f"({time_str})")
+                                    else:
+                                        # 如果是间歇期（没时间也不暂停），则清空文本
+                                        self.countdown_label.setText("")
+                                else:
+                                    # 如果还没有任何OCR数据，也清空文本
+                                    self.countdown_label.setText("")
+                                
                                 # 只有在获取到有效数据，且游戏未暂停时，才更新事件
                                 if ocr_data and not ocr_data.get('is_paused') and ocr_data.get('time'):
                                     current_count = ocr_data.get('n', 1)
@@ -587,7 +616,10 @@ class TimerWindow(QMainWindow):
                                 # 如果游戏暂停或未识别到时间，则不更新事件UI，让其保持在上一状态
                                 self.logger.debug(f"游戏暂停或无有效OCR数据，跳过地图事件更新。数据: {ocr_data}")
                         else:
-                            #地图不是净网行动，使用普通的地图事件管理器即可
+                            #地图不是净网行动，使用普通的地图事件管理器即可,并清空净网专属倒计时
+                            if self.countdown_label.isVisible():
+                                self.countdown_label.hide()
+                                self.countdown_label.setText("") # 顺便清空文本，是个好习惯
                             self.map_event_manager.update_events(current_seconds, self.game_state.game_screen)
 
                 except Exception as e:
@@ -796,7 +828,9 @@ class TimerWindow(QMainWindow):
                 self.logger.info("创建并启动 MalwarfareMapHandler 实例。")
                 self.malwarfare_handler = MalwarfareMapHandler()
                 self.malwarfare_handler.start()
-                
+            
+            self.countdown_label.show() # 显示倒计时标签
+            
             # 净网行动需要额外多一列显示计数
             self.table_area.setColumnCount(4)
             self.table_area.setColumnWidth(0, 40)  # Count
@@ -805,7 +839,7 @@ class TimerWindow(QMainWindow):
             self.table_area.setColumnWidth(3, 5) # Army (placeholder)
 
         else:
-            self.logger.warning(f"使用标准地图 '{map_name}'，正在启用 MapEventManager。")
+            self.logger.info(f"使用标准地图 '{map_name}'，正在启用 MapEventManager。")
             self.map_event_manager = MapEventManager(self.table_area, self.toast_manager, self.logger)
             self.is_map_Malwarfare = False
             

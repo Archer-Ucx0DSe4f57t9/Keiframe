@@ -745,6 +745,7 @@ class MalwarfareMapHandler:
 
         
         # --- 处理最后节点时的自动关闭机制 ---
+        '''
         if parsed and self._running: # 确保在有有效结果且线程仍在运行时检查
             is_shutdown_condition_met = False
             # 检查 n 是否为 4，以及 time 是否存在且有效
@@ -769,7 +770,7 @@ class MalwarfareMapHandler:
             if self._shutdown_condition_counter >= 10:
                 self.logger.info("检测到 n=4 且 时间<20秒 的状态已连续满足10次,自动退出净网检测")
                 self._running = False # 设置标志位，让 _run_loop 线程在下一次循环时优雅地退出
-
+        '''
         with self._result_lock:
             self._latest_result = self._last_valid_parsed
 
