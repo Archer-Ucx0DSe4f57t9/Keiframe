@@ -110,9 +110,7 @@ def main():
         print(f"错误: 图像文件未在 {args.image_path} 找到")
         return
 
-    handler = MalwarfareMapHandler(
-        logger=MockLogger()
-    )
+    handler = MalwarfareMapHandler()
 
     if not handler.templates:
         print("\n[CRITICAL ERROR] 模板未能成功加载，请检查 'char_templates_1920w' 文件夹路径和内容。")

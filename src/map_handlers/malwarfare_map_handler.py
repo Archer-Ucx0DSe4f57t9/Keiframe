@@ -19,7 +19,7 @@ class MalwarfareMapHandler:
     """
     通过屏幕捕捉、图像处理和模板匹配，实时识别净网的当前已净化的节点数，倒计时，和是否处于暂停状态。
     """
-    def __init__(self, debug=True):
+    def __init__(self, debug=False):
         """
         初始化处理器。
         """
@@ -490,7 +490,7 @@ class MalwarfareMapHandler:
                     self._detected_count_color = best_color
                     self.logger.info(f"颜色校准成功！本局游戏'Count'颜色为: {self._detected_count_color.upper()} (分数: {best_score:.2f})")
                 else:
-                    self.logger.warning(f"颜色校准失败 (最高分: {best_score:.2f})，将在下一轮继续尝试。")
+                    self.logger.info(f"颜色校准失败 (最高分: {best_score:.2f})，将在下一轮继续尝试。")
                     return
 
             # --- 步骤2: 使用已确定的颜色进行常规识别 ---

@@ -194,7 +194,7 @@ class MutatorManager(QWidget):
             if next_deployment_time and (
                     next_deployment_time - current_seconds) <= config.MUTATION_FACTOR_ALERT_SECONDS:
                 time_remaining = next_deployment_time - current_seconds
-                message = f"{mutator_types_to_CHS.get(mutator_type)} 还有: {int(time_remaining)}秒 "
+                message = f"{mutator_types_to_CHS.get(mutator_type)} 还有: {int(time_remaining):0>2}秒 "
                 self.show_mutator_alert(message, mutator_type, time_remaining)
             else:
                 self.hide_mutator_alert(mutator_type)

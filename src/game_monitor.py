@@ -38,7 +38,8 @@ PLAYER_NAMES = []
 current_game_id = None  # 添加新的全局变量用于标识当前游戏
 '''
 
-URL = "http://localhost:6119/game/"
+port_game_status  = "http://localhost:6119/game/"
+port_game_screen_status = "http://localhost:6119/ui/"
 troop = None
 
 
@@ -57,10 +58,10 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
             game_data = get_mock_data()
             map_data = get_mock_screen_data()
         else:
-            async with session.get(f'{URL}', timeout=2) as resp:
+            async with session.get(f'{port_game_status}', timeout=2) as resp:
                 resp.raise_for_status()  # 处理非200状态码
                 game_data = await resp.json()
-            async with session.get(f'{URL}ui', timeout=2) as resp:
+            async with session.get(f'{port_game_screen_status}', timeout=2) as resp:
                 resp.raise_for_status()  # 处理非200状态码
                 map_data = await resp.json()
 

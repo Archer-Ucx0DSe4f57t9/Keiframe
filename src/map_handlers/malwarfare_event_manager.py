@@ -123,7 +123,7 @@ class MapwarfareEventManager:
                         time_diff = current_countdown_seconds - row_seconds
                         # 在指定时间窗口内显示或更新提示
                         if 0 < time_diff <= config.MAP_ALERT_SECONDS:
-                            toast_message = f'余{int(time_diff)}秒  ' + f"  {time_item.text()}\t{event_item.text()}" + (
+                            toast_message = f'余{int(time_diff):0>2}秒  ' + f"  {time_item.text()}\t{event_item.text()}" + (
                                 f"\t{army_item.text()}" if army_item and army_item.text() else "")
                             self.toast_manager.show_map_countdown_alert(event_id, time_diff, toast_message, game_screen)
                         else:
