@@ -814,6 +814,8 @@ class TimerWindow(QMainWindow):
     def on_map_selected(self, map_name):
         """处理地图选择变化事件"""
         # 检查是否是由用户手动选择触发的
+        if hasattr(self, 'toast_manager') and self.toast_manager:
+            self.toast_manager.clear_all_alerts()
         if not self.manual_map_selection and self.sender() == self.combo_box:
             self.manual_map_selection = True
             self.logger.info('用户手动选择了地图')

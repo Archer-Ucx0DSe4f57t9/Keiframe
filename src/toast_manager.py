@@ -92,9 +92,19 @@ class ToastManager:
 
     def remove_alert(self, event_id):
         if event_id in self.map_alerts:
-            self.map_alerts[event_id].hide_alert()
+            alert_instance = self.map_alerts.get(event_id)
+            if alert_instance and hasattr(alert_instance, 'hide_alert'):
+                alert_instance.hide_alert()
             del self.map_alerts[event_id]
 
     def has_alert(self, event_id):
         return event_id in self.map_alerts
 
+    def clear_all_alerts(self):
+        self.logger.info("正在清除所有屏幕提示 (toasts)...")
+        # 使用 list() 来创建一个字典值的副本进行迭代，
+        # 这样在循环内部修改字典是安全的。
+        for alert_id in list(self.map_alerts.keys()):
+            self.remove_alert(alert_id) # 复用已有的 remove_alert 逻辑
+        # 确保字典最终为空
+        self.map_alerts.clear()
