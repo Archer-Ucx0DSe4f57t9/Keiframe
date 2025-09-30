@@ -19,7 +19,7 @@ class MalwarfareMapHandler:
     """
     通过屏幕捕捉、图像处理和模板匹配，实时识别净网的当前已净化的节点数，倒计时，和是否处于暂停状态。
     """
-    def __init__(self, debug=False):
+    def __init__(self, game_state = None, debug=False):
         """
         初始化处理器。
         """
@@ -28,6 +28,7 @@ class MalwarfareMapHandler:
         self._consecutive_failures = 0 #连续获取数据失败一定次数后重定位
         self._shutdown_condition_counter = 0 #在n=4(最后一个锁)时，如果时间小于20秒持续一定时间，结束运行（最后一波在倒计时还剩30秒时发出，10秒已经很足够）
         self._time_recognition_failures = 0 #时间识别的连续失败计数器
+        self.game_state = game_state
         
         # 获取当前文件所在目录，用于构建绝对路径
         base_dir = os.path.dirname(__file__)
@@ -359,6 +360,11 @@ class MalwarfareMapHandler:
             self._running = False
             if self._running_thread and self._running_thread.is_alive():
                 self._running_thread.join(timeout=1)
+            #清理线程池
+            try:
+                self._executor.shutdown(wait=False, cancel_futures=True)
+            except TypeError:
+                self._executor.shutdown(wait=False)
             self.logger.info("MalwarfareMapHandler 已停止。")
 
     def _run_loop(self):
@@ -368,7 +374,7 @@ class MalwarfareMapHandler:
                     start_time = time.perf_counter()
                     sc2_rect = get_sc2_window_geometry()
                     
-                    if not sc2_rect or not is_game_active():
+                    if not sc2_rect or not is_game_active() or self.game_state.game_screen =="matchmaking":
                         # 当游戏窗口关闭时，重置状态以便下次启动时重新探测
                         self._current_ui_offset_state = -1
                         self._detected_count_color = None
@@ -780,6 +786,35 @@ class MalwarfareMapHandler:
             # 返回 self._latest_result 的一个浅拷贝，防止外部修改影响内部状态
             return self._latest_result.copy() if self._latest_result else None
 
+    def reset(self):
+        """
+        将处理器的所有内部状态变量重置为初始值。
+        这使得一个实例可以被安全地用于一场新游戏。
+        """
+        self.logger.info("正在重置 MalwarfareMapHandler 的内部状态...")
+        
+        # 重新创建线程池，确保它是全新的
+        if self._executor._shutdown:
+             self._executor = ThreadPoolExecutor(max_workers=3)
+
+        # 重置所有在 __init__ 中设置的状态变量
+        self._consecutive_failures = 0
+        self._shutdown_condition_counter = 0
+        self._time_recognition_failures = 0
+        
+        self._current_ui_offset_state = -1 # 强制重新探测UI位置
+        self._detected_count_color = None  # 强制重新校准颜色
+        
+        self._latest_count = None
+        self._latest_paused = None
+        self._latest_time = None
+        
+        self._last_count_update = 0
+        self._last_status_update = 0
+        
+        self._latest_result = None
+        self._last_valid_parsed = None
+    
     def shutdown(self):
         self.logger.info("正在请求关闭 MalwarfareMapHandler...")
         self.cleanup()

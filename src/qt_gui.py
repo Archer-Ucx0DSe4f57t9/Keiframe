@@ -828,7 +828,8 @@ class TimerWindow(QMainWindow):
             
             if self.malwarfare_handler is None:
                 self.logger.info("创建并启动 MalwarfareMapHandler 实例。")
-                self.malwarfare_handler = MalwarfareMapHandler()
+                self.malwarfare_handler = MalwarfareMapHandler(game_state = self.game_state)
+                self.malwarfare_handler.reset()
                 self.malwarfare_handler.start()
             
             self.countdown_label.show() # 显示倒计时标签
@@ -841,6 +842,7 @@ class TimerWindow(QMainWindow):
             self.table_area.setColumnWidth(3, 5) # Army (placeholder)
 
         else:
+            #标准地图环境
             self.logger.info(f"使用标准地图 '{map_name}'，正在启用 MapEventManager。")
             self.map_event_manager = MapEventManager(self.table_area, self.toast_manager, self.logger)
             self.is_map_Malwarfare = False
