@@ -35,3 +35,4 @@ src/monkey.js
 /src/map_handlers/debugpath/
 /tests/debug_out/
 /tests/samples/
+/tests/debug_output
