@@ -28,7 +28,7 @@ from map_handlers.map_event_manager import MapEventManager
 from map_handlers.malwarfare_event_manager import MapwarfareEventManager
 from map_handlers.malwarfare_map_handler import MalwarfareMapHandler
 from toast_manager import ToastManager
-import ui_setup, game_monitor, config_hotkeys,game_time_handler,map_loader
+import ui_setup, game_monitor, config_hotkeys,game_time_handler,map_loader,app_window_manager
 
 
 class TimerWindow(QMainWindow):
@@ -37,11 +37,7 @@ class TimerWindow(QMainWindow):
     toggle_artifact_signal = pyqtSignal()
 
     def get_screen_resolution(self):
-        user32 = ctypes.windll.user32
-        # user32.SetProcessDPIAware()  # 让 Python 以物理 DPI 运行
-        width = user32.GetSystemMetrics(0)  # 主屏幕宽度
-        height = user32.GetSystemMetrics(1)  # 主屏幕高度
-        return width, height
+        return app_window_manager.get_screen_resolution()
 
     def _run_async_game_scheduler(self, progress_signal):
         """在新线程中启动 asyncio 事件循环"""
@@ -49,6 +45,9 @@ class TimerWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        #在最开始安全地初始化 control_window 为 None
+        # 万一在真正创建前触发了 moveEvent，它可以通过 hasattr() 或 try/except 优雅地失败。
+        self.control_window = None
 
         # 初始化artifact_window
         from misc.artifacts import ArtifactWindow
@@ -98,33 +97,33 @@ class TimerWindow(QMainWindow):
         # 搜索框的信号连接
         if hasattr(self, 'files'): # 确保 setup_search_and_combo_box 已创建 files
             self.setup_search_box_connections(self.files)
+            
+        # 初始化全局快捷键
+        config_hotkeys.init_global_hotkeys(self)
+        
+         # 启动游戏检查线程
+        self.game_check_thread = threading.Thread(target=self._run_async_game_scheduler, args=(self.progress_signal,), daemon=True)
+        self.game_check_thread.start()
+        
 
         # 创建控制窗体
         self.control_window = ControlWindow()
         self.control_window.move(self.x(), self.y() - self.control_window.height())
-        self.control_window.show()
-
+   
         # 连接控制窗口的状态改变信号
-        self.control_window.state_changed.connect(self.on_control_state_changed)
+        self.control_window.state_changed.connect(lambda unlocked: app_window_manager.on_control_state_changed(self,unlocked))
 
         # 监听主窗口位置变化
-        self.windowHandle().windowStateChanged.connect(self.update_control_window_position)
+        self.windowHandle().windowStateChanged.connect(lambda: app_window_manager.update_control_window_position(self))
 
         # 连接信号到处理函数
         self.progress_signal.connect(self.handle_progress_update)
 
-        # 初始化全局快捷键
-        config_hotkeys.init_global_hotkeys(self)
-        
+        QTimer.singleShot(50, self.show_control_window)
         # 强制加载第一个地图
-       
         if hasattr(self, 'files') and self.files:
             map_loader.handle_map_selection(self, self.files[0])
-            
-        # 启动游戏检查线程
-        self.game_check_thread = threading.Thread(target=self._run_async_game_scheduler, args=(self.progress_signal,), daemon=True)
-        self.game_check_thread.start()
-        
+
         # 显示窗口并强制置顶
         self.show()
         if sys.platform == 'win32':
@@ -136,7 +135,7 @@ class TimerWindow(QMainWindow):
 
         # 初始化时设置为锁定状态（不可点击）
         # 使用延迟调用，确保窗口已完全初始化
-        QTimer.singleShot(100, lambda: self.on_control_state_changed(False))
+        QTimer.singleShot(100, lambda: app_window_manager.on_control_state_changed(self, False))
 
     def get_current_screen(self):
         """获取当前窗口所在的显示器"""
@@ -155,20 +154,17 @@ class TimerWindow(QMainWindow):
         # 如果没有找到，返回主显示器
         return QApplication.primaryScreen()
 
-    def update_control_window_position(self):
-        # 保持控制窗口与主窗口位置同步
-        current_screen = self.get_current_screen()
-        screen_geometry = current_screen.geometry()
-
-        # 确保控制窗口不会超出屏幕顶部
-        new_y = max(screen_geometry.y(), self.y() - self.control_window.height())
-        self.control_window.move(self.x(), new_y)
+    def show_control_window(self):
+        """辅助方法：确保 control_window 存在后才显示和定位"""
+        if self.control_window:
+            # 注意：调用 app_window_manager 模块中的函数进行位置更新
+            app_window_manager.update_control_window_position(self)
+            self.control_window.show()
 
     def moveEvent(self, event):
         """鼠标移动事件，用于更新控制窗口位置"""
+        app_window_manager.update_control_window_position(self)
         super().moveEvent(event)
-        if hasattr(self, 'control_window'):
-            self.update_control_window_position()
 
     def handle_screenshot_hotkey(self):
         """处理截图快捷键"""
@@ -202,6 +198,8 @@ class TimerWindow(QMainWindow):
 
     def init_ui(self):
         ui_setup.init_ui(self)
+        
+    
 
     def setup_search_box_connections(self, files):
         ####################
@@ -272,118 +270,19 @@ class TimerWindow(QMainWindow):
 
     def mousePressEvent(self, event):
         """鼠标按下事件，用于实现窗口拖动"""
-        # 检查窗口是否处于可点击状态（非锁定状态）
-        is_clickable = not self.testAttribute(Qt.WA_TransparentForMouseEvents)
-
-        if is_clickable:  # 窗口可点击时
-            if event.button() == Qt.LeftButton:
-                pos = event.pos()
-                map_area = QRect(10, 5, 30, 30)
-                if map_area.contains(pos):
-                    self.drag_position = event.globalPos() - self.frameGeometry().topLeft()
-                    self.is_dragging = True
-                    event.accept()
-                else:
-                    # 检查是否点击了突变按钮
-                    event.ignore()
-        else:
-            if self.ctrl_pressed and event.button() == Qt.LeftButton:
-                pos = event.pos()
-                map_area = QRect(10, 5, 30, 30)
-                if map_area.contains(pos):
-                    self.drag_position = event.globalPos() - self.frameGeometry().topLeft()
-                    self.is_dragging = True
-                    event.accept()
-                else:
-                    event.ignore()
-            else:
-                event.ignore()
+        app_window_manager.mousePressEvent_handler(self, event)
 
     def mouseMoveEvent(self, event):
         """鼠标移动事件，用于实现窗口拖动"""
-        if event.buttons() & Qt.LeftButton and hasattr(self, 'is_dragging') and self.is_dragging:
-            self.move(event.globalPos() - self.drag_position)
-            event.accept()
+        app_window_manager.mouseMoveEvent_handler(self,event)
 
     def mouseReleaseEvent(self, event):
         """鼠标释放事件"""
-        if event.button() == Qt.LeftButton:
-            self.is_dragging = False
-            event.accept()
+        app_window_manager.mouseReleaseEvent_handler(self,event)
 
     def on_control_state_changed(self, unlocked):
         """处理控制窗口状态改变事件"""
-        self.logger.info(f'控制窗口状态改变: unlocked={unlocked}')
-
-        # 根据解锁状态显示或隐藏替换指挥官按钮
-        if hasattr(self, 'replace_commander_btn'):
-            if unlocked and config.REPLACE_COMMANDER_FLAG:
-                self.replace_commander_btn.show()
-            else:
-                self.replace_commander_btn.hide()
-
-        # 同步更新指挥官选择器窗口的显示状态
-        if hasattr(self, 'commander_selector'):
-            self.commander_selector.set_visibility(unlocked)
-
-        # 在Windows平台上，直接使用Windows API设置窗口样式
-        if sys.platform == 'win32':
-            try:
-                import ctypes
-                from ctypes import wintypes
-
-                # 定义Windows API常量
-                GWL_EXSTYLE = -20
-                WS_EX_TRANSPARENT = 0x00000020
-                WS_EX_LAYERED = 0x00080000
-
-                # 获取窗口句柄
-                hwnd = int(self.winId())
-
-                # 获取当前窗口样式
-                ex_style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-                self.logger.info(f'当前窗口样式: {ex_style}')
-
-                if not unlocked:  # 锁定状态（不可点击）
-                    # 添加透明样式
-                    new_ex_style = ex_style | WS_EX_TRANSPARENT | WS_EX_LAYERED
-                    self.logger.info(f'设置窗口为不可点击状态，样式从 {ex_style} 更改为 {new_ex_style}')
-                else:  # 解锁状态（可点击）
-                    # 移除透明样式，但保留WS_EX_LAYERED
-                    new_ex_style = (ex_style & ~WS_EX_TRANSPARENT) | WS_EX_LAYERED
-                    self.logger.info(f'设置窗口为可点击状态，样式从 {ex_style} 更改为 {new_ex_style}')
-
-                # 设置新样式
-                result = ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, new_ex_style)
-                if result == 0:
-                    error = ctypes.windll.kernel32.GetLastError()
-                    self.logger.error(f'SetWindowLongW失败，错误码: {error}')
-
-                # 强制窗口重绘
-                ctypes.windll.user32.SetWindowPos(
-                    hwnd, 0, 0, 0, 0, 0,
-                    0x0001 | 0x0002 | 0x0004 | 0x0020  # SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED
-                )
-
-            except Exception as e:
-                self.logger.error(f'设置Windows平台点击穿透失败: {str(e)}')
-                self.logger.error(traceback.format_exc())
-        else:
-            # 非Windows平台使用Qt的方法
-            self.hide()  # 先隐藏窗口
-
-            if not unlocked:  # 锁定状态（不可点击）
-                self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-                self.logger.info('已设置窗口为不可点击状态')
-            else:  # 解锁状态（可点击）
-                self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
-                self.logger.info('已设置窗口为可点击状态')
-
-            self.show()  # 重新显示窗口
-
-        # 更新突变按钮的状态
-        if hasattr(self, 'mutator_manager'):
-            self.mutator_manager.on_control_state_changed(unlocked)
+        app_window_manager.on_control_state_changed(self,unlocked)
 
     def on_replace_commander(self):
         """处理替换指挥官按钮的点击事件"""
@@ -543,9 +442,4 @@ class TimerWindow(QMainWindow):
     def showEvent(self, event):
         """窗口显示事件，确保窗口始终保持在最上层"""
         super().showEvent(event)
-        if sys.platform == 'win32':
-            import win32gui
-            import win32con
-            hwnd = int(self.winId())
-            win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                                  win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE)
+        app_window_manager.showEvent_handler(self, event)
