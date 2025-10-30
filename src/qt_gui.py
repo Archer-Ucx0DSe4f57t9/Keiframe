@@ -1,34 +1,16 @@
 import os
 import sys
-import re
-import time
 import traceback
-import keyboard
-import ctypes
 import threading, asyncio
-from PyQt5.QtWidgets import (
-    QMainWindow, QWidget, QLabel, QApplication, QComboBox,
-    QTableWidgetItem, QPushButton, QHBoxLayout
-, QLineEdit  # 从 QtWidgets 导入
-)
+from PyQt5.QtWidgets import (QMainWindow, QApplication)
 from control_window import ControlWindow
-from misc.commander_selector import CommanderSelector
-from PyQt5.QtGui import (
-    QFont, QBrush,
-    QColor
-)
-from PyQt5.QtCore import Qt, QTimer, QPoint, pyqtSignal, QRect
+from PyQt5.QtCore import Qt, QTimer, QPoint, pyqtSignal
 import config
 from PyQt5 import QtCore
 
 import image_util
-from fileutil import get_resources_dir, list_files
-from mutator_manager import MutatorManager
-from map_handlers.map_event_manager import MapEventManager
-from map_handlers.malwarfare_event_manager import MapwarfareEventManager
-from map_handlers.malwarfare_map_handler import MalwarfareMapHandler
 from toast_manager import ToastManager
-import ui_setup, game_monitor, config_hotkeys,game_time_handler,map_loader,app_window_manager
+import ui_setup, game_monitor, config_hotkeys,game_time_handler,map_loader,app_window_manager,language_manager
 
 
 class TimerWindow(QMainWindow):
@@ -342,68 +324,10 @@ class TimerWindow(QMainWindow):
 
     def get_text(self, key):
         """获取多语言文本"""
-        try:
-            config_path = get_resources_dir('resources', 'words.conf')
-            with open(config_path, 'r', encoding='utf-8') as f:
-                import json
-                content = json.load(f)
-                texts = content['qt_gui']
-                if config.current_language in texts and key in texts[config.current_language]:
-                    return texts[config.current_language][key]
-                return key
-        except Exception as e:
-            self.logger.error(f"加载语言配置文件失败: {str(e)}")
-            return key
+        return language_manager.get_text(self,key)
 
     def on_language_changed(self, lang):
-        """处理语言切换事件"""
-        # 更新config.py中的语言配置
-        if getattr(sys, 'frozen', False):  # 是否为打包的 exe
-            config_file = os.path.join(os.path.dirname(sys.executable), 'config.py')  # exe 所在目录
-        else:
-            config_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src',
-                                       'config.py')  # 源码所在目录
-
-        self.logger.info(f"load config: {config_file}")
-
-        with open(config_file, 'r', encoding='utf-8') as f:
-            content = f.read()
-
-        # 使用正则表达式替换current_language的值
-        new_content = re.sub(r"current_language\s*=\s*'[^']*'", f"current_language = '{lang}'", content)
-
-        self.logger.info(f"update config: {config_file}")
-        with open(config_file, 'w', encoding='utf-8') as f:
-            f.write(new_content)
-
-        # 更新config模块中的值
-        config.current_language = lang
-
-        # 更新commander_selector的语言设置
-        if hasattr(self, 'commander_selector'):
-            self.commander_selector.set_language(lang)
-
-        # 重新加载地图列表
-        resources_dir = get_resources_dir('resources', 'maps', lang)
-        if not resources_dir:
-            files = []
-        else:
-            files = list_files(resources_dir)
-
-        # 清空并重新添加地图列表
-        self.combo_box.clear()
-        self.combo_box.addItems(files)
-
-        # 如果有文件，自动加载第一个
-        if files:
-            map_loader.handle_map_selection(files[0])
-
-        # 更新UI文本
-        self.map_label.setText(self.get_text('map_label'))
-        self.replace_commander_btn.setText(self.get_text('replace_commander'))
-
-        # 重新初始化系统托盘菜单以更新语言选择标记
-        self.init_tray()
+        return language_manager.on_language_changed(self,lang)
 
     def handle_artifact_shortcut(self):
         # 如果窗口可见，则销毁图片
