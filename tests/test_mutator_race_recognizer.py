@@ -90,11 +90,16 @@ if __name__ == "__main__":
     
     # --- 6. 正常执行原逻辑以获得最终结果 ---
     logger.info("\n--- 正在执行原有的连续识别逻辑 (用于最终确认) ---")
+    
+    TEST_SCALE_FACTOR = 1.0
+    
     for _ in range(recognizer.CONSECUTIVE_MATCH_REQUIREMENT):
         if not recognizer.race_detection_complete:
-            recognizer._scan_for_races(screenshot_gray)
+            # 传入 scale_factor 解决 TypeError
+            recognizer._scan_for_races(screenshot_gray, TEST_SCALE_FACTOR)
         if not recognizer.mutator_detection_complete:
-            recognizer._scan_for_mutators(screenshot_gray)
+            # 传入 scale_factor 解决 TypeError
+            recognizer._scan_for_mutators(screenshot_gray, TEST_SCALE_FACTOR)
     
     # --- 7. 输出最终结果 ---
     final_results = recognizer.get_results()

@@ -45,6 +45,15 @@ class Mutator_and_enemy_race_automatic_recognizer:
         # 初始化状态和结果存储
         self._reset_state()
 
+        #测试用代码
+        x1, y1, x2, y2 = self._base_roi
+        self.RECOGNITION_ROI = {
+            'left': x1,
+            'top': y1,
+            'width': x2 - x1,
+            'height': y2 - y1
+        }
+
     def _load_templates(self, directory_path):
         """从指定目录加载所有 .png 模板图片。"""
         templates = {}
@@ -224,9 +233,9 @@ class Mutator_and_enemy_race_automatic_recognizer:
             while self._running:
                 # 检查所有任务是否都已完成
                 if self.race_detection_complete and self.mutator_detection_complete:
-                    self.logger.info("所有识别任务已完成，线程将休眠。")
+                    self.logger.info("所有识别任务已完成，进入等待状态。")
                     self._running = False # 设置标志位以表明我们想停止
-                    break
+                    continue
 
                 if self.race_detection_complete and not self.mutator_detection_complete and self._race_confirmed_time:
                   elapsed = time.perf_counter() - self._race_confirmed_time

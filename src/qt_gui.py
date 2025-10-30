@@ -28,7 +28,8 @@ from map_handlers.map_event_manager import MapEventManager
 from map_handlers.malwarfare_event_manager import MapwarfareEventManager
 from map_handlers.malwarfare_map_handler import MalwarfareMapHandler
 from toast_manager import ToastManager
-import game_monitor
+import ui_setup, game_monitor, config_hotkeys,game_time_handler
+
 
 class TimerWindow(QMainWindow):
     # 创建信号用于地图更新
@@ -45,6 +46,7 @@ class TimerWindow(QMainWindow):
     def _run_async_game_scheduler(self, progress_signal):
         """在新线程中启动 asyncio 事件循环"""
         asyncio.run(game_monitor.check_for_new_game_scheduler(progress_signal))
+
     def __init__(self):
         super().__init__()
 
@@ -84,7 +86,7 @@ class TimerWindow(QMainWindow):
 
         # 初始化定时器
         self.timer = QTimer()
-        self.timer.timeout.connect(self.update_game_time)
+        self.timer.timeout.connect(lambda: game_time_handler.update_game_time(self))
         self.timer.start(200)  # 自动开始更新，每200毫秒更新一次
 
         # 连接表格区域的双击事件
@@ -92,6 +94,10 @@ class TimerWindow(QMainWindow):
 
         # 初始化系统托盘
         self.init_tray()
+
+        # 搜索框的信号连接
+        if hasattr(self, 'files'): # 确保 setup_search_and_combo_box 已创建 files
+            self.setup_search_box_connections(self.files)
 
         # 创建控制窗体
         self.control_window = ControlWindow()
@@ -108,11 +114,25 @@ class TimerWindow(QMainWindow):
         self.progress_signal.connect(self.handle_progress_update)
 
         # 初始化全局快捷键
-        self.init_global_hotkeys()
+        config_hotkeys.init_global_hotkeys(self)
+        
+        # 强制加载第一个地图
+        # 确保 ui_setup.init_ui 已经创建了 self.files (地图列表) 和 self.on_map_selected 方法
+        if hasattr(self, 'files') and self.files:
+            self.on_map_selected(self.files[0]) # 这一步会实例化 self.map_event_manager！
 
         # 启动游戏检查线程
         self.game_check_thread = threading.Thread(target=self._run_async_game_scheduler, args=(self.progress_signal,), daemon=True)
         self.game_check_thread.start()
+        
+        # 显示窗口并强制置顶
+        self.show()
+        if sys.platform == 'win32':
+            import win32gui
+            import win32con
+            hwnd = int(self.winId())
+            win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
+                                  win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE)
 
         # 初始化时设置为锁定状态（不可点击）
         # 使用延迟调用，确保窗口已完全初始化
@@ -181,234 +201,14 @@ class TimerWindow(QMainWindow):
             self.logger.error(traceback.format_exc())
 
     def init_ui(self):
-        # 初始化变量
-        self.suppress_auto_selection = False
-        """初始化用户界面"""
-        self.setWindowTitle('SC2 Timer')
-        self.setGeometry(config.MAIN_WINDOW_X, config.MAIN_WINDOW_Y, config.MAIN_WINDOW_WIDTH, 30)  # 调整初始窗口位置
+        ui_setup.init_ui(self)
 
-        # 设置窗口样式 - 不设置点击穿透，这将由on_control_state_changed方法控制
-        self.setWindowFlags(
-            Qt.FramelessWindowHint |  # 无边框
-            Qt.WindowStaysOnTopHint |  # 置顶
-            Qt.Tool |  # 不在任务栏显示
-            Qt.MSWindowsFixedSizeDialogHint  # 禁用窗口自动调整
-        )
-        self.setAttribute(Qt.WA_TranslucentBackground)  # 透明背景
-        self.setAttribute(Qt.WA_NoSystemBackground)  # 禁用系统背景
-
-        # 添加键盘事件监听变量
-        self.ctrl_pressed = False
-
-        # 创建主容器控件
-        self.main_container = QWidget(self)
-        self.main_container.setGeometry(0, 0, config.MAIN_WINDOW_WIDTH, 50)  # 调整主容器初始高度
-        from config import MAIN_WINDOW_BG_COLOR
-        self.main_container.setStyleSheet(f'background-color: {MAIN_WINDOW_BG_COLOR}')
-
-        # 创建时间显示标签
-        self.time_label = QLabel(self.current_time, self.main_container)
-        self.time_label.setFont(QFont('Consolas', 11))
-        self.time_label.setStyleSheet('color: rgb(0, 255, 128); background-color: transparent')
-        self.time_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.time_label.setGeometry(10, 40, 100, 20)  # 调整宽度为100px
-        self.time_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)  # 添加鼠标事件穿透
-
-        # 创建倒计时显示标签
-        self.countdown_label = QLabel("", self.main_container)
-        self.countdown_label.setFont(QFont('Consolas', 11))
-        # 使用不同的颜色（例如黄色）以作区分
-        self.countdown_label.setStyleSheet('color: rgb(255, 255, 0); background-color: transparent')
-        self.countdown_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        # 放置在主计时器旁边
-        self.countdown_label.setGeometry(80, 40, 100, 20)
-        self.countdown_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        self.countdown_label.hide() # 默认隐藏
-        
-        # 创建地图版本选择按钮组
-        self.map_version_group = QWidget(self.main_container)
-        self.map_version_group.setGeometry(60, 40, 100, 20)  # 增加总宽度到100px
-        self.map_version_group.setStyleSheet('background-color: transparent')
-        version_layout = QHBoxLayout(self.map_version_group)
-        version_layout.setContentsMargins(0, 0, 0, 0)
-        version_layout.setSpacing(4)  # 增加按钮间距
-
-        self.version_buttons = []
-        for version in ['A', 'B']:  # 默认使用A/B，后续会根据地图类型动态更改
-            btn = QPushButton(version)
-            btn.setFont(QFont('Arial', 11))  # 增加字体大小
-            btn.setFixedSize(48, 20)  # 增加按钮宽度到48px
-            btn.setCheckable(True)
-            btn.setStyleSheet('''
-                QPushButton {
-                    color: rgb(200, 200, 200);
-                    background-color: rgba(43, 43, 43, 200);
-                    border: none;
-                    border-radius: 3px;
-                    padding: 0px;
-                }
-                QPushButton:checked {
-                    color: rgb(0, 191, 255);
-                    background-color: rgba(0, 191, 255, 30);
-                }
-                QPushButton:hover {
-                    background-color: rgba(0, 191, 255, 20);
-                }
-            ''')
-            version_layout.addWidget(btn)
-            self.version_buttons.append(btn)
-            btn.clicked.connect(self.on_version_selected)
-
-        # 默认隐藏按钮组
-        self.map_version_group.hide()
-
-        # 创建表格显示区
-        from PyQt5.QtWidgets import QTableWidget
-        self.table_area = QTableWidget(self.main_container)
-        self.table_area.setGeometry(0, 65, config.MAIN_WINDOW_WIDTH, config.TABLE_HEIGHT)  # 保持表格区域位置不变
-        self.table_area.setColumnCount(3)
-        self.table_area.horizontalHeader().setVisible(False)  # 隐藏水平表头
-        self.table_area.setColumnWidth(0, 50)  # 设置时间列的固定宽度
-        self.table_area.setColumnWidth(2, 5)  # 设置时间列的固定宽度
-        self.table_area.setColumnWidth(1, config.MAIN_WINDOW_WIDTH - 55)  # 设置文字列的固定宽度
-        self.table_area.verticalHeader().setVisible(False)  # 隐藏垂直表头
-        self.table_area.setEditTriggers(QTableWidget.NoEditTriggers)  # 设置表格只读
-        self.table_area.setSelectionBehavior(QTableWidget.SelectRows)  # 设置选择整行
-        self.table_area.setShowGrid(False)  # 隐藏网格线
-        self.table_area.setStyleSheet(f'''
-            QTableWidget {{ 
-                border: none; 
-                background-color: transparent; 
-                padding-left: 5px; 
-                font-size: {config.TABLE_FONT_SIZE}px;
-                font-family: Arial;
-            }}
-            QTableWidget::horizontalHeader {{ 
-                border: none;
-                background-color: transparent;
-                padding: 0px;
-                padding-left: 5px;
-                text-align: left;
-            }}
-            QTableWidget::verticalHeader {{
-                border: none;
-                background-color: transparent;
-                padding: 0px;
-                padding-left: 5px;
-                text-align: left;
-            }}
-            QTableWidget::item {{ 
-                padding: 0px;
-                padding-left: 5px;
-                text-align: left;
-                /* 移除对颜色的全局设置，允许单元格通过setForeground方法设置颜色 */
-            }}
-            QTableWidget::item:selected {{ 
-                background-color: transparent; 
-                color: rgb(255, 255, 255); 
-                border: none; 
-                text-align: left;
-            }}
-            QTableWidget::item:focus {{ 
-                background-color: transparent; 
-                color: rgb(255, 255, 255); 
-                border: none; 
-                text-align: left;
-            }}''')
-
-        # 设置表格的滚动条策略
-        self.table_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.table_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
-        # self.setFixedSize(config.MAIN_WINDOW_WIDTH, 250)  # 固定窗口大小为250
-
-        # 调整主窗口大小以适应新添加的控件
-        self.main_container.setGeometry(0, 0, config.MAIN_WINDOW_WIDTH, 300)  # 调整容器高度
-
-        # 创建搜索框
-        self.search_box = QLineEdit(self.main_container)
-        self.search_box.setPlaceholderText("搜索…")
-        self.search_box.setFixedSize(50, 30)
-        self.search_box.setFont(QFont('Arial', 9))
-        self.search_box.setStyleSheet('''
-            QLineEdit {
-                color: white;
-                background-color: rgba(50, 50, 50, 200);
-                border: 1px solid gray;
-                border-radius: 5px;
-                padding: 5px;
-            }
-        ''')
-        self.search_box.move(10, 5)
-
-        # 创建下拉框
-        self.combo_box = QComboBox(self.main_container)
-        self.combo_box.setGeometry(40, 5, 117, 30)
-        self.combo_box.setFont(QFont('Arial', 9))  # 修改字体大小为9pt
-
-        # 设置下拉列表视图
-        view = self.combo_box.view()
-        view.setStyleSheet("""
-            background-color: rgba(43, 43, 43, 200);
-            color: white;
-        """)
-
-        # 设置ComboBox样式
-        self.combo_box.setStyleSheet('''
-        QComboBox {
-            color: rgb(0, 191, 255);
-            background-color: rgba(43, 43, 43, 200);
-            border: none;
-            border-radius: 5px;
-            padding: 5px;
-            font-size: 9pt;
-        }
-        QComboBox::drop-down {
-            border: none;
-            width: 20px;
-        }
-        QComboBox::down-arrow {
-            image: none;
-            border-left: 6px solid transparent;
-            border-right: 6px solid transparent;
-            border-top: 6px solid white;
-            width: 0;
-            height: 0;
-            margin-right: 5px;
-        }
-        /* 下拉滚动条样式 */
-        QComboBox QScrollBar:vertical {
-            width: 8px;
-            background: rgba(200, 200, 200, 100);
-        }
-        QComboBox QScrollBar::handle:vertical {
-            background: rgba(150, 150, 150, 150);
-            border-radius: 4px;
-        }''')
-
-        # 加载resources文件夹下的文件
-        resources_dir = get_resources_dir('resources', 'maps', config.current_language)
-        if not resources_dir:
-            files = []
-        else:
-            files = list_files(resources_dir)
-        self.combo_box.setGeometry(60, 5, 100, 30)  # 右移一点
-        # self.combo_box.setGeometry(40, 5, 117, 30)
-        self.combo_box.setFont(QFont('Arial', 9))
-        self.combo_box.addItems(files)
-
-        # 连接下拉框选择变化事件
-        self.combo_box.currentTextChanged.connect(self.on_map_selected)
-
-        # 如果有文件，自动加载第一个
-        if files:
-            self.on_map_selected(files[0])
-
+    def setup_search_box_connections(self, files):
         ####################
         # 用户输入搜索
-        # 清空搜索框的定时器
-        self.clear_search_timer = QTimer()
-        self.clear_search_timer.setSingleShot(True)
+        # 清空搜索框的定时器->现在在ui_setup实现
+        #self.clear_search_timer = QTimer()
+        #self.clear_search_timer.setSingleShot(True)
 
         # 更新搜索内容
         def update_combo_box(keyword, allow_auto_select=True):
@@ -464,177 +264,6 @@ class TimerWindow(QMainWindow):
 
         # 调整时间标签的位置和高度
         self.time_label.setGeometry(10, 40, 100, 20)
-
-        # 在表格区域之后添加图标区域
-        self.mutator_manager = MutatorManager(self.main_container)
-        self.mutator_manager.setStyleSheet("""
-            QWidget {
-                background-color: rgba(43, 43, 43, 96);
-                border-radius: 5px;
-            }
-        """)
-        table_bottom = self.table_area.geometry().bottom()
-        self.mutator_manager.setGeometry(0, table_bottom + 5, self.main_container.width(), 50)
-
-        # 添加替换指挥官按钮
-        self.replace_commander_btn = QPushButton(self.get_text('replace_commander'), self.main_container)
-        self.replace_commander_btn.clicked.connect(self.on_replace_commander)
-        self.replace_commander_btn.setStyleSheet('''
-            QPushButton {
-                color: black;
-                background-color: rgba(236, 236, 236, 200);
-                border: none;
-                border-radius: 3px;
-                padding: 5px;
-                font-size: 12pt;
-            }
-            QPushButton:hover {
-                background-color: rgba(43, 43, 43, 200);
-            }
-        ''')
-        if config.REPLACE_COMMANDER_FLAG:
-            self.replace_commander_btn.setFixedSize(150, 30)
-        else:
-            self.replace_commander_btn.setFixedSize(0, 0)
-        commander_btn_x = (self.main_container.width() - self.replace_commander_btn.width()) // 2
-        self.replace_commander_btn.move(commander_btn_x, self.mutator_manager.geometry().bottom() + 5)
-        self.replace_commander_btn.hide()  # 初始状态为隐藏
-
-        # 更新主容器高度
-        self.main_container.setFixedHeight(self.replace_commander_btn.geometry().bottom() + 5)
-        self.setFixedHeight(self.main_container.height())  # 更新窗口高度
-
-        print(f"图标区域位置: {self.mutator_manager.geometry()}")
-        print(f"主容器高度: {self.main_container.height()}")
-
-        # 创建指挥官选择器实例，传入当前窗口的几何信息
-        self.commander_selector = CommanderSelector(self)
-
-        # 显示窗口并强制置顶
-        self.show()
-        if sys.platform == 'win32':
-            import win32gui
-            import win32con
-            hwnd = int(self.winId())
-            win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                                  win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE)
-
-    def update_game_time(self):
-        """更新游戏时间显示"""
-        self.logger.debug('开始更新游戏时间')
-        start_time = time.time()
-
-        try:
-            # 从全局变量获取游戏时间
-            if self.game_state.most_recent_playerdata and isinstance(self.game_state.most_recent_playerdata, dict):
-                game_time = self.game_state.most_recent_playerdata.get('time', 0)
-                self.logger.debug(f'从全局变量获取的原始时间数据: {game_time}')
-
-                # 格式化时间显示
-                hours = int(float(game_time) // 3600)
-                minutes = int((float(game_time) % 3600) // 60)
-                seconds = int(float(game_time) % 60)
-
-                # 修改格式化逻辑：有小时时显示HH:MM:SS，没有小时时只显示MM:SS
-                if hours > 0:
-                    formatted_time = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-                else:
-                    formatted_time = f"{minutes:02d}:{seconds:02d}"
-
-                self.current_time = formatted_time
-                self.time_label.setText(formatted_time)
-
-                # 更新地图信息（如果有）
-                map_name = self.game_state.most_recent_playerdata.get('map')
-                if map_name:
-                    self.logger.debug(f'地图信息更新: {map_name}')
-
-                self.logger.debug(f'游戏时间更新: {formatted_time} (格式化后), 原始数据: {game_time}')
-
-                # 根据当前时间调整表格滚动位置和行颜色
-                try:
-                    # 将当前时间转换为分钟数，以便于比较
-                    current_minutes = hours * 60 + minutes
-                    current_seconds = current_minutes * 60 + seconds
-
-                    # === 突变信息相关 ===
-
-                    if hasattr(self, 'mutator_manager'):
-                        self.logger.debug(f'正在检查突变: {formatted_time} (格式化后), 原始数据: {game_time}')
-                        self.mutator_manager.check_alerts(current_seconds, self.game_state.game_screen)
-
-                    # ===地图信息相关===
-                    # 将地图事件的更新任务委托给 MapEventManager
-                    if hasattr(self, 'map_event_manager'):
-                        self.logger.debug(f'正在检查地图事件: {formatted_time} (格式化后), 原始数据: {game_time}')
-                        if self.is_map_Malwarfare:
-                            if not self.countdown_label.isVisible():
-                                self.countdown_label.show()
-                            if self.malwarfare_handler:
-                                ocr_data = self.malwarfare_handler.get_latest_data()
-
-                                if ocr_data:
-                                    time_str = ocr_data.get('time')
-                                    is_paused = ocr_data.get('is_paused')
-
-                                    if is_paused:
-                                        self.countdown_label.setText("(暂停)")
-                                    elif time_str:
-                                        # 使用括号包围，使其更像一个补充信息
-                                        self.countdown_label.setText(f"({time_str})")
-                                    else:
-                                        # 如果是间歇期（没时间也不暂停），则清空文本
-                                        self.countdown_label.setText("")
-                                else:
-                                    # 如果还没有任何OCR数据，也清空文本
-                                    self.countdown_label.setText("")
-                                
-                                # 只有在获取到有效数据，且游戏未暂停时，才更新事件
-                                if ocr_data and not ocr_data.get('is_paused') and ocr_data.get('time'):
-                                    current_count = ocr_data.get('n', 1)
-                                    time_str = ocr_data.get('time')
-
-                                    try:
-                                        # 将 "M:SS" 格式的时间字符串转换为总秒数
-                                        parts = time_str.split(':')
-                                        if len(parts) == 2:
-                                            minutes = int(parts[0])
-                                            seconds = int(parts[1])
-                                            countdown_seconds = minutes * 60 + seconds
-
-                                            # 将数据传递给 SpecialLevelEventManager
-                                            self.map_event_manager.update_events(
-                                                current_count,
-                                                countdown_seconds,
-                                                self.game_state.game_screen
-                                            )
-                                        else:
-                                            self.logger.warning(f"从OCR接收到无效的时间格式: {time_str}")
-                                    except (ValueError, TypeError) as e:
-                                            self.logger.error(f"解析OCR时间 '{time_str}' 失败: {e}")
-                            else:
-                                # 如果游戏暂停或未识别到时间，则不更新事件UI，让其保持在上一状态
-                                self.logger.debug(f"游戏暂停或无有效OCR数据，跳过地图事件更新。数据: {ocr_data}")
-                        else:
-                            #地图不是净网行动，使用普通的地图事件管理器即可,并清空净网专属倒计时
-                            if self.countdown_label.isVisible():
-                                self.countdown_label.hide()
-                                self.countdown_label.setText("") # 顺便清空文本，是个好习惯
-                            self.map_event_manager.update_events(current_seconds, self.game_state.game_screen)
-
-                except Exception as e:
-                    self.logger.error(f'调整表格滚动位置和颜色失败: {str(e)}\n{traceback.format_exc()}')
-
-            else:
-                self.logger.debug('未获取到有效的游戏时间数据')
-                self.time_label.setText("00:00")
-
-        except Exception as e:
-            self.logger.error(f'获取游戏时间失败: {str(e)}\n{traceback.format_exc()}')
-            # 如果获取失败，显示默认时间
-            self.time_label.setText("00:00")
-
-        self.logger.debug(f'本次更新总耗时：{time.time() - start_time:.2f}秒\n')
 
     def init_tray(self):
         """初始化系统托盘"""
@@ -1030,28 +659,6 @@ class TimerWindow(QMainWindow):
                     #self.show_toast(selected_text, config.TOAST_DURATION, force_show=True)  # 设置5000毫秒（5秒）后自动消失
             event.accept()
 
-    def init_global_hotkeys(self):
-        """初始化全局快捷键"""
-        try:
-            # 解析快捷键配置
-            map_shortcut = config.MAP_SHORTCUT.replace(' ', '').lower()
-            lock_shortcut = config.LOCK_SHORTCUT.replace(' ', '').lower()
-            screenshot_shortcut = config.SCREENSHOT_SHORTCUT.replace(' ', '').lower()
-            artifact_shortcut = config.SHOW_ARTIFACT_SHORTCUT.replace(' ', '').lower()
-
-            # 注册全局快捷键
-            keyboard.add_hotkey(map_shortcut, self.handle_map_switch_hotkey)
-            keyboard.add_hotkey(lock_shortcut, self.handle_lock_shortcut)
-            keyboard.add_hotkey(screenshot_shortcut, self.handle_screenshot_hotkey)
-
-            self.toggle_artifact_signal.connect(self.handle_artifact_shortcut)
-            keyboard.add_hotkey(artifact_shortcut, self.toggle_artifact_signal.emit)
-            self.logger.info(
-                f'成功注册全局快捷键: {config.MAP_SHORTCUT}, {config.LOCK_SHORTCUT}, {config.SCREENSHOT_SHORTCUT}')
-
-        except Exception as e:
-            self.logger.error(f'注册全局快捷键失败: {str(e)}')
-            self.logger.error(traceback.format_exc())
 
     def get_text(self, key):
         """获取多语言文本"""
@@ -1134,36 +741,6 @@ class TimerWindow(QMainWindow):
                 self.logger.error(f'draw artifacts layer failed: {str(e)}')
                 self.logger.error(traceback.format_exc())
 
-    def handle_lock_shortcut(self):
-        """处理锁定快捷键"""
-        self.logger.info(f'检测到锁定快捷键组合: {config.LOCK_SHORTCUT}')
-        # 切换控制窗口的锁定状态
-        self.control_window.is_locked = not self.control_window.is_locked
-        self.control_window.update_icon()
-        # 发送状态改变信号
-        self.control_window.state_changed.emit(not self.control_window.is_locked)
-
-    def handle_map_switch_hotkey(self):
-        """处理地图切换快捷键"""
-        self.logger.info(f'检测到地图切换快捷键组合: {config.MAP_SHORTCUT}')
-        # 检查当前地图是否为A/B版本
-        if self.map_version_group.isVisible():
-            self.logger.info('当前地图支持A/B版本切换')
-            # 获取当前选中的按钮
-            current_btn = None
-            for btn in self.version_buttons:
-                if btn.isChecked():
-                    current_btn = btn
-                    break
-
-            # 切换到另一个版本
-            if current_btn:
-                current_idx = self.version_buttons.index(current_btn)
-                next_idx = (current_idx + 1) % len(self.version_buttons)
-                self.logger.info(f'从版本 {current_btn.text()} 切换到版本 {self.version_buttons[next_idx].text()}')
-                self.version_buttons[next_idx].click()
-        else:
-            self.logger.info('当前地图不支持A/B版本切换')
 
     def closeEvent(self, event):
         """窗口关闭事件处理"""
@@ -1173,7 +750,7 @@ class TimerWindow(QMainWindow):
                 self.malwarfare_handler.shutdown()
                 self.malwarfare_handler = None
             # 清理全局快捷键
-            keyboard.unhook_all()
+            config_hotkeys.unhook_global_hotkeys(self)
             self.logger.info('已清理所有全局快捷键')
         except Exception as e:
             self.logger.error(f'清理全局快捷键失败: {str(e)}')
