@@ -10,6 +10,7 @@ from PyQt5 import QtCore
 
 import image_util
 from toast_manager import ToastManager
+from mutator_and_enemy_race_automatic_recognizer import Mutator_and_enemy_race_automatic_recognizer
 import ui_setup, game_monitor, config_hotkeys,game_time_handler,map_loader,app_window_manager,language_manager
 
 
@@ -17,6 +18,7 @@ class TimerWindow(QMainWindow):
     # 创建信号用于地图更新
     progress_signal = QtCore.pyqtSignal(list)
     toggle_artifact_signal = pyqtSignal()
+    mutator_and_enemy_race_recognition_signal = QtCore.pyqtSignal(dict)
 
     def get_screen_resolution(self):
         return app_window_manager.get_screen_resolution()
@@ -30,6 +32,10 @@ class TimerWindow(QMainWindow):
         #在最开始安全地初始化 control_window 为 None
         # 万一在真正创建前触发了 moveEvent，它可以通过 hasattr() 或 try/except 优雅地失败。
         self.control_window = None
+
+        # 初始化突变因子和种族识别器
+        self.mutator_and_enemy_race_recognizer = Mutator_and_enemy_race_automatic_recognizer(recognition_signal = self.mutator_and_enemy_race_recognition_signal)
+        self.mutator_and_enemy_race_recognizer.reset_and_start() # 启动识别线程
 
         # 初始化artifact_window
         from misc.artifacts import ArtifactWindow
@@ -61,7 +67,7 @@ class TimerWindow(QMainWindow):
         self.map_event_manager = None
         self.is_map_Malwarfare = False
         self.malwarfare_handler = None
-        
+
         # 初始化UI
         self.init_ui()
 
@@ -79,19 +85,19 @@ class TimerWindow(QMainWindow):
         # 搜索框的信号连接
         if hasattr(self, 'files'): # 确保 setup_search_and_combo_box 已创建 files
             self.setup_search_box_connections(self.files)
-            
+
         # 初始化全局快捷键
         config_hotkeys.init_global_hotkeys(self)
-        
+
          # 启动游戏检查线程
         self.game_check_thread = threading.Thread(target=self._run_async_game_scheduler, args=(self.progress_signal,), daemon=True)
         self.game_check_thread.start()
-        
+
 
         # 创建控制窗体
         self.control_window = ControlWindow()
         self.control_window.move(self.x(), self.y() - self.control_window.height())
-   
+
         # 连接控制窗口的状态改变信号
         self.control_window.state_changed.connect(lambda unlocked: app_window_manager.on_control_state_changed(self,unlocked))
 
@@ -100,8 +106,13 @@ class TimerWindow(QMainWindow):
 
         # 连接信号到处理函数
         self.progress_signal.connect(self.handle_progress_update)
-
+        
+        #连接突变因子和种族识
+        self.mutator_and_enemy_race_recognition_signal.connect(self.handle_mutator_and_enemy_race_recognition_update)
+        
+        #延迟开启主控制界面
         QTimer.singleShot(50, self.show_control_window)
+        
         # 强制加载第一个地图
         if hasattr(self, 'files') and self.files:
             map_loader.handle_map_selection(self, self.files[0])
@@ -119,6 +130,8 @@ class TimerWindow(QMainWindow):
         # 使用延迟调用，确保窗口已完全初始化
         QTimer.singleShot(100, lambda: app_window_manager.on_control_state_changed(self, False))
 
+
+    
     def get_current_screen(self):
         """获取当前窗口所在的显示器"""
         window_geometry = self.geometry()
@@ -279,7 +292,9 @@ class TimerWindow(QMainWindow):
 
     def handle_progress_update(self, data):
         """处理进度更新信号"""
-        if data[0] == 'update_map':
+        action = data[0]
+
+        if action == 'update_map':
             # 在下拉框中查找并选择地图
             map_name = data[1]
             self.logger.info(f'收到地图更新信号: {map_name}')
@@ -295,6 +310,17 @@ class TimerWindow(QMainWindow):
                 map_loader.handle_map_selection(self, map_name)
             else:
                 self.logger.warning(f'未在下拉框中找到地图: {map_name}')
+
+        elif action == 'reset_game_info':
+            self.logger.info('收到新游戏信号，正在重置识别器和游戏状态')
+            # 重置识别器状态，并重新开始扫描
+            if hasattr(self, 'mutator_and_enemy_race_recognizer') and self.mutator_and_enemy_race_recognizer:
+                 self.mutator_and_enemy_race_recognizer.reset_and_start() # 调用识别器的重置和启动方法
+
+            # 清除全局状态中的种族和突变因子
+            game_monitor.state.enemy_race = None
+            game_monitor.state.active_mutators = None
+
 
     def on_version_selected(self):
         map_loader.handle_version_selection(self)
@@ -345,6 +371,23 @@ class TimerWindow(QMainWindow):
                 self.logger.error(f'draw artifacts layer failed: {str(e)}')
                 self.logger.error(traceback.format_exc())
 
+    # 处理识别器传回突变因子和种族的数据
+    def handle_mutator_and_enemy_race_recognition_update(self, results):
+        """处理种族和突变因子识别结果的更新"""
+        race = results.get("race")
+        mutators = results.get("mutators")
+
+        if race:
+            self.logger.warning(f"UI接收到确认种族: {race}")
+            game_monitor.state.enemy_race = race
+
+        if mutators is not None:
+            # 只有当 mutators 不为 None（即识别完成，可能是空列表）时才更新
+            self.logger.warning(f"UI接收到确认突变因子: {mutators}")
+            game_monitor.state.active_mutators = mutators
+            # 调用 MutatorManager 来同步按钮状态
+            if hasattr(self, 'mutator_manager') and self.mutator_manager:
+                self.mutator_manager.sync_mutator_toggles(mutators)
 
     def closeEvent(self, event):
         """窗口关闭事件处理"""
@@ -353,11 +396,16 @@ class TimerWindow(QMainWindow):
                 self.logger.info("应用关闭，正在关闭 MalwarfareMapHandler。")
                 self.malwarfare_handler.shutdown()
                 self.malwarfare_handler = None
+
+            if hasattr(self, 'mutator_and_enemy_race_recognizer') and self.recognizer:
+                self.mutator_and_enemy_race_recognizer.shutdown()
+                self.logger.info("突变因子和种族识别器已关闭。")
+
             # 清理全局快捷键
             config_hotkeys.unhook_global_hotkeys(self)
-            self.logger.info('已清理所有全局快捷键')
+            self.logger.info('已清理')
         except Exception as e:
-            self.logger.error(f'清理全局快捷键失败: {str(e)}')
+            self.logger.error(f'清理失败: {str(e)}')
             self.logger.error(traceback.format_exc())
 
         # 调用父类的closeEvent

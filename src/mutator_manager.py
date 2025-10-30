@@ -13,9 +13,9 @@ from logging_util import get_logger
 from message_presenter import MessagePresenter
 from window_utils import get_sc2_window_geometry
 
-mutator_types = ['deployment', 'propagator', 'voidrifts', 'killbots', 'bombbots']
-mutator_types_to_CHS = {'deployment': '部署', 'propagator': '小软', 'voidrifts': '裂隙', 'killbots': '杀戮',
-                        'bombbots': '炸弹'}
+mutator_types = ['AggressiveDeployment', 'Propagators', 'VoidRifts', 'KillBots', 'BoomBots']
+mutator_types_to_CHS = {'AggressiveDeployment': '部署', 'Propagators': '小软', 'VoidRifts': '裂隙', 'KillBots': '杀戮',
+                        'BoomBots': '炸弹'}
 
 
 class MutatorManager(QWidget):
@@ -41,7 +41,7 @@ class MutatorManager(QWidget):
         layout.setSpacing(8)
         layout.setContentsMargins(4, 5, 8, 5)
 
-        icon_paths = ['deployment.png', 'propagator.png', 'voidrifts.png', 'killbots.png', 'bombbots.png']
+        icon_paths = ['AggressiveDeployment.png', 'Propagators.png', 'VoidRifts.png', 'KillBots.png', 'BoomBots.png']
         for icon_name in icon_paths:
             btn = QPushButton()
             icon_path = os.path.join(get_resources_dir(), 'ico', 'mutator', icon_name)
@@ -276,8 +276,58 @@ class MutatorManager(QWidget):
         for btn in self.mutator_buttons:
             btn.setAttribute(Qt.WA_TransparentForMouseEvents, not unlocked)
             if btn.isChecked():
+                # 激活状态 (彩色)
                 btn.setIcon(btn.original_icon)
             else:
+                # 非激活状态 (灰色)
                 btn.setIcon(btn.gray_icon)
 
+    def sync_mutator_toggles(self, confirmed_mutators):
+        """
+        根据识别器确认的突变因子列表，同步按钮的选中状态。
+        confirmed_mutators: 识别器确认的突变因子名称列表 (e.g., ['propagator', 'deployment'])
+        """
+        self.logger.info(f"同步突变因子按钮状态: {confirmed_mutators}")
 
+        # 将所有按钮的信号暂时阻塞，避免在同步过程中触发 on_mutator_toggled 逻辑
+        for btn in self.mutator_buttons:
+            btn.blockSignals(True)
+
+        try:
+            for btn in self.mutator_buttons:
+                mutator_type = btn.property("mutator_type")
+                should_be_checked = mutator_type in confirmed_mutators
+
+                # 1. 确保按钮的选中状态正确
+                btn.setChecked(should_be_checked)
+
+                # 2. 【关键修复】手动同步 UI 和加载配置，因为信号被阻塞
+                if should_be_checked:
+                    # 同步 UI 状态（图标和阴影）
+                    btn.setIcon(btn.original_icon)
+                    # 重新应用阴影效果（如果需要）
+                    shadow = QGraphicsDropShadowEffect()
+                    shadow.setBlurRadius(10)
+                    shadow.setXOffset(3)
+                    shadow.setYOffset(3)
+                    shadow.setColor(QColor(0, 0, 0, 160))
+                    btn.setGraphicsEffect(shadow)
+
+                    # 重新加载配置 (核心步骤)
+                    time_points = self.load_mutator_config(mutator_type)
+                    self.active_mutator_time_points[mutator_type] = time_points
+                    self.logger.debug(f"通过同步加载 {mutator_type} 配置。")
+                else:
+                    # 同步 UI 状态 (灰色图标和清除阴影)
+                    btn.setIcon(btn.gray_icon)
+                    btn.setGraphicsEffect(None)
+
+                    # 清除配置
+                    if mutator_type in self.active_mutator_time_points:
+                        del self.active_mutator_time_points[mutator_type]
+                    self.hide_mutator_alert(mutator_type)
+
+        finally:
+            # 恢复所有按钮的信号
+            for btn in self.mutator_buttons:
+                btn.blockSignals(False)

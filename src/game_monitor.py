@@ -24,7 +24,8 @@ class GlobalState:
         self.current_game_id = None
         self.troop = None
         self.game_screen = None
-
+        self.active_mutators = None
+        self.enemy_race = None
 
 # 创建一个唯一的全局状态实例
 state = GlobalState()
@@ -105,6 +106,8 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
                 await asyncio.sleep(0.5)
                 return
 
+            # 发送信号，通知主线程重置识别器和地图
+            progress_callback.emit(['reset_game_info'])
             # 更新全局变量
             state.most_recent_playerdata = {
                 'time': game_data['displayTime'],

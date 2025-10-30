@@ -29,9 +29,10 @@ class Mutator_and_enemy_race_automatic_recognizer:
     #如果种族已确认，但在此秒数后仍未发现突变因子，则确认突变因子为空
     MUTATOR_TIMEOUT_AFTER_RACE = 10.0
 
-    def __init__(self):
+    def __init__(self,recognition_signal = None):
         self.logger = get_logger(__name__)
-
+        self.recognition_signal = recognition_signal
+        
         self._base_roi = (1850, 190, 1920, 764)
         self._running = False
         self._thread = None
@@ -160,7 +161,7 @@ class Mutator_and_enemy_race_automatic_recognizer:
 
         # 如果找到了任何潜在匹配
         if best_match_name:
-            # [状态切换] 立即进入1秒/次的“确认模式”
+            # [状态切换] 立即进入0.5秒/次的“确认模式”
             self._race_scan_interval = 0.5
 
             # 如果最佳匹配发生变化（异常情况），清空所有计数，但保持1秒模式
@@ -179,6 +180,10 @@ class Mutator_and_enemy_race_automatic_recognizer:
                 # 当种族确认后，启动突变因子超时计时器
                 if self._race_confirmed_time is None:
                     self._race_confirmed_time = time.perf_counter()
+
+                if self.recognition_signal:
+                    self.recognition_signal.emit({'race': self.recognized_race, 'mutators': None})
+
         else:
             # 如果完全没找到匹配，且之前有潜在目标，则清空计数
             if self._last_best_race_match is not None:
@@ -218,6 +223,10 @@ class Mutator_and_enemy_race_automatic_recognizer:
                 if name not in self.recognized_mutators:
                     self.recognized_mutators.append(name)
                     self.logger.info(f"** 突变因子已确认: {name} **")
+
+                if self.recognition_signal:
+                        # 每次确认新的突变因子时，都发送完整的列表
+                        self.recognition_signal.emit({'race': None, 'mutators': self.recognized_mutators})
 
         # [状态切换] 只要发现任何一个潜在突变因子，就进入1秒/次的“确认模式”
         if a_potential_match_found:
