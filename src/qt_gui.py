@@ -28,7 +28,7 @@ from map_handlers.map_event_manager import MapEventManager
 from map_handlers.malwarfare_event_manager import MapwarfareEventManager
 from map_handlers.malwarfare_map_handler import MalwarfareMapHandler
 from toast_manager import ToastManager
-import ui_setup, game_monitor, config_hotkeys,game_time_handler
+import ui_setup, game_monitor, config_hotkeys,game_time_handler,map_loader
 
 
 class TimerWindow(QMainWindow):
@@ -117,10 +117,10 @@ class TimerWindow(QMainWindow):
         config_hotkeys.init_global_hotkeys(self)
         
         # 强制加载第一个地图
-        # 确保 ui_setup.init_ui 已经创建了 self.files (地图列表) 和 self.on_map_selected 方法
+       
         if hasattr(self, 'files') and self.files:
-            self.on_map_selected(self.files[0]) # 这一步会实例化 self.map_event_manager！
-
+            map_loader.handle_map_selection(self, self.files[0])
+            
         # 启动游戏检查线程
         self.game_check_thread = threading.Thread(target=self._run_async_game_scheduler, args=(self.progress_signal,), daemon=True)
         self.game_check_thread.start()
@@ -237,7 +237,7 @@ class TimerWindow(QMainWindow):
 
             # ✅ 只在明确需要时触发地图变更
             if filtered and allow_auto_select:
-                self.on_map_selected(filtered[0])
+                map_loader.handle_map_selection(self, filtered[0])
 
         # 用户输入时触发（允许自动选择）
         def filter_combo_box_user():
@@ -411,233 +411,15 @@ class TimerWindow(QMainWindow):
                 self.manual_map_selection = False
                 self.combo_box.setCurrentIndex(index)
                 # 手动调用地图选择事件处理函数，确保加载地图文件
-                self.on_map_selected(map_name)
+                map_loader.handle_map_selection(self, map_name)
             else:
                 self.logger.warning(f'未在下拉框中找到地图: {map_name}')
 
     def on_version_selected(self):
-        """处理地图版本按钮选择事件"""
-        sender = self.sender()
-        if not sender or not isinstance(sender, QPushButton):
-            return
-
-        # 取消其他按钮的选中状态
-        for btn in self.version_buttons:
-            if btn != sender:
-                btn.setChecked(False)
-
-        # 获取当前地图名称的前缀
-        current_map = self.combo_box.currentText()
-        if not current_map:
-            return
-
-        # 根据按钮文本和地图前缀构造新的地图名称
-        prefix = current_map.rsplit('-', 1)[0]
-        new_map = f"{prefix}-{sender.text()}"
-
-        # 在下拉框中查找并选择新地图
-        index = self.combo_box.findText(new_map)
-        if index >= 0:
-            self.combo_box.setCurrentIndex(index)
+        map_loader.handle_version_selection(self)
 
     def on_map_selected(self, map_name):
-        """处理地图选择变化事件"""
-        # 检查是否是由用户手动选择触发的
-        if hasattr(self, 'toast_manager') and self.toast_manager:
-            self.toast_manager.clear_all_alerts()
-        if not self.manual_map_selection and self.sender() == self.combo_box:
-            self.manual_map_selection = True
-            self.logger.info('用户手动选择了地图')
-            
-        # 根据地图名称实例化正确的事件管理器
-        if map_name == '净网行动':
-            self.logger.warning("检测到特殊地图 '净网行动'，正在启用 MalwarfareEventManager。")
-            self.map_event_manager = MapwarfareEventManager(self.table_area, self.toast_manager, self.logger)
-            self.is_map_Malwarfare = True
-            
-            if self.malwarfare_handler is None:
-                self.logger.info("创建并启动 MalwarfareMapHandler 实例。")
-                self.malwarfare_handler = MalwarfareMapHandler(game_state = self.game_state)
-                self.malwarfare_handler.reset()
-                self.malwarfare_handler.start()
-            
-            self.countdown_label.show() # 显示倒计时标签
-            
-            # 净网行动需要额外多一列显示计数
-            self.table_area.setColumnCount(4)
-            self.table_area.setColumnWidth(0, 40)  # Count
-            self.table_area.setColumnWidth(1, 50)  # Time
-            self.table_area.setColumnWidth(2, config.MAIN_WINDOW_WIDTH - 95) # Event
-            self.table_area.setColumnWidth(3, 5) # Army (placeholder)
-
-        else:
-            #标准地图环境
-            self.logger.info(f"使用标准地图 '{map_name}'，正在启用 MapEventManager。")
-            self.map_event_manager = MapEventManager(self.table_area, self.toast_manager, self.logger)
-            self.is_map_Malwarfare = False
-            
-            if self.malwarfare_handler is not None:
-                self.logger.info("切换到其他地图，正在关闭 MalwarfareMapHandler。")
-                self.malwarfare_handler.shutdown()
-                self.malwarfare_handler = None # 释放实例
-            
-            # 标准地图是3列
-            self.table_area.setColumnCount(3)
-            self.table_area.setColumnWidth(0, 50)  # Time
-            self.table_area.setColumnWidth(1, config.MAIN_WINDOW_WIDTH - 55) # Event
-            self.table_area.setColumnWidth(2, 5) # Army (placeholder)
-        # <--- MODIFICATION END --->
-        
-
-        # 处理地图版本按钮组的显示
-        if '-' in map_name:
-            prefix = map_name.rsplit('-', 1)[0]
-            suffix = map_name.rsplit('-', 1)[1]
-
-            # 检查是否存在同前缀的其他地图
-            has_variant = False
-            variant_type = None
-            for i in range(self.combo_box.count()):
-                other_map = self.combo_box.itemText(i)
-                if other_map != map_name and other_map.startswith(prefix + '-'):
-                    has_variant = True
-                    other_suffix = other_map.rsplit('-', 1)[1]
-                    if other_suffix in ['左', '右'] and suffix in ['左', '右']:
-                        variant_type = 'LR'
-                    elif other_suffix in ['A', 'B'] and suffix in ['A', 'B']:
-                        variant_type = 'AB'
-                    elif other_suffix in ['神', '人虫'] and suffix in ['神', '人虫']:
-                        variant_type = 'PZT'
-                    break
-
-            if has_variant and variant_type:
-                # 更新按钮文本
-                if variant_type == 'LR':
-                    self.version_buttons[0].setText('左')
-                    self.version_buttons[1].setText('右')
-                elif variant_type == 'AB':  # AB
-                    self.version_buttons[0].setText('A')
-                    self.version_buttons[1].setText('B')
-                else:  # PZT （地勤图）
-                    self.version_buttons[0].setText('神')
-                    self.version_buttons[1].setText('人虫')
-
-                # 设置当前选中的按钮
-                current_suffix = suffix
-                for btn in self.version_buttons:
-                    btn.setChecked(btn.text() == current_suffix)
-
-                # 显示按钮组
-                self.map_version_group.show()
-            else:
-                # 隐藏按钮组
-                self.map_version_group.hide()
-        else:
-            # 没有版本区分，隐藏按钮组
-            self.map_version_group.hide()
-
-        try:
-            map_file_path = get_resources_dir('resources', 'maps', config.current_language, map_name)
-            self.logger.info(f'尝试加载地图文件: {map_file_path}')
-
-            # 读取地图文件内容
-            if os.path.exists(map_file_path):
-                with open(map_file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                self.logger.info(f'成功读取地图文件内容: {map_name}\n文件内容:\n{content}')
-
-                # 清空表格现有内容
-                self.table_area.setRowCount(0)
-                self.logger.info('已清空表格现有内容')
-
-                # 按行分割内容，过滤掉空行和只包含空白字符的行
-                lines = [line.strip() for line in content.split('\n') if line and not line.isspace()]
-                self.logger.info('解析到的有效行数: {}'.format(len(lines)))
-                self.logger.info('解析后的行内容:\n{}'.format('\n'.join(lines)))
-
-                # 设置表格行数
-                self.table_area.setRowCount(len(lines))
-                self.logger.info(f'设置表格行数为: {len(lines)}')
-
-                # 填充表格内容
-                for row, line in enumerate(lines):
-                    # 按tab分隔符拆分时间和事件
-                    parts = line.split('\t')
-                    self.logger.info(f'处理第{row + 1}行: {line}, 拆分结果: {parts}')
-                    if self.is_map_Malwarfare:
-                        # 净网行动处理逻辑 (4列)
-                        if len(parts) >= 4:
-                            count_item = QTableWidgetItem(parts[0])
-                            time_item = QTableWidgetItem(parts[1])
-                            event_item = QTableWidgetItem(parts[2])
-                            army_item = QTableWidgetItem(parts[3])
-
-                            # 设置颜色和对齐
-                            for item in [count_item, time_item, event_item, army_item]:
-                                item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                                item.setForeground(QBrush(QColor(255, 255, 255)))
-
-                            self.table_area.setItem(row, 0, count_item)
-                            self.table_area.setItem(row, 1, time_item)
-                            self.table_area.setItem(row, 2, event_item)
-                            self.table_area.setItem(row, 3, army_item)
-                            self.logger.info(f'已添加净网表格内容 - 行{row+1}: Count={parts[0]}, Time={parts[1]}, Event={parts[2]}, Army={parts[3]}')
-                        else:
-                            self.logger.warning(f"行 {row+1} 格式不符合净网地图要求 (需要4列): {line}")
-                    else:
-                         # 标准地图处理逻辑 (2或3列)
-                        if len(parts) >= 2:
-                            # 创建时间单元格
-                            time_item = QTableWidgetItem(parts[0])
-                            time_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                            time_item.setForeground(QBrush(QColor(255, 255, 255)))  # 修改时间列文字颜色为白色
-                            self.table_area.setItem(row, 0, time_item)
-
-                            # 创建事件单元格
-                            event_item = QTableWidgetItem(parts[1])
-                            event_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                            event_item.setForeground(QBrush(QColor(255, 255, 255)))  # 设置事件列文字颜色为白色
-                            self.table_area.setItem(row, 1, event_item)
-
-                            if len(parts) == 3:
-                                army_item = QTableWidgetItem(parts[2])
-                                army_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                                army_item.setForeground(QBrush(QColor(255, 255, 255)))  # 设置事件
-                                self.table_area.setItem(row, 2, army_item)
-                                self.logger.info(
-                                    f'已添加表格内容 - 行{row + 1}: 时间={parts[0]}, 事件={parts[1]}, {parts[2]}')
-                            elif len(parts) ==4:
-                                self.logger.info(
-                                    f'已添加净网表格内容 - 行{row + 1}: 压制塔={parts[0]}, 时间={parts[1]}, 事件={parts[2]} {parts[3]}')
-                            else:
-                                self.logger.info(f'已添加表格内容 - 行{row + 1}: 时间={parts[0]}, 事件={parts[1]}')
-                        else:
-                            # 对于不符合格式的行，将整行内容显示在事件列
-                            event_item = QTableWidgetItem(line)
-                            event_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                            event_item.setForeground(QBrush(QColor(255, 255, 255)))  # 设置事件列文字颜色为白色
-
-                            self.table_area.setItem(row, 0, event_item)
-                            self.table_area.setSpan(row, 0, 1, 3)  # 将当前行的两列合并为一列
-
-                            self.logger.info(f'已添加不规范行内容到合并单元格 - 行{row + 1}: {line}')
-
-                # 验证表格内容
-                row_count = self.table_area.rowCount()
-                self.logger.info(f'最终表格行数: {row_count}')
-                for row in range(row_count):
-                    time_item = self.table_area.item(row, 0)
-                    event_item = self.table_area.item(row, 1)
-                    time_text = time_item.text() if time_item else 'None'
-                    event_text = event_item.text() if event_item else 'None'
-                    self.logger.info(f'验证第{row + 1}行内容: 时间={time_text}, 事件={event_text}')
-
-            else:
-                self.logger.error(f'地图文件不存在: {map_name}')
-                return
-
-        except Exception as e:
-            self.logger.error(f'加载地图文件时出错: {str(e)}\n{traceback.format_exc()}')
+        map_loader.handle_map_selection(self,map_name)
 
 
     def on_text_double_click(self, event):
@@ -658,7 +440,6 @@ class TimerWindow(QMainWindow):
                         f"{time_text}\t{event_text}" if time_text else event_text)
                     #self.show_toast(selected_text, config.TOAST_DURATION, force_show=True)  # 设置5000毫秒（5秒）后自动消失
             event.accept()
-
 
     def get_text(self, key):
         """获取多语言文本"""
@@ -716,7 +497,7 @@ class TimerWindow(QMainWindow):
 
         # 如果有文件，自动加载第一个
         if files:
-            self.on_map_selected(files[0])
+            map_loader.handle_map_selection(files[0])
 
         # 更新UI文本
         self.map_label.setText(self.get_text('map_label'))
