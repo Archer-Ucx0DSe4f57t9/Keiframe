@@ -53,7 +53,14 @@ def on_language_changed(window, lang):
 
         # 4. 重新加载地图列表
         resources_dir = get_resources_dir('resources', 'maps', lang)
-        files = list_files(resources_dir) if resources_dir else []
+        all_files = list_files(resources_dir) if resources_dir else []
+        files = []
+        for file_name in all_files:
+        # 确保只处理 .csv 文件
+            if file_name.lower().endswith('.csv'):
+                # 移除 .csv 扩展名
+                clean_name = file_name[:-4] 
+                files.append(clean_name)
 
         # 清空并重新添加地图列表
         window.combo_box.clear()

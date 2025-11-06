@@ -5,7 +5,7 @@ current_region = 'kr'  # 当前地区 / Current region
 current_language = 'zh'  # 当前语言 / Current language
 
 # 调试模式配置
-debug_mode = False  # 设置为True启用调试模式 / Set to True to enable debug mode
+debug_mode = True  # 设置为True启用调试模式 / Set to True to enable debug mode
 debug_time_factor = 5.0  # 调试模式下的时间流速因子 / Time flow factor in debug mode
 
 # 日志级别配置

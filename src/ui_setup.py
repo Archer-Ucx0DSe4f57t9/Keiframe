@@ -225,8 +225,16 @@ def setup_search_and_combo_box(window):
 
     # 加载resources文件夹下的文件
     resources_dir = get_resources_dir('resources', 'maps', config.current_language)
-    window.files = list_files(resources_dir) if resources_dir else []
-    window.combo_box.addItems(window.files)
+    all_files = list_files(resources_dir) if resources_dir else []
+    window.files = []
+    for file_name in all_files:
+    # 确保只处理 .csv 文件
+        if file_name.lower().endswith('.csv'):
+            # 移除 .csv 扩展名
+            clean_name = file_name[:-4] 
+            window.files.append(clean_name)
+
+    window.combo_box.addItems(sorted(window.files))
 
     ####################
     # 用户输入搜索

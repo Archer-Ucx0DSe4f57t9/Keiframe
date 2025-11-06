@@ -101,7 +101,7 @@ class MapEventManager:
                     except ValueError:
                         continue
 
-            # 第三次遍历：更新提醒和销毁过时提醒
+            # 第三次遍历：更新提醒和销毁过时提醒    
             for row in range(self.table_area.rowCount()):
                 time_item = self.table_area.item(row, 0)
                 event_item = self.table_area.item(row, 1)

@@ -56,11 +56,12 @@ def handle_map_selection(window, map_name):
             window.malwarfare_handler.start()
         
         window.countdown_label.show()
-        window.table_area.setColumnCount(4)
-        window.table_area.setColumnWidth(0, 40)
-        window.table_area.setColumnWidth(1, 50)
-        window.table_area.setColumnWidth(2, config.MAIN_WINDOW_WIDTH - 95)
-        window.table_area.setColumnWidth(3, 5)
+        window.table_area.setColumnCount(5)
+        window.table_area.setColumnWidth(0, 40) # Count
+        window.table_area.setColumnWidth(1, 50) # Time
+        window.table_area.setColumnWidth(2, config.MAIN_WINDOW_WIDTH - 95) # Event (宽列)
+        window.table_area.setColumnWidth(3, 5) # 新增 Sound 列（隐藏）
+        window.table_area.setColumnWidth(4, 5) # Hero 列（隐藏/留空）
 
     else:
         window.logger.info(f"使用标准地图 '{map_name}'，正在启用 MapEventManager。")
@@ -74,10 +75,12 @@ def handle_map_selection(window, map_name):
         
         window.countdown_label.hide()
         window.countdown_label.setText("")
-        window.table_area.setColumnCount(3)
-        window.table_area.setColumnWidth(0, 50)
-        window.table_area.setColumnWidth(1, config.MAIN_WINDOW_WIDTH - 55)
-        window.table_area.setColumnWidth(2, 5)
+        window.table_area.setColumnCount(5) 
+        window.table_area.setColumnWidth(0, 50)          # Time
+        window.table_area.setColumnWidth(1, config.MAIN_WINDOW_WIDTH - 90) # Event
+        window.table_area.setColumnWidth(2, 30)          # Army/Note
+        window.table_area.setColumnWidth(3, 5)           # Sound File (隐藏)
+        window.table_area.setColumnWidth(4, 5)           # Hero Event (隐藏)
 
     # 处理地图版本按钮组的显示 (原有的版本检测逻辑)
     if '-' in map_name:
@@ -124,7 +127,8 @@ def handle_map_selection(window, map_name):
         
     # 加载地图文件内容并填充表格 (原有的文件加载和表格填充逻辑)
     try:
-        map_file_path = get_resources_dir('resources', 'maps', config.current_language, map_name)
+        map_file_name_with_ext = map_name + ".csv" # 构造带扩展名的文件名
+        map_file_path = get_resources_dir('resources', 'maps', config.current_language, map_file_name_with_ext)
         window.logger.info(f'尝试加载地图文件: {map_file_path}')
 
         if os.path.exists(map_file_path):
@@ -149,52 +153,91 @@ def handle_map_selection(window, map_name):
             for row, line in enumerate(lines):
                 
                 # 按tab分隔符拆分时间和事件
-                parts = line.split('\t')
+                parts = line.split(',')
                 
                 if window.is_map_Malwarfare:
                     # 净网行动处理逻辑 (4列)
                     if len(parts) >= 4:
-                        count_item = QTableWidgetItem(parts[0])
-                        time_item = QTableWidgetItem(parts[1])
-                        event_item = QTableWidgetItem(parts[2])
-                        army_item = QTableWidgetItem(parts[3])
+                        count_text = parts[0].strip()
+                        time_text = parts[1].strip()
+                        event_text = parts[2].strip()
+                        army_text = parts[3].strip()
+                        sound_text = parts[4].strip() if len(parts) >= 5 else "" # Sound 现在是第 5 列
+                        hero_text = "" # 净网行动英雄列留空
 
-                        # 设置颜色和对齐
-                        for item in [count_item, time_item, event_item, army_item]:
-                            item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                            item.setForeground(QBrush(QColor(255, 255, 255)))
+                    # 0. Count
+                    count_item = QTableWidgetItem(count_text)
+                    count_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                    count_item.setForeground(QBrush(QColor(255, 255, 255)))
+                    window.table_area.setItem(row, 0, count_item)
+                    
+                    # 1. Time
+                    time_item = QTableWidgetItem(time_text)
+                    time_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                    time_item.setForeground(QBrush(QColor(255, 255, 255)))
+                    window.table_area.setItem(row, 1, time_item)
+                    
+                    # 2. Event
+                    event_item = QTableWidgetItem(event_text)
+                    event_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                    event_item.setForeground(QBrush(QColor(255, 255, 255)))
+                    window.table_area.setItem(row, 2, event_item) 
+                    
+                    # 3. Sound (隐藏列)
+                    sound_item = QTableWidgetItem(sound_text)
+                    sound_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                    sound_item.setForeground(QBrush(QColor(255, 255, 255)))
+                    window.table_area.setItem(row, 3, sound_item)
 
-                        window.table_area.setItem(row, 0, count_item)
-                        window.table_area.setItem(row, 1, time_item)
-                        window.table_area.setItem(row, 2, event_item)
-                        window.table_area.setItem(row, 3, army_item)
-                        window.logger.info(f'已添加净网表格内容 - 行{row+1}: Count={parts[0]}, Time={parts[1]}, Event={parts[2]}, Army={parts[3]}')
-                    else:
-                        window.logger.warning(f"行 {row+1} 格式不符合净网地图要求 (需要4列): {line}")
+                    # 4. Hero (隐藏列，留空)
+                    hero_item = QTableWidgetItem(hero_text)
+                    hero_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                    hero_item.setForeground(QBrush(QColor(255, 255, 255)))
+                    window.table_area.setItem(row, 4, hero_item)
+                    
+                    window.logger.info(f'已添加净网表格内容 - 行{row+1}: Count={count_text}, Time={time_text}, Event={event_text}, Sound={sound_text}')
                 else:
                      # 标准地图处理逻辑 (2或3列)
                     if len(parts) >= 2:
-                      # 创建时间单元格
-                        time_item = QTableWidgetItem(parts[0])
+                      # 确保所有 5 个单元格的内容都有定义 (如果 parts 长度不足，则使用空字符串)
+                        time_text = parts[0].strip()
+                        event_text = parts[1].strip()
+                        army_text = parts[2].strip() if len(parts) >= 3 else ""
+                        sound_text = parts[3].strip() if len(parts) >= 4 else "" # Sound
+                        hero_text = parts[4].strip() if len(parts) >= 5 else "" # Hero
+
+                        # 1. 时间单元格 (列 0)
+                        time_item = QTableWidgetItem(time_text)
                         time_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
                         time_item.setForeground(QBrush(QColor(255, 255, 255)))
                         window.table_area.setItem(row, 0, time_item)
-                      # 创建事件单元格
-                        event_item = QTableWidgetItem(parts[1])
+                        
+                        # 2. 事件单元格 (列 1)
+                        event_item = QTableWidgetItem(event_text)
                         event_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
                         event_item.setForeground(QBrush(QColor(255, 255, 255)))
                         window.table_area.setItem(row, 1, event_item)
 
-                        if len(parts) >= 3: # 检查是否有第三列数据（兵种/备注）
-                            army_item = QTableWidgetItem(parts[2])
-                            army_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                            army_item.setForeground(QBrush(QColor(255, 255, 255))) # 设置事件
-                            window.table_area.setItem(row, 2, army_item)
-                            window.logger.info(
-                                    f'已添加表格内容 - 行{row + 1}: 时间={parts[0]}, 事件={parts[1]}, {parts[2]}')
-                        elif len(parts) == 2 and window.table_area.columnCount() == 3:
-                            # 确保第三列是空的，如果表格是3列的
-                            window.table_area.setItem(row, 2, QTableWidgetItem(""))
+                        # 3. 兵种/备注单元格 (列 2)
+                        army_item = QTableWidgetItem(army_text)
+                        army_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                        army_item.setForeground(QBrush(QColor(255, 255, 255)))
+                        window.table_area.setItem(row, 2, army_item)
+                        
+                        # 4. 音频文件单元格 (列 3)
+                        sound_item = QTableWidgetItem(sound_text)
+                        sound_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                        sound_item.setForeground(QBrush(QColor(255, 255, 255)))
+                        window.table_area.setItem(row, 3, sound_item)
+                        
+                        # 5. 英雄事件单元格 (列 4)
+                        hero_item = QTableWidgetItem(hero_text)
+                        hero_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                        hero_item.setForeground(QBrush(QColor(255, 255, 255)))
+                        window.table_area.setItem(row, 4, hero_item)
+
+                        window.logger.info(
+                                f'已添加表格内容 - 行{row + 1}: T={time_text}, E={event_text}, A={army_text}, S={sound_text}, H={hero_text}')
 
                     else:
                       # 对于不符合格式的行，将整行内容显示在事件列

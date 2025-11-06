@@ -25,7 +25,8 @@ class ToastManager:
             alert.hide_alert()
 
     def show_map_countdown_alert(self, event_id, time_diff, message, game_screen):
-
+        self.logger.warning(f"尝试播报信息{message}")
+        
         new_event = False
         """
         根据事件ID显示或更新地图倒计时提示

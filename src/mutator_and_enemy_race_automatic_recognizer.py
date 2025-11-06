@@ -249,7 +249,7 @@ class Mutator_and_enemy_race_automatic_recognizer:
                 if self.race_detection_complete and not self.mutator_detection_complete and self._race_confirmed_time:
                   elapsed = time.perf_counter() - self._race_confirmed_time
                   if elapsed > self.MUTATOR_TIMEOUT_AFTER_RACE:
-                      self.logger.info(f"种族已确认超过 {self.MUTATOR_TIMEOUT_AFTER_RACE} 秒，未发现突变因子。将突变因子确认为空。")
+                      self.logger.warning(f"种族已确认超过 {self.MUTATOR_TIMEOUT_AFTER_RACE} 秒，未发现突变因子。将突变因子确认为空。")
                       self.recognized_mutators = [] # 确认结果为空列表
                       self.mutator_detection_complete = True
                       continue # 进入下一个循环，将会触发上面的“所有任务完成”逻辑
