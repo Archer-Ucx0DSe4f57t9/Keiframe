@@ -42,6 +42,24 @@ def handle_map_selection(window, map_name):
     if not window.manual_map_selection and window.sender() == window.combo_box:
         window.manual_map_selection = True
         window.logger.info('用户手动选择了地图')
+    
+    # 在地嗪图识别到神族时，自动切换到神族模式
+    if map_name == '机会渺茫-人虫' and window.game_state.enemy_race == 'Protoss':
+        new_map = '机会渺茫-神'
+        window.logger.info(f"检测到 '机会渺茫-人虫' 且种族为 Protoss，尝试切换到: {new_map}")
+        
+        index = window.combo_box.findText(new_map)
+        if index >= 0:
+            # 如果目标地图已经是新地图，则跳过 set，避免无限循环
+            if window.combo_box.currentText() != new_map:
+                window.combo_box.setCurrentIndex(index)
+                # 重要：在 setCurrentIndex 后，信号会再次触发 handle_map_selection
+                return 
+            else:
+                window.logger.info("目标地图已是 '机会渺茫-神'，继续加载。")
+        else:
+            window.logger.warning(f"未在下拉框中找到地图: {new_map}，继续加载原地图。")   
+         
         
     # 根据地图名称实例化正确的事件管理器
     if map_name == '净网行动':

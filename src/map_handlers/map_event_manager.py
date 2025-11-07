@@ -6,7 +6,7 @@ import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import config
 import time  # 添加 time 模块用于调试
-
+import game_monitor
 
 
 class MapEventManager:
@@ -63,7 +63,12 @@ class MapEventManager:
                             closest_row = row
                     except ValueError:
                         continue
-
+            
+            is_heroes_from_the_storm_active = False
+            if game_monitor.state.active_mutators and 'HeroesFromtheStorm' in game_monitor.state.active_mutators:
+                is_heroes_from_the_storm_active = True
+                self.logger.debug("HeroesFromtheStorm 突变因子已激活。")
+            
             # 第二次遍历：设置颜色和触发提示
             for row in range(self.table_area.rowCount()):
                 time_item = self.table_area.item(row, 0)
@@ -106,6 +111,8 @@ class MapEventManager:
                 time_item = self.table_area.item(row, 0)
                 event_item = self.table_area.item(row, 1)
                 army_item = self.table_area.item(row, 2)
+                hero_item = self.table_area.item(row, 4)
+                
                 if time_item and time_item.text():
                     try:
                         time_parts = time_item.text().split(':')
@@ -118,6 +125,14 @@ class MapEventManager:
                         event_id = f"map_event_{row}"  # 使用行号作为唯一ID
 
                         if time_diff > 0 and time_diff <= config.MAP_ALERT_SECONDS:
+                            extra_text = ""
+                            if is_heroes_from_the_storm_active and hero_item and hero_item.text().strip():
+                                # 激活且第 5 列有内容，则使用第 5 列
+                                extra_text = f"\t{hero_item.text().strip()}"
+                            elif army_item:
+                                # 否则，如果第 3 列有内容，则使用第 3 列
+                                extra_text = f"\t{army_item.text().strip()}"
+                            
                             toast_message = f'{time_diff:0>2}秒后   ' + f"{time_item.text()}\t{event_item.text()}" + (
                                 f"\t{army_item.text()}" if army_item else "")
                             # 调用 ToastManager 的新方法

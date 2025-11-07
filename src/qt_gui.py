@@ -381,6 +381,10 @@ class TimerWindow(QMainWindow):
             self.logger.warning(f"UI接收到确认种族: {race}")
             game_monitor.state.enemy_race = race
 
+            current_map = self.combo_box.currentText()
+            if current_map:
+                map_loader.handle_map_selection(self, current_map)
+
         if mutators is not None:
             # 只有当 mutators 不为 None（即识别完成，可能是空列表）时才更新
             self.logger.warning(f"UI接收到确认突变因子: {mutators}")

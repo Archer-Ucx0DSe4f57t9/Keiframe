@@ -36,6 +36,7 @@ class Mutator_and_enemy_race_automatic_recognizer:
         self._base_roi = (1850, 190, 1920, 764)
         self._running = False
         self._thread = None
+        self._current_game_time = 0.0
         self.base_dir = os.path.dirname(__file__)
 
         # 加载模板
@@ -87,6 +88,7 @@ class Mutator_and_enemy_race_automatic_recognizer:
         # 最终识别结果
         self.recognized_race = None
         self.recognized_mutators = []
+        self._current_game_time = 0.0
 
         # 用于跟踪连续匹配次数的计数器
         self.race_candidates = {name: 0 for name in self.race_templates.keys()}
@@ -139,6 +141,10 @@ class Mutator_and_enemy_race_automatic_recognizer:
             "race": self.recognized_race,
             "mutators": self.recognized_mutators
         }
+    
+    def update_game_time(self,game_time_seconds):
+        self.logger.info(f"已经接收到游戏时间{game_time_seconds}")
+        self._current_game_time = game_time_seconds
 
     def _scan_for_races(self, screenshot_gray, scale_factor):
         """在截图中扫描并更新种族识别状态。"""
@@ -177,12 +183,10 @@ class Mutator_and_enemy_race_automatic_recognizer:
                 self.recognized_race = best_match_name
                 self.race_detection_complete = True
                 self.logger.info(f"** 种族已确认: {self.recognized_race} **")
-                # 当种族确认后，启动突变因子超时计时器
-                if self._race_confirmed_time is None:
-                    self._race_confirmed_time = time.perf_counter()
 
                 if self.recognition_signal:
                     self.recognition_signal.emit({'race': self.recognized_race, 'mutators': None})
+
 
         else:
             # 如果完全没找到匹配，且之前有潜在目标，则清空计数
@@ -246,6 +250,15 @@ class Mutator_and_enemy_race_automatic_recognizer:
                     self._running = False # 设置标志位以表明我们想停止
                     continue
 
+                # 条件：已超过 30 秒 AND 突变因子检测未完成
+                if self._current_game_time >= 30 and not self.mutator_detection_complete:
+                    self.logger.warning("游戏时间已超过 30 秒，且突变因子未确认，将结果确认为空。")
+                    self.recognized_mutators = [] # 确认结果为空列表
+                    self.mutator_detection_complete = True
+                    self.recognition_signal.emit({'race': None, 'mutators': self.recognized_mutators})
+                    continue
+                '''
+                //弃用原来逻辑
                 if self.race_detection_complete and not self.mutator_detection_complete and self._race_confirmed_time:
                   elapsed = time.perf_counter() - self._race_confirmed_time
                   if elapsed > self.MUTATOR_TIMEOUT_AFTER_RACE:
@@ -253,9 +266,10 @@ class Mutator_and_enemy_race_automatic_recognizer:
                       self.recognized_mutators = [] # 确认结果为空列表
                       self.mutator_detection_complete = True
                       continue # 进入下一个循环，将会触发上面的“所有任务完成”逻辑
-
+               
+                '''
                 current_time = time.perf_counter()
-
+                
                 # 检查哪个任务需要扫描
                 is_race_scan_due = not self.race_detection_complete and \
                                    current_time - self._last_race_scan_time >= self._race_scan_interval

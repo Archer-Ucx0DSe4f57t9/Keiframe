@@ -13,10 +13,10 @@ from logging_util import get_logger
 from message_presenter import MessagePresenter
 from window_utils import get_sc2_window_geometry
 
-mutator_types = ['AggressiveDeployment', 'Propagators', 'VoidRifts', 'KillBots', 'BoomBots']
+mutator_types = ['AggressiveDeployment', 'Propagators', 'VoidRifts', 'KillBots', 'BoomBots', 
+                 'HeroesFromtheStorm', 'AggressiveDeploymentProtoss'] # 新增两个
 mutator_types_to_CHS = {'AggressiveDeployment': '部署', 'Propagators': '小软', 'VoidRifts': '裂隙', 'KillBots': '杀戮',
-                        'BoomBots': '炸弹'}
-
+                        'BoomBots': '炸弹', 'HeroesFromtheStorm': '风暴英雄', 'AggressiveDeploymentProtoss': '神族部署'}
 
 class MutatorManager(QWidget):
     def __init__(self, parent=None):
@@ -288,6 +288,11 @@ class MutatorManager(QWidget):
         confirmed_mutators: 识别器确认的突变因子名称列表 (e.g., ['propagator', 'deployment'])
         """
         self.logger.info(f"同步突变因子按钮状态: {confirmed_mutators}")
+
+        if 'AggressiveDeployment' in confirmed_mutators and self.parent().game_state.enemy_race == 'Protoss':
+            self.logger.warning("检测到 AggressiveDeployment 且敌方种族为 Protoss，切换到 AggressiveDeploymentProtoss 变式。")
+            confirmed_mutators.remove('AggressiveDeployment')
+            confirmed_mutators.append('AggressiveDeploymentProtoss')
 
         # 将所有按钮的信号暂时阻塞，避免在同步过程中触发 on_mutator_toggled 逻辑
         for btn in self.mutator_buttons:

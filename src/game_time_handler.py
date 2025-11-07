@@ -105,6 +105,12 @@ def update_game_time(window):
                             window.countdown_label.setText("") 
                         window.map_event_manager.update_events(current_seconds, window.game_state.game_screen)
 
+                
+                #===突变因子识别器相关===
+                if hasattr(window, 'mutator_and_enemy_race_recognizer'):
+                    window.logger.debug(f'尝试推送到因子识别器时间{current_seconds}')
+                    window.mutator_and_enemy_race_recognizer .update_game_time(current_seconds)
+
             except Exception as e:
                 window.logger.error(f'调整表格滚动位置和颜色失败: {str(e)}\n{traceback.format_exc()}')
 
