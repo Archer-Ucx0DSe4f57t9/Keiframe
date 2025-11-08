@@ -33,7 +33,7 @@ class Mutator_and_enemy_race_automatic_recognizer:
         self.logger = get_logger(__name__)
         self.recognition_signal = recognition_signal
         
-        self._base_roi = (1850, 190, 1920, 764)
+        self._base_roi = (1850, 190, 1920, 800)
         self._running = False
         self._thread = None
         self._current_game_time = 0.0

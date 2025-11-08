@@ -12,6 +12,7 @@ from fileutil import get_resources_dir
 from logging_util import get_logger
 from message_presenter import MessagePresenter
 from window_utils import get_sc2_window_geometry
+from game_monitor import state as game_state
 
 mutator_types = ['AggressiveDeployment', 'Propagators', 'VoidRifts', 'KillBots', 'BoomBots', 
                  'HeroesFromtheStorm', 'AggressiveDeploymentProtoss'] # 
@@ -42,7 +43,8 @@ class MutatorManager(QWidget):
         layout.setSpacing(8)
         layout.setContentsMargins(4, 5, 8, 5)
 
-        icon_paths = ['AggressiveDeployment.png', 'Propagators.png', 'VoidRifts.png', 'KillBots.png', 'BoomBots.png']
+        icon_paths = ['AggressiveDeployment.png', 'Propagators.png', 'VoidRifts.png', 'KillBots.png', 'BoomBots.png',
+                      'AggressiveDeploymentProtoss.png','HeroesFromtheStorm.png']
         for icon_name in icon_paths:
             btn = QPushButton()
             icon_path = os.path.join(get_resources_dir(), 'ico', 'mutator', icon_name)
@@ -307,8 +309,8 @@ class MutatorManager(QWidget):
         """
         self.logger.info(f"同步突变因子按钮状态: {confirmed_mutators}")
 
-        if 'AggressiveDeployment' in confirmed_mutators and self.parent().game_state.enemy_race == 'Protoss':
-            self.logger.warning("检测到 AggressiveDeployment 且敌方种族为 Protoss，切换到 AggressiveDeploymentProtoss 变式。")
+        if 'AggressiveDeployment' in confirmed_mutators and game_state.enemy_race == 'Protoss':
+            self.logger.info("检测到 AggressiveDeployment 且敌方种族为 Protoss，切换到 AggressiveDeploymentProtoss 变式。")
             confirmed_mutators.remove('AggressiveDeployment')
             confirmed_mutators.append('AggressiveDeploymentProtoss')
 
@@ -328,9 +330,9 @@ class MutatorManager(QWidget):
                 if should_be_checked:
                     #确定加载配置名称
                     config_name_to_load = mutator_type
-                    if mutator_type == 'AggressiveDeploymentProtoss':
+                    if mutator_type == 'AggressiveDeployment' and game_state.enemy_race == 'Protoss':
                         config_name_to_load = 'AggressiveDeploymentProtoss'
-                        self.logger.warning(f"应用变式: {mutator_type} + {self.parent().game_state.enemy_race } -> 加载 {config_name_to_load}")
+                        self.logger.info(f"应用变式: {mutator_type} + {game_state.enemy_race } -> 加载 {config_name_to_load}")
                     
                     # 同步 UI 状态（图标和阴影）
                     btn.setIcon(btn.original_icon)
@@ -345,6 +347,12 @@ class MutatorManager(QWidget):
                     # 重新加载配置 (核心步骤)
                     time_points = self.load_mutator_config(config_name_to_load)
                     
+                    if time_points:
+                        self.logger.info(f"配置 '{config_name_to_load}' 已成功加载 {len(time_points)} 个时间点。")
+                    else:
+                        # 如果没有时间点，可能是文件缺失或格式错误
+                        self.logger.error(f"警告：配置 '{config_name_to_load}' 加载后时间点列表为空。")
+                    
                     # 更新活动配置
                     self.active_mutator_time_points[mutator_type] = time_points #字典形式，键为原始mutator_type，在识别到protoss时可以更新值
                     self.logger.debug(f"通过同步加载 {mutator_type} 配置。")
@@ -357,7 +365,10 @@ class MutatorManager(QWidget):
                     if mutator_type in self.active_mutator_time_points:
                         del self.active_mutator_time_points[mutator_type]
                     self.hide_mutator_alert(mutator_type)
-
+        except Exception as e:
+                # 【捕获所有异常，并打印完整的堆栈信息】
+                self.logger.error(f"FATAL ERROR during mutator sync: {str(e)}")
+                self.logger.error(traceback.format_exc())
         finally:
             # 恢复所有按钮的信号
             for btn in self.mutator_buttons:

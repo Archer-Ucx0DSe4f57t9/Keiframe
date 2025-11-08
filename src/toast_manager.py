@@ -24,7 +24,7 @@ class ToastManager:
         for alert in self.map_alerts.values():
             alert.hide_alert()
 
-    def show_map_countdown_alert(self, event_id, time_diff, message, game_screen):
+    def show_map_countdown_alert(self, event_id, time_diff, message, game_screen, sound_filename: str = None):
         self.logger.debug(f"尝试播报信息{message}")
         
         new_event = False
@@ -79,8 +79,11 @@ class ToastManager:
 
         # 根据时间差设置颜色
         text_color = config.MAP_ALERT_NORMAL_COLOR  # 默认颜色
+        final_sound_filename = None
         if time_diff is not None and time_diff <= config.MAP_ALERT_WARNING_THRESHOLD_SECONDS:
             text_color = config.MAP_ALERT_WARNING_COLOR
+            if sound_filename:
+                final_sound_filename = sound_filename
 
         # 更新 MessagePresenter 的内容
         alert_label.update_message(
@@ -88,7 +91,8 @@ class ToastManager:
             text_color,
             x=alert_label_x, y=alert_label_y,
             width=sc2_width, height=line_height,
-            font_size=font_size
+            font_size=font_size,
+            sound_filename=final_sound_filename
         )
 
     def remove_alert(self, event_id):

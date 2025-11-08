@@ -67,7 +67,7 @@ class MapEventManager:
             is_heroes_from_the_storm_active = False
             if game_monitor.state.active_mutators and 'HeroesFromtheStorm' in game_monitor.state.active_mutators:
                 is_heroes_from_the_storm_active = True
-                self.logger.debug("HeroesFromtheStorm 突变因子已激活。")
+                self.logger.warning("HeroesFromtheStorm 突变因子已激活。")
             
             # 第二次遍历：设置颜色和触发提示
             for row in range(self.table_area.rowCount()):
@@ -111,6 +111,7 @@ class MapEventManager:
                 time_item = self.table_area.item(row, 0)
                 event_item = self.table_area.item(row, 1)
                 army_item = self.table_area.item(row, 2)
+                sound_item = self.table_area.item(row, 3)
                 hero_item = self.table_area.item(row, 4)
                 
                 if time_item and time_item.text():
@@ -126,14 +127,15 @@ class MapEventManager:
 
                         if time_diff > 0 and time_diff <= config.MAP_ALERT_SECONDS:
                             toast_message = (
-                                f'{time_diff:0>2}秒后   '
+                                f'{time_diff:0>2}秒后'
                                 + f"{time_item.text()}\t{event_item.text()}"
                                 + (f"\t{army_item.text()}" if army_item else "")
                                 + (f"风暴: \t{hero_item.text()}" if is_heroes_from_the_storm_active and len(hero_item.text())>0 else "")
                             )
+                            sound_filename = sound_item.text().strip() if sound_item else ""
                             # 调用 ToastManager 的新方法
                             self.logger.debug(f'正在调用toast_manager播报地图事件')
-                            self.toast_manager.show_map_countdown_alert(event_id, time_diff, toast_message, game_screen)
+                            self.toast_manager.show_map_countdown_alert(event_id, time_diff, toast_message, game_screen,sound_filename)
                         else:
                             if self.toast_manager.has_alert(event_id):
                                 self.toast_manager.remove_alert(event_id)

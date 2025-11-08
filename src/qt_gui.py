@@ -106,13 +106,13 @@ class TimerWindow(QMainWindow):
 
         # 连接信号到处理函数
         self.progress_signal.connect(self.handle_progress_update)
-        
+
         #连接突变因子和种族识
         self.mutator_and_enemy_race_recognition_signal.connect(self.handle_mutator_and_enemy_race_recognition_update)
-        
+
         #延迟开启主控制界面
         QTimer.singleShot(50, self.show_control_window)
-        
+
         # 强制加载第一个地图
         if hasattr(self, 'files') and self.files:
             map_loader.handle_map_selection(self, self.files[0])
@@ -131,7 +131,7 @@ class TimerWindow(QMainWindow):
         QTimer.singleShot(100, lambda: app_window_manager.on_control_state_changed(self, False))
 
 
-    
+
     def get_current_screen(self):
         """获取当前窗口所在的显示器"""
         window_geometry = self.geometry()
@@ -378,7 +378,7 @@ class TimerWindow(QMainWindow):
         mutators = results.get("mutators")
 
         if race:
-            self.logger.warning(f"UI接收到确认种族: {race}")
+            self.logger.info(f"UI接收到确认种族: {race}")
             game_monitor.state.enemy_race = race
 
             current_map = self.combo_box.currentText()
@@ -386,12 +386,12 @@ class TimerWindow(QMainWindow):
                 map_loader.handle_map_selection(self, current_map)
             # 如果种族更新，强制同步突变因子按钮状态    
             if hasattr(self, 'mutator_manager') and self.mutator_manager and game_monitor.state.active_mutators is not None:
-                self.logger.warning(f"种族已更新{race}"，强制重新同步突变因子变式。")
+                self.logger.info(f"种族已更新{race}，强制重新同步突变因子变式。")
                 self.mutator_manager.sync_mutator_toggles(game_monitor.state.active_mutators)
 
         if mutators is not None:
             # 只有当 mutators 不为 None（即识别完成，可能是空列表）时才更新
-            self.logger.warning(f"UI接收到确认突变因子: {mutators}")
+            self.logger.info(f"UI接收到确认突变因子: {mutators}")
             game_monitor.state.active_mutators = mutators
             # 调用 MutatorManager 来同步按钮状态
             if hasattr(self, 'mutator_manager') and self.mutator_manager:
