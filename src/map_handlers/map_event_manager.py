@@ -125,16 +125,12 @@ class MapEventManager:
                         event_id = f"map_event_{row}"  # 使用行号作为唯一ID
 
                         if time_diff > 0 and time_diff <= config.MAP_ALERT_SECONDS:
-                            extra_text = ""
-                            if is_heroes_from_the_storm_active and hero_item and hero_item.text().strip():
-                                # 激活且第 5 列有内容，则使用第 5 列
-                                extra_text = f"\t{hero_item.text().strip()}"
-                            elif army_item:
-                                # 否则，如果第 3 列有内容，则使用第 3 列
-                                extra_text = f"\t{army_item.text().strip()}"
-                            
-                            toast_message = f'{time_diff:0>2}秒后   ' + f"{time_item.text()}\t{event_item.text()}" + (
-                                f"\t{army_item.text()}" if army_item else "")
+                            toast_message = (
+                                f'{time_diff:0>2}秒后   '
+                                + f"{time_item.text()}\t{event_item.text()}"
+                                + (f"\t{army_item.text()}" if army_item else "")
+                                + (f"风暴: \t{hero_item.text()}" if is_heroes_from_the_storm_active and len(hero_item.text())>0 else "")
+                            )
                             # 调用 ToastManager 的新方法
                             self.logger.debug(f'正在调用toast_manager播报地图事件')
                             self.toast_manager.show_map_countdown_alert(event_id, time_diff, toast_message, game_screen)

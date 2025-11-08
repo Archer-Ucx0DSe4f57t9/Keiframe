@@ -308,6 +308,12 @@ class MutatorManager(QWidget):
 
                 # 2. 【关键修复】手动同步 UI 和加载配置，因为信号被阻塞
                 if should_be_checked:
+                    #确定加载配置名称
+                    config_name_to_load = mutator_type
+                    if mutator_type == 'AggressiveDeploymentProtoss':
+                        config_name_to_load = 'AggressiveDeploymentProtoss'
+                        self.logger.warning(f"应用变式: {mutator_type} + {self.parent().game_state.enemy_race } -> 加载 {config_name_to_load}")
+                    
                     # 同步 UI 状态（图标和阴影）
                     btn.setIcon(btn.original_icon)
                     # 重新应用阴影效果（如果需要）
@@ -319,8 +325,10 @@ class MutatorManager(QWidget):
                     btn.setGraphicsEffect(shadow)
 
                     # 重新加载配置 (核心步骤)
-                    time_points = self.load_mutator_config(mutator_type)
-                    self.active_mutator_time_points[mutator_type] = time_points
+                    time_points = self.load_mutator_config(config_name_to_load)
+                    
+                    # 更新活动配置
+                    self.active_mutator_time_points[mutator_type] = time_points #字典形式，键为原始mutator_type，在识别到protoss时可以更新值
                     self.logger.debug(f"通过同步加载 {mutator_type} 配置。")
                 else:
                     # 同步 UI 状态 (灰色图标和清除阴影)

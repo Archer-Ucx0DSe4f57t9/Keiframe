@@ -384,6 +384,10 @@ class TimerWindow(QMainWindow):
             current_map = self.combo_box.currentText()
             if current_map:
                 map_loader.handle_map_selection(self, current_map)
+            # 如果种族更新，强制同步突变因子按钮状态    
+            if hasattr(self, 'mutator_manager') and self.mutator_manager and game_monitor.state.active_mutators is not None:
+                self.logger.warning(f"种族已更新{race}"，强制重新同步突变因子变式。")
+                self.mutator_manager.sync_mutator_toggles(game_monitor.state.active_mutators)
 
         if mutators is not None:
             # 只有当 mutators 不为 None（即识别完成，可能是空列表）时才更新
