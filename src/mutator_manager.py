@@ -14,9 +14,10 @@ from message_presenter import MessagePresenter
 from window_utils import get_sc2_window_geometry
 
 mutator_types = ['AggressiveDeployment', 'Propagators', 'VoidRifts', 'KillBots', 'BoomBots', 
-                 'HeroesFromtheStorm', 'AggressiveDeploymentProtoss'] # 新增两个
+                 'HeroesFromtheStorm', 'AggressiveDeploymentProtoss'] # 
+#名称到简略中文名称映射，用于提示显示
 mutator_types_to_CHS = {'AggressiveDeployment': '部署', 'Propagators': '小软', 'VoidRifts': '裂隙', 'KillBots': '杀戮',
-                        'BoomBots': '炸弹', 'HeroesFromtheStorm': '风暴英雄', 'AggressiveDeploymentProtoss': '神族部署'}
+                        'BoomBots': '炸弹', 'HeroesFromtheStorm': '风暴', 'AggressiveDeploymentProtoss': '部署'}
 
 class MutatorManager(QWidget):
     def __init__(self, parent=None):
@@ -146,7 +147,7 @@ class MutatorManager(QWidget):
     def load_mutator_config(self, mutator_name):
         """加载突变因子配置文件"""
         try:
-            config_path = os.path.join('resources', 'mutator', f'{mutator_name}.txt')
+            config_path = os.path.join('resources', 'mutator', f'{mutator_name}.csv')
             if not os.path.exists(config_path):
                 self.logger.error(f'突变因子配置文件不存在: {config_path}')
                 return []
@@ -154,18 +155,21 @@ class MutatorManager(QWidget):
             with open(config_path, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
 
-            time_points = []
+            time_points_info = []
             for line in lines:
                 if line.strip():
-                    parts = line.strip().split('\t')
-                    if len(parts) >= 1:
+                    parts = line.strip().split(',')
+                    if len(parts) >= 3:
                         time_str = parts[0].strip()
+                        content_text = parts[1].strip() 
+                        sound_filename = parts[2].strip() # <--- 新增：读取第 3 列的内容
+                        
                         time_parts = time_str.split(':')
                         if len(time_parts) == 2:
                             seconds = int(time_parts[0]) * 60 + int(time_parts[1])
-                            time_points.append(seconds)
+                            time_points_info.append((seconds, content_text, sound_filename))  #存储时间点、因子信息和音频文件名的元组
 
-            return sorted(time_points)
+            return sorted(time_points_info,key=lambda x: x[0])  # 返回按时间排序的列表
 
         except Exception as e:
             self.logger.error(f'加载突变因子配置失败: {str(e)}')
@@ -184,22 +188,34 @@ class MutatorManager(QWidget):
                 label.hide()
             return
 
-        for mutator_type, time_points in self.active_mutator_time_points.items():
-            next_deployment_time = None
-            for deployment_time in time_points:
-                if deployment_time > current_seconds:
-                    next_deployment_time = deployment_time
+        for mutator_type, time_points_info in self.active_mutator_time_points.items():
+            next_deployment_info = None
+            for deployment_seconds, content_text,sound_filename in time_points_info:
+                if deployment_seconds > current_seconds:
+                    next_deployment_info = (deployment_seconds, content_text,sound_filename)
                     break
 
-            if next_deployment_time and (
-                    next_deployment_time - current_seconds) <= config.MUTATION_FACTOR_ALERT_SECONDS:
+            if next_deployment_info:
+                next_deployment_time = next_deployment_info[0]
+                content_to_show = next_deployment_info[1]
+                warning_sound_filename = next_deployment_info[2] if len(next_deployment_info[2]) > 0 else None
+
+            if (next_deployment_time - current_seconds) <= config.MUTATION_FACTOR_ALERT_SECONDS:
                 time_remaining = next_deployment_time - current_seconds
-                message = f"{int(time_remaining)}秒后：{mutator_types_to_CHS.get(mutator_type)}  "
-                self.show_mutator_alert(message, mutator_type, time_remaining)
+
+                if (mutator_type == "AggressiveDeploymentProtoss" or mutator_type == "AggressiveDeployment"):
+                    #部署因子涉及到强度信息
+                     message = f"{int(time_remaining)}秒后：{mutator_types_to_CHS.get(mutator_type)} 强度：{content_to_show}"
+                else:
+                    #其他因子只涉及到数量，风暴不由mutatormanager播报
+                    message = f"{int(time_remaining)}秒后：{mutator_types_to_CHS.get(mutator_type)}*{content_to_show} "
+
+
+                self.show_mutator_alert(message, mutator_type, time_remaining,warning_sound_filename)
             else:
                 self.hide_mutator_alert(mutator_type)
 
-    def show_mutator_alert(self, message, mutator_type='deployment', time_remaining=None):
+    def show_mutator_alert(self, message, mutator_type='deployment', time_remaining=None, warning_sound_filename=None):
         """
         显示/更新突变因子提醒，并根据剩余时间动态改变颜色。
         """
@@ -224,7 +240,7 @@ class MutatorManager(QWidget):
             alert_label = MessagePresenter(self.parent(), icon_name=icon_name, font_size=font_size)
             self.mutator_alert_labels[mutator_type] = alert_label
 
-        # 1. 设置标签的几何信息 
+        # 1. 设置标签的几何信息
         alert_area_y = sc2_y + int(sc2_height * config.MUTATOR_ALERT_TOP_OFFSET_PERCENT)
 
         try:
@@ -249,10 +265,12 @@ class MutatorManager(QWidget):
 
         # 动态更新文本、颜色和字体大小
         text_color = config.MUTATION_FACTOR_NORMAL_COLOR
-        sound_filename = None
+
         if time_remaining is not None and time_remaining <= config.MUTATION_FACTOR_WARNING_THRESHOLD_SECONDS:
             text_color = config.MUTATION_FACTOR_WARNING_COLOR
-            sound_filename = 'Default.mp3'
+            sound_filename = warning_sound_filename
+        else:
+            sound_filename = None
 
         # 传递计算好的 font_size
         alert_label.update_message(
