@@ -125,7 +125,14 @@ class MutatorManager(QWidget):
     def on_mutator_toggled(self, button, checked):
         mutator_type = button.property("mutator_type")
 
+        if game_state.active_mutators is None:
+            game_state.active_mutators = []
+
         if checked:
+
+            if mutator_type not in game_state.active_mutators:
+                game_state.active_mutators.append(mutator_type)
+
             button.setIcon(button.original_icon)
             shadow = QGraphicsDropShadowEffect()
             shadow.setBlurRadius(10)
@@ -136,9 +143,13 @@ class MutatorManager(QWidget):
 
             time_points = self.load_mutator_config(mutator_type)
             self.active_mutator_time_points[mutator_type] = time_points
+            self.logger.warning(f"手动加载 {mutator_type} 配置。时间点数量: {len(time_points)}")
         else:
             button.setIcon(button.gray_icon)
             button.setGraphicsEffect(None)
+
+            if mutator_type in game_state.active_mutators:
+                game_state.active_mutators.remove(mutator_type)
 
             if mutator_type in self.active_mutator_time_points:
                 del self.active_mutator_time_points[mutator_type]
@@ -196,11 +207,14 @@ class MutatorManager(QWidget):
                 if deployment_seconds > current_seconds:
                     next_deployment_info = (deployment_seconds, content_text,sound_filename)
                     break
+            
+            if not next_deployment_info:
+                self.hide_mutator_alert(mutator_type)
+                continue # 跳到下一个 mutator_type
 
-            if next_deployment_info:
-                next_deployment_time = next_deployment_info[0]
-                content_to_show = next_deployment_info[1]
-                warning_sound_filename = next_deployment_info[2] if len(next_deployment_info[2]) > 0 else None
+            next_deployment_time = next_deployment_info[0]
+            content_to_show = next_deployment_info[1]
+            warning_sound_filename = next_deployment_info[2] if len(next_deployment_info[2]) > 0 else None
 
             if (next_deployment_time - current_seconds) <= config.MUTATION_FACTOR_ALERT_SECONDS:
                 time_remaining = next_deployment_time - current_seconds

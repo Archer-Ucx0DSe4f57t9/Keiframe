@@ -6,7 +6,7 @@ import time
 import threading
 import mss
 import os
-
+import config
 import sys
 import os
 from logging_util import get_logger
@@ -33,7 +33,6 @@ class Mutator_and_enemy_race_automatic_recognizer:
         self.logger = get_logger(__name__)
         self.recognition_signal = recognition_signal
         
-        self._base_roi = (1850, 190, 1920, 800)
         self._running = False
         self._thread = None
         self._current_game_time = 0.0
@@ -48,7 +47,7 @@ class Mutator_and_enemy_race_automatic_recognizer:
         self._reset_state()
 
         #测试用代码
-        x1, y1, x2, y2 = self._base_roi
+        x1, y1, x2, y2 = config.MUTATOR_AND_ENEMY_RACE_RECOGNIZER_ROI
         self.RECOGNITION_ROI = {
             'left': x1,
             'top': y1,
