@@ -61,7 +61,7 @@ MUTATOR_DEPLOYMENT_COLOR = 'rgb(0, 255, 128)'  # 突变因子部署颜色 / Muta
 MUTATOR_RIFTS_COLOR = 'rgb(0, 255, 128)'  # 突变因子裂隙颜色 / Mutator rifts color
 MUTATOR_PROPAGATOR_COLOR = 'rgb(0, 255, 128)'  # 突变因子传播者颜色 / Mutator propagator color
 # 提醒大小(基于“StarCraft II”窗口的尺寸)
-MUTATOR_ALERT_TOP_OFFSET_PERCENT = 0.40  # 提醒区域距离窗口顶部的百分比
+MUTATOR_ALERT_TOP_OFFSET_PERCENT = 0.35  # 提醒区域距离窗口顶部的百分比
 MUTATOR_ALERT_LINE_HEIGHT_PERCENT = 0.03  # 每行提醒占窗口高度的百分比
 MUTATOR_ALERT_FONT_SIZE_PERCENT_OF_LINE = 0.6  # 字体大小占每行高度的百分比
 MUTATOR_ALERT_HORIZONTAL_INDENT_PERCENT = 0.01  # 距离游戏边框左侧的水平缩进
