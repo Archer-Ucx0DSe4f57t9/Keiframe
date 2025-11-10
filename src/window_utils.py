@@ -5,7 +5,14 @@ import win32api
 from logging_util import get_logger
 
 logger = get_logger('window_utils')
-hwnd = win32gui.FindWindow(None, "StarCraft II")
+
+def get_window_hwnd():
+    for name in ["StarCraft II", "《星际争霸II》"]:
+        hwnd = win32gui.FindWindow(None, name)
+        if hwnd:
+            return hwnd
+
+hwnd = get_window_hwnd()
 
 
 #获取窗口内容区的左上角和坐标

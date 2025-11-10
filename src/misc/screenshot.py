@@ -5,7 +5,13 @@ import win32gui
 import keyboard  # pip install keyboard
 
 # 找到游戏窗口
-hwnd = win32gui.FindWindow(None, "StarCraft II")
+def get_window_hwnd():
+    for name in ["StarCraft II", "《星际争霸II》"]:
+        hwnd = win32gui.FindWindow(None, name)
+        if hwnd:
+            return hwnd
+
+hwnd = get_window_hwnd()
 
 def screenshot_client_area():
     """对客户区截图"""
