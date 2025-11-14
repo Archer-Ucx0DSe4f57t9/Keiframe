@@ -292,7 +292,7 @@ class Mutator_and_enemy_race_automatic_recognizer:
                     sct_img = sct.grab(monitor)
                     game_screen_bgr = cv2.cvtColor(np.array(sct_img), cv2.COLOR_BGRA2BGR)
 
-                    x1, y1, x2, y2 = self._base_roi
+                    x1, y1, x2, y2 = config.MUTATOR_AND_ENEMY_RACE_RECOGNIZER_ROI
                     if y2 > game_screen_bgr.shape[0] or x2 > game_screen_bgr.shape[1]:
                         time.sleep(1)
                         continue

@@ -1,4 +1,4 @@
-#malwarfare_map_handler.py
+#malwarfare_map_handler.py working currently
 import cv2
 import numpy as np
 import time
@@ -30,7 +30,7 @@ class MalwarfareMapHandler:
         self._shutdown_condition_counter = 0 #在n=4(最后一个锁)时，如果时间小于20秒持续一定时间，结束运行（最后一波在倒计时还剩30秒时发出，10秒已经很足够）
         self._time_recognition_failures = 0 #时间识别的连续失败计数器
         self.game_state = game_state
-        
+
         # 获取当前文件所在目录，用于构建绝对路径
         base_dir = os.path.dirname(__file__)
         self.debug_path = os.path.join(base_dir, 'debugpath')
@@ -42,11 +42,11 @@ class MalwarfareMapHandler:
         self._running_thread = None
 
         # --- 1. 定义所有可能的HSV颜色范围 ---
-        
+
         # 黄色 (对应倒计时和暂停的颜色)
         self.yellow_lower = np.array([20, 80, 80])
         self.yellow_upper = np.array([40, 255, 255])
-        
+
         #用于统计三种已净化的节点的颜色
         # 绿色 (对应人族)
         self.green_lower = np.array([60, 70, 70])
@@ -71,7 +71,7 @@ class MalwarfareMapHandler:
         # 定义三种UI状态对应的精确垂直偏移像素
 
         self.UI_STATE_OFFSETS = [0, config.MALWARFARE_HERO_OFFSET, config.MALWARFARE_ZWEIHAKA_OFFSET] 
-        
+
         # 存储“基准”ROI (状态0: 0偏移时的坐标)
         self._base_count_roi = (
             config.MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD[0], config.MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD[1],
@@ -85,10 +85,10 @@ class MalwarfareMapHandler:
             config.MALWARFARE_TIME_TOP_LFET_COORD[0], config.MALWARFARE_TIME_TOP_LFET_COORD[1],
             config.MALWARFARE_TIME_BOTTOM_RIGHT_COORD[0], config.MALWARFARE_TIME_BOTTOM_RIGHT_COORD[1]
         )
-        
+
         # UI状态变量, -1 代表未知，需要探测
         self._current_ui_offset_state = -1 
-        
+
         # 当前生效的ROI，会在探测后被设置
         self._count_roi = None
         self._paused_roi = None
@@ -96,24 +96,24 @@ class MalwarfareMapHandler:
 
         # --- 3. 加载模板 ---
         self.BASE_RESOLUTION_WIDTH = 1920.0
-        
-        
+
+
         template_dir_en = 'char_templates_1920w'
         template_dir_zh = 'char_templates_1920w_zh' 
-        
+
         self.templates_en = self._load_templates(template_dir_en)
         self.templates_zh = self._load_templates(template_dir_zh)
-        
+
         #英文模板集
         self.templates_en_green = self._load_templates('char_templates_1920w')#人族和rep用
         self.templates_en_orange = self._load_templates('char_templates_1920w_orange')#神族和虫族count用
         self.templates_en_blue = self._load_templates('char_templates_1920w_blue')#神族和虫族count用
-        
+
         #中文模板集
         self.templates_zh_green = self._load_templates('char_templates_1920w_zh')#人族和rep用
         self.templates_en_orange = self._load_templates('char_templates_1920w_zh_orange')#神族和虫族count用
         self.templates_en_blue = self._load_templates('char_templates_1920w_zh_blue')#神族和虫族count用
-        
+
         self.template_sets = {
         'green_en': self.templates_green,
         'orange_en': self.templates_orange,
@@ -122,27 +122,27 @@ class MalwarfareMapHandler:
         'orange_zh': self.templates_zh_orange,
         'blue_zh': self.templates_zh_blue
         }
-        
+
         self._detected_language = None # 'en' 或 'zh'
         self.templates = self.templates_green
-        
+
 
         # --- 4. 状态变量初始化 ---
         self._latest_count = None
         self._latest_paused = None
         self._latest_time = None
-        
+
         self._count_lock = threading.Lock()
         self._paused_lock = threading.Lock()
         self._time_lock = threading.Lock()
-        
+
         self._last_count_update = 0
         self._last_status_update = 0
-        
+
         self._latest_result = None
         self._result_lock = threading.Lock()
         self._last_valid_parsed = None
-    
+
     def _detect_and_set_ui_state(self, img_bgr):
         """
         探测UI的当前垂直偏移状态。
