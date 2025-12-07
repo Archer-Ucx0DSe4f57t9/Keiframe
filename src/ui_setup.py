@@ -1,3 +1,4 @@
+#ui_setup.py
 import os
 from PyQt5.QtWidgets import (
     QWidget, QLabel, QComboBox, QTableWidget,
@@ -254,6 +255,9 @@ def setup_mutator_commander(window):
             border-radius: 5px;
         }
     """)
+    
+    
+    
     table_bottom = window.table_area.geometry().bottom()
     window.mutator_manager.setGeometry(0, table_bottom + 5, window.main_container.width(), 50)
 

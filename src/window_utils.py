@@ -6,17 +6,33 @@ from logging_util import get_logger
 
 logger = get_logger('window_utils')
 
-def get_window_hwnd():
-    for name in ["StarCraft II", "《星际争霸II》"]:
-        hwnd = win32gui.FindWindow(None, name)
-        if hwnd:
-            return hwnd
+class WindowHandleManager:
+    
+    def __init__(self, titles=["StarCraft II", "《星际争霸II》"]):
 
-hwnd = get_window_hwnd()
+        self.titles = titles
+        self.cached_hwnd = None
 
+    def _find_window(self):
+        for title in self.titles:
+            hwnd = win32gui.FindWindow(None, title)
+            if hwnd:
+                return hwnd
+        return None
+
+    def get_hwnd(self):
+        if self.cached_hwnd:
+            if win32gui.IsWindow(self.cached_hwnd):
+                return self.cached_hwnd
+        new_hwnd = self._find_window()
+        self.cached_hwnd = new_hwnd
+        return new_hwnd
+
+manager = WindowHandleManager()
 
 #获取窗口内容区的左上角和坐标
 def get_sc2_window_geometry() -> object:
+    hwnd = manager.get_hwnd()
     try:
         if hwnd:
             # 内容区大小（如果为窗口模式不含边框+标题栏）
@@ -36,6 +52,7 @@ def get_sc2_window_geometry() -> object:
 
 #判断是不是全屏游戏
 def is_sc2_fullscreen():
+    hwnd = manager.get_hwnd()
     # 获取窗口矩形
     rect = win32gui.GetWindowRect(hwnd)  # (left, top, right, bottom)
     win_width = rect[2] - rect[0]
@@ -50,7 +67,7 @@ def is_sc2_fullscreen():
 
 #判断是不是无边框窗口，以标题栏为准
 def get_window_style():
-    
+    hwnd = manager.get_hwnd()
     style = win32gui.GetWindowLong(hwnd, win32con.GWL_STYLE)
 
     has_titlebar = bool(style & win32con.WS_CAPTION)#有没有标题栏
@@ -62,7 +79,7 @@ def get_window_style():
 
 #判断游戏窗口是否已经激活
 def is_game_active() -> bool:
-
+    hwnd = manager.get_hwnd()
     # 1. 获取当前前景窗口的句柄
     foreground_hwnd = win32gui.GetForegroundWindow()
 

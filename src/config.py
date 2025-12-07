@@ -26,8 +26,8 @@ TOAST_FONT_SIZE = 45  # 字体大小 / Font size
 TOAST_FONT_COLOR = 'rgb(0, 191, 255)'  # 字体颜色 / Font color
 TOAST_OUTLINE_COLOR = 'rgb(0, 0, 0)'  # 字体描边颜色/Outline Color
 
-# 窗体设置项
-MAIN_WINDOW_X = 1029
+# 窗体设置项(主界面位置)
+MAIN_WINDOW_X = 1000
 MAIN_WINDOW_Y = 1049
 # 主窗口透明度配置 ，最后一个200为透明度，前面三个数是RGB数值，具体可以网上查一下选一个自己喜欢的颜色，0完全透明、255完全不透明 / 0 fully transparent, 255 fully opaque
 MAIN_WINDOW_BG_COLOR = 'rgba(43, 43, 43, 200)'  # 主界面背景设置
@@ -149,7 +149,7 @@ ARTIFACTS_POS_亡者之夜 = [468 / 1242, 495 / 938, 40, 40]
 ARTIFACTS_POS_熔火危机 = [730 / 1783, 1200 / 1334, 40, 40]
 
 #突变因子和敌方种族识别区域（默认1920）
-MUTATOR_AND_ENEMY_RACE_RECOGNIZER_ROI = (1850, 190, 1920, 800)
+MUTATOR_AND_ENEMY_RACE_RECOGNIZER_ROI = (1850, 50, 1920, 800)
 
 #敌方ai识别区域识别区域（默认1920）
 ENEMY_COMP_RECOGNIZER_ROI = (1450, 373 ,1920 ,800)
