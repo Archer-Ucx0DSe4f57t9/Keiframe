@@ -37,26 +37,53 @@ def mousePressEvent_handler(window, event):
     """鼠标按下事件，用于实现窗口拖动 (原 TimerWindow.mousePressEvent)"""
     # 检查窗口是否处于可点击状态（非锁定状态）
     is_clickable = not window.testAttribute(Qt.WA_TransparentForMouseEvents)
-
+    pos = event.pos()
+    DRAG_AREA = QRect(162, 5, 38, 30)
+    SEARCH_BOX_AREA = QRect(10, 5, 50, 30)
+    
+    if event.button() != Qt.LeftButton:
+        event.ignore()
+        return
+    
     if is_clickable:  # 窗口可点击时
-        if event.button() == Qt.LeftButton:
-            pos = event.pos()
-            # 简化拖动区域判断，或保留原逻辑
-            map_area = QRect(162, 5, 38, 30)
-            if map_area.contains(pos):
-                window.drag_position = event.globalPos() - window.frameGeometry().topLeft()
-                window.is_dragging = True
-                event.accept()
-            else:
-                event.ignore()
+        if DRAG_AREA.contains(pos):
+            window.drag_position = event.globalPos() - window.frameGeometry().topLeft()
+            window.is_dragging = True
+            event.accept()
+
     else:
-        if window.ctrl_pressed and event.button() == Qt.LeftButton:
-            pos = event.pos()
-            map_area = QRect(162, 5, 38, 30)
-            if map_area.contains(pos):
+        if window.ctrl_pressed and False:#临时弃置，不使用
+
+            if DRAG_AREA.contains(pos):
+                
+                # 临时禁用事件穿透，确保后续的 mouseMoveEvent 能被接收！
+                window.setAttribute(Qt.WA_TransparentForMouseEvents, False)
+                window.is_temp_unlocked = True # 使用临时解锁标志
+                
                 window.drag_position = event.globalPos() - window.frameGeometry().topLeft()
                 window.is_dragging = True
                 event.accept()
+
+            elif SEARCH_BOX_AREA.contains(pos):
+                # 临时禁用事件穿透
+                window.setAttribute(Qt.WA_TransparentForMouseEvents, False)
+                
+                # 允许当前事件被接受，让搜索框接收到点击和焦点
+                event.accept()
+                
+                # 延迟恢复事件穿透属性
+                # QTimer.singleShot(100, lambda: window.setAttribute(Qt.WA_TransparentForMouseEvents, True))
+                # ⚠️ 注意：直接恢复会导致用户输入一个字符后就无法继续输入。
+                #     我们必须在 mouseReleaseEvent 或用户失去焦点时恢复。
+                
+                # 临时启用鼠标事件，并让 TimerWindow 知道这次是临时启用
+                window.is_temp_unlocked = True 
+                
+                # 确保搜索框获得焦点
+                window.search_box.setFocus()
+                
+                # 退出函数
+                return
             else:
                 event.ignore()
         else:
@@ -65,7 +92,7 @@ def mousePressEvent_handler(window, event):
 # 辅助函数 4: 鼠标移动事件处理
 def mouseMoveEvent_handler(window, event):
     """鼠标移动事件，用于实现窗口拖动 (原 TimerWindow.mouseMoveEvent)"""
-    if event.buttons() & Qt.LeftButton and hasattr(window, 'is_dragging') and window.is_dragging:
+    if event.buttons() == Qt.LeftButton and hasattr(window, 'is_dragging') and window.is_dragging:
         window.move(event.globalPos() - window.drag_position)
         event.accept()
 
@@ -75,6 +102,19 @@ def mouseReleaseEvent_handler(window, event):
     if event.button() == Qt.LeftButton:
         window.is_dragging = False
         event.accept()
+
+    if hasattr(window, 'is_temp_unlocked') and window.is_temp_unlocked:
+        
+        # 检查 ControlWindow 状态（假设 control_window 有 is_unlocked 属性）
+        is_control_unlocked = getattr(window.control_window, 'is_unlocked', False) 
+        
+        # 如果 ControlWindow 处于锁定状态，我们才恢复事件穿透属性
+        if not is_control_unlocked:
+            window.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+            window.is_temp_unlocked = False # 重置临时标志
+        
+    else:
+        event.ignore()
 
 # 辅助函数 6: 控制状态改变（点击穿透）
 def on_control_state_changed(window, unlocked):

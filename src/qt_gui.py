@@ -1,8 +1,9 @@
 import os
 import sys
+import json
 import traceback
 import threading, asyncio
-from PyQt5.QtWidgets import (QMainWindow, QApplication)
+from PyQt5.QtWidgets import (QMainWindow, QApplication,QMessageBox)
 from control_window import ControlWindow
 from PyQt5.QtCore import Qt, QTimer, QPoint, pyqtSignal
 import config
@@ -12,7 +13,7 @@ import image_util
 from toast_manager import ToastManager
 from mutator_and_enemy_race_automatic_recognizer import Mutator_and_enemy_race_automatic_recognizer
 import ui_setup, game_monitor, config_hotkeys,game_time_handler,map_loader,app_window_manager,language_manager
-
+from global_key_listener import GlobalKeyListener
 
 class TimerWindow(QMainWindow):
     # 创建信号用于地图更新
@@ -85,6 +86,18 @@ class TimerWindow(QMainWindow):
         # 搜索框的信号连接
         if hasattr(self, 'files'): # 确保 setup_search_and_combo_box 已创建 files
             self.setup_search_box_connections(self.files)
+
+        self.ctrl_pressed = False
+        self.is_temp_unlocked = False 
+        '''
+        # [新增] 实例化监听器并连接信号
+        self.global_listener = GlobalKeyListener(parent=self)
+        self.global_listener.ctrl_state_changed.connect(self.set_ctrl_state)
+        self.global_listener.start_listening()
+        '''
+        # 连接 "保存位置" 按钮信号
+        if hasattr(self, 'set_position_btn'):
+            self.set_position_btn.clicked.connect(self.save_current_position)
 
         # 初始化全局快捷键
         config_hotkeys.init_global_hotkeys(self)
@@ -348,6 +361,62 @@ class TimerWindow(QMainWindow):
                     #self.show_toast(selected_text, config.TOAST_DURATION, force_show=True)  # 设置5000毫秒（5秒）后自动消失
             event.accept()
 
+    def save_current_position(self):
+        """询问并保存当前窗口位置到 settings.json"""
+        current_x = self.x()
+        current_y = self.y()
+
+        reply = QMessageBox.question(
+            self, 
+            '保存位置', 
+            f"确定要将当前位置 (X:{current_x}, Y:{current_y}) 保存为默认启动位置吗？",
+            QMessageBox.Yes | QMessageBox.No, 
+            QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            try:
+                # 1. 确定文件路径 (使用与 config.py 中相同的逻辑)
+                CONFIG_FILE_NAME = 'settings.json'
+                
+                if getattr(sys, 'frozen', False):
+                    # 打包环境
+                    project_root_path = os.path.dirname(sys.executable)
+                else:
+                    # 源码环境: qt_gui.py 在 src/，需要向上两级目录到项目根目录
+                    current_dir = os.path.dirname(os.path.abspath(__file__))
+                    project_root_path = os.path.dirname(current_dir) 
+
+                config_path = os.path.join(project_root_path, CONFIG_FILE_NAME)
+
+                # 2. 读取现有配置（如果存在），以便保留其他设置
+                settings = {}
+                if os.path.exists(config_path):
+                    try:
+                        with open(config_path, 'r', encoding='utf-8') as f:
+                            settings = json.load(f)
+                    except:
+                        self.logger.warning("settings.json 文件损坏，将覆盖写入。")
+
+                # 3. 更新位置信息
+                settings['MAIN_WINDOW_X'] = current_x
+                settings['MAIN_WINDOW_Y'] = current_y
+
+                # 4. 写入文件
+                with open(config_path, 'w', encoding='utf-8') as f:
+                    json.dump(settings, f, indent=4) # 使用 indent=4 格式化，方便用户阅读
+
+                # 5. 更新内存中的 config 变量
+                config.MAIN_WINDOW_X = current_x
+                config.MAIN_WINDOW_Y = current_y
+
+                self.logger.info(f"位置已保存到 settings.json: X={current_x}, Y={current_y}")
+                QMessageBox.information(self, "成功", "窗口位置已保存到 settings.json 文件。")
+
+            except Exception as e:
+                self.logger.error(f"保存位置失败: {traceback.format_exc()}")
+                QMessageBox.warning(self, "错误", f"无法保存配置文件：请检查文件权限。\n错误详情: {str(e)}")
+    
     def get_text(self, key):
         """获取多语言文本"""
         return language_manager.get_text(self,key)
@@ -397,6 +466,32 @@ class TimerWindow(QMainWindow):
             if hasattr(self, 'mutator_manager') and self.mutator_manager:
                 self.mutator_manager.sync_mutator_toggles(mutators)
 
+    #当搜索框失去焦点时，检查是否需要恢复锁定（事件穿透
+    def restore_lock_on_search_focus_out(self):
+        # 检查窗口当前是否被锁定 (即 is_clickable == False)
+        is_currently_locked = self.testAttribute(Qt.WA_TransparentForMouseEvents)
+
+        # 检查是否是临时解锁状态并且窗口当前是解锁的
+        if hasattr(self, 'is_temp_unlocked') and self.is_temp_unlocked and not is_currently_locked:
+            
+            # 检查控制窗口是否被明确设置为解锁状态
+            is_control_unlocked = getattr(self.control_window, 'is_unlocked', True) 
+            
+            # 只有当控制窗口不是明确解锁时，才恢复锁定
+            if not is_control_unlocked:
+                self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+                self.logger.info("搜索框失去焦点，已恢复窗口锁定（事件穿透）。")
+                self.is_temp_unlocked = False # 重置临时标志
+            # else: 如果控制窗口已经是解锁状态，则不设置穿透属性，保持解锁
+
+    '''
+    def set_ctrl_state(self, state):
+        """接收来自 GlobalKeyListener 的信号，在 Qt 主线程中更新状态"""
+        if self.ctrl_pressed != state:
+            self.ctrl_pressed = state
+            self.logger.warning(f"全局 L-Ctrl 状态更新: {state}")
+            # 如果需要，可以在这里触发 UI 视觉反馈
+    '''
     def closeEvent(self, event):
         """窗口关闭事件处理"""
         try:
@@ -408,6 +503,10 @@ class TimerWindow(QMainWindow):
             if hasattr(self, 'mutator_and_enemy_race_recognizer') and self.recognizer:
                 self.mutator_and_enemy_race_recognizer.shutdown()
                 self.logger.info("突变因子和种族识别器已关闭。")
+                
+            if hasattr(self, 'global_listener') and self.global_listener:
+                self.global_listener.stop_listening()
+                self.logger.info("按键监听已关闭。")
 
             # 清理全局快捷键
             config_hotkeys.unhook_global_hotkeys(self)

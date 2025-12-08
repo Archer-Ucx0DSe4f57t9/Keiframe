@@ -1,5 +1,9 @@
 # -*- coding.py: utf-8 -*-
 
+import os
+import json
+import sys
+
 # current region
 current_region = 'kr'  # 当前地区 / Current region
 current_language = 'zh'  # 当前语言 / Current language
@@ -191,3 +195,47 @@ MALWARFARE_REPLAY_OFFSET = 49
 # 配置用参数，如无必要请勿修改
 #############################
 MUTATOR_WIDTH = 27 #UI界面突变图标区域宽度
+
+#############################
+# 读取外部配置相关
+#############################
+
+CONFIG_FILE_NAME = 'settings.json'
+
+def get_settings_path():
+    """根据运行环境计算 settings.json 的绝对路径 (项目根目录)"""
+    if getattr(sys, 'frozen', False):
+        # 打包环境 (EXE): 使用可执行文件所在的目录
+        project_root = os.path.dirname(sys.executable)
+    else:
+        # 源码环境: config.py 在 src/ 中，需要向上两级目录到达项目根目录
+        current_dir = os.path.dirname(os.path.abspath(__file__)) # /project/src
+        project_root = os.path.dirname(current_dir) # /project/
+
+    return os.path.join(project_root, CONFIG_FILE_NAME)
+
+
+def load_external_settings():
+    """尝试加载外部 JSON 配置并覆盖当前模块的变量"""
+    CONFIG_PATH = get_settings_path()
+    
+    if not os.path.exists(CONFIG_PATH):
+        return
+
+    try:
+        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+            settings = json.load(f)
+            
+        allowed_keys = ['MAIN_WINDOW_X', 'MAIN_WINDOW_Y']
+        g = globals()
+        
+        for key, value in settings.items():
+            if key in allowed_keys and isinstance(value, int):
+                g[key] = value
+
+    except Exception as e:
+        # 打印错误，但不中断程序运行
+        print(f"警告：加载外部配置失败，将使用默认值。错误信息: {e}")
+
+# 执行加载
+load_external_settings()
