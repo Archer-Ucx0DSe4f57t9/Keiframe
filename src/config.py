@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding.py: utf-8 -*-
 
 # current region
 current_region = 'kr'  # 当前地区 / Current region
@@ -33,7 +33,7 @@ MAIN_WINDOW_Y = 1049
 MAIN_WINDOW_BG_COLOR = 'rgba(43, 43, 43, 200)'  # 主界面背景设置
 COMMANDER_SELECTOR_BG_COLOR = 'rgba(43, 43, 43, 200)'  # 指挥官选择器背景设置
 # 窗体宽度 注意这里没有对按钮之类的宽度进行适配，改了之后主要影响的是表格中文字显示的宽度
-MAIN_WINDOW_WIDTH = 167  # 主窗口宽度 / Main window width
+MAIN_WINDOW_WIDTH = 200  # 主窗口宽度 / Main window width
 
 # 表格字体大小
 TABLE_FONT_SIZE = 12  # 表格字体大小 / Table font size
@@ -107,14 +107,17 @@ MAP_SEARCH_KEYWORDS = {
     "庙b": "往日神庙-B",
     "撕裂a": "虚空撕裂-左",
     "撕裂b": "虚空撕裂-右",
-    "地勤": "机会渺茫",
+    "地勤": "机会渺茫-人虫",
+    "地勤p": "机会渺茫-神",
     "零件": "聚铁成兵",
     "杀毒": "净网行动",
     "穿梭机": "虚空降临",
+    "记者": "熔火危机",
     # 可以继续添加……
 }
 #############################
 # 下面配置主要用于图像识别
+#############################
 DEBUG_SHOW_ENEMY_INFO_SQUARE = False  # 是否显示敌方单位信息框 / Whether to show enemy unit information boxes
 GAME_SCREEN = 0
 GAME_SCREEN_DPI = 96
@@ -183,3 +186,8 @@ MALWARFARE_PAUSED_OFFSET_FROM_COUNT = (45, 0)   # 示例: (351-306, 165-164)
 MALWARFARE_HERO_OFFSET = 97
 MALWARFARE_ZWEIHAKA_OFFSET = 181
 MALWARFARE_REPLAY_OFFSET = 49
+
+#############################
+# 配置用参数，如无必要请勿修改
+#############################
+MUTATOR_WIDTH = 27 #UI界面突变图标区域宽度

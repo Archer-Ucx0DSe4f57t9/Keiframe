@@ -1,3 +1,4 @@
+#mutator_manager
 import asyncio
 import os
 import traceback
@@ -18,7 +19,7 @@ mutator_types = ['AggressiveDeployment', 'Propagators', 'VoidRifts', 'KillBots',
                  'HeroesFromtheStorm', 'AggressiveDeploymentProtoss'] # 
 #名称到简略中文名称映射，用于提示显示
 mutator_types_to_CHS = {'AggressiveDeployment': '部署', 'Propagators': '小软', 'VoidRifts': '裂隙', 'KillBots': '杀戮',
-                        'BoomBots': '炸弹', 'HeroesFromtheStorm': '风暴', 'AggressiveDeploymentProtoss': '部署'}
+                        'BoomBots': '炸弹', 'HeroesFromtheStorm': '风暴', 'AggressiveDeploymentProtoss': '部署神族'}
 
 class MutatorManager(QWidget):
     def __init__(self, parent=None):
@@ -39,9 +40,10 @@ class MutatorManager(QWidget):
 
     def init_mutator_ui(self):
         """初始化突变因子按钮UI"""
-        layout = QHBoxLayout(self)
-        layout.setSpacing(8)
-        layout.setContentsMargins(4, 5, 8, 5)
+        from PyQt5.QtWidgets import QVBoxLayout
+        layout = QVBoxLayout(self)
+        layout.setSpacing(1)
+        layout.setContentsMargins(0, 5, 0, 0)
 
         icon_paths = ['AggressiveDeployment.png', 'Propagators.png', 'VoidRifts.png', 'KillBots.png', 'BoomBots.png',
                       'AggressiveDeploymentProtoss.png','HeroesFromtheStorm.png']
@@ -62,6 +64,7 @@ class MutatorManager(QWidget):
             btn.setIconSize(QSize(26, 26))
             btn.setFixedSize(32, 32)
             btn.setCheckable(True)
+            btn.setToolTip(mutator_types_to_CHS.get(icon_name.split('.')[0]))
 
             btn.setStyleSheet('''
                 QPushButton { border: none; padding: 0px; 
@@ -83,6 +86,9 @@ class MutatorManager(QWidget):
             self.mutator_buttons.append(btn)
 
         layout.addStretch()
+        
+        # 确保 MutatorManager 的尺寸适应所有按钮
+        self.setFixedSize(layout.sizeHint())
 
     def create_transparent_pixmap(self, pixmap, opacity):
         """创建半透明的QPixmap"""

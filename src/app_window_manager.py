@@ -7,6 +7,8 @@ from PyQt5.QtCore import Qt, QRect, QPoint
 from PyQt5.QtWidgets import QApplication
 import config
 
+
+
 # 辅助函数 1: 获取屏幕分辨率
 def get_screen_resolution():
     """获取屏幕分辨率 (原 TimerWindow.get_screen_resolution)"""
@@ -40,7 +42,7 @@ def mousePressEvent_handler(window, event):
         if event.button() == Qt.LeftButton:
             pos = event.pos()
             # 简化拖动区域判断，或保留原逻辑
-            map_area = QRect(10, 5, 30, 30)
+            map_area = QRect(162, 5, 38, 30)
             if map_area.contains(pos):
                 window.drag_position = event.globalPos() - window.frameGeometry().topLeft()
                 window.is_dragging = True
@@ -50,7 +52,7 @@ def mousePressEvent_handler(window, event):
     else:
         if window.ctrl_pressed and event.button() == Qt.LeftButton:
             pos = event.pos()
-            map_area = QRect(10, 5, 30, 30)
+            map_area = QRect(162, 5, 38, 30)
             if map_area.contains(pos):
                 window.drag_position = event.globalPos() - window.frameGeometry().topLeft()
                 window.is_dragging = True

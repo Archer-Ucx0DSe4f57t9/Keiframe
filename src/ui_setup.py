@@ -1,7 +1,7 @@
 #ui_setup.py
 import os
 from PyQt5.QtWidgets import (
-    QWidget, QLabel, QComboBox, QTableWidget,
+    QWidget, QLabel, QComboBox, QHBoxLayout,
     QPushButton, QHBoxLayout, QLineEdit, QApplication
 )
 from PyQt5.QtGui import QFont, QBrush, QColor
@@ -10,6 +10,7 @@ import config
 from fileutil import get_resources_dir, list_files
 from mutator_manager import MutatorManager
 from misc.commander_selector import CommanderSelector
+
 
 # 辅助函数 1: 设置窗口样式
 def setup_window_style(window):
@@ -102,12 +103,12 @@ def setup_table_area(window):
     # ... (表格区域创建和样式代码) ... (保持与原文件一致)
     from PyQt5.QtWidgets import QTableWidget
     window.table_area = QTableWidget(window.main_container)
-    window.table_area.setGeometry(0, 65, config.MAIN_WINDOW_WIDTH, config.TABLE_HEIGHT)
+    window.table_area.setGeometry(0, 65, config.MAIN_WINDOW_WIDTH-config.MUTATOR_WIDTH, config.TABLE_HEIGHT)
     window.table_area.setColumnCount(3)
     window.table_area.horizontalHeader().setVisible(False)
     window.table_area.setColumnWidth(0, 50)
     window.table_area.setColumnWidth(2, 5)
-    window.table_area.setColumnWidth(1, config.MAIN_WINDOW_WIDTH - 55)
+    window.table_area.setColumnWidth(1, config.MAIN_WINDOW_WIDTH-config.MUTATOR_WIDTH - 55)
     window.table_area.verticalHeader().setVisible(False)
     window.table_area.setEditTriggers(QTableWidget.NoEditTriggers)
     window.table_area.setSelectionBehavior(QTableWidget.SelectRows)
@@ -245,7 +246,7 @@ def setup_search_and_combo_box(window):
     # 注意：搜索框的信号连接 (textChanged.connect) 需要保留在 TimerWindow 的 __init__ 中，以便访问内部函数。
 
 # 辅助函数 7: 创建突变和指挥官替换区域
-def setup_mutator_commander(window):
+def setup_mutator_ui(window):
     """创建突变管理器和指挥官替换按钮"""
     # ... (突变和按钮创建和样式代码) ... (保持与原文件一致)
     window.mutator_manager = MutatorManager(window.main_container)
@@ -256,38 +257,107 @@ def setup_mutator_commander(window):
         }
     """)
     
+    mutator_x = config.MAIN_WINDOW_WIDTH - config.MUTATOR_WIDTH 
     
+    # 获取 time_label 的 top 坐标 (假设 time_label 已经在 window.time_label 中设置)
+    # 根据 ui_setup.py 中的定义：time_label.setGeometry(10, 40, 100, 20)
+    time_label_y = 30 
     
-    table_bottom = window.table_area.geometry().bottom()
-    window.mutator_manager.setGeometry(0, table_bottom + 5, window.main_container.width(), 50)
+    # 将 MutatorManager 放置在窗口右侧，从 time_label 的顶部开始
+    # 高度暂时设为 250，以便容纳所有按钮。最终高度将在 MutatorManager 内部决定。
+    window.mutator_manager.setGeometry(mutator_x, time_label_y, config.MUTATOR_WIDTH, 250)
 
-    window.replace_commander_btn = QPushButton(window.get_text('replace_commander'), window.main_container)
-    window.replace_commander_btn.clicked.connect(window.on_replace_commander)
-    window.replace_commander_btn.setStyleSheet('''
-        QPushButton {
-            color: black;
-            background-color: rgba(236, 236, 236, 200);
-            border: none;
-            border-radius: 3px;
-            padding: 5px;
-            font-size: 12pt;
-        }
-        QPushButton:hover {
-            background-color: rgba(43, 43, 43, 200);
-        }
-    ''')
-    if config.REPLACE_COMMANDER_FLAG:
-        window.replace_commander_btn.setFixedSize(150, 30)
-    else:
-        window.replace_commander_btn.setFixedSize(0, 0)
-    commander_btn_x = (window.main_container.width() - window.replace_commander_btn.width()) // 2
-    window.replace_commander_btn.move(commander_btn_x, window.mutator_manager.geometry().bottom() + 5)
+def setup_bottom_buttons(window):
+    """
+    初始化表格下方的功能按钮区域
+    包含：Memo 按钮、预留位置、以及废弃的指挥官替换按钮占位
+    """
+    # --- 常量定义 ---
+    AREA_HEIGHT = 35  # 底部区域总高度
+    BTN_SIZE = 27     # 按钮大小
+    
+    # --- 1. 创建底部容器 ---
+    start_y = window.table_area.geometry().bottom() + 5
+    
+    window.bottom_button_area = QWidget(window.main_container)
+    window.bottom_button_area.setStyleSheet("background-color: transparent;")
+    window.bottom_button_area.setGeometry(0, start_y, config.MAIN_WINDOW_WIDTH, AREA_HEIGHT)
+
+    # --- 2. 设置水平布局 ---
+    # 这就是"依次添加"的核心
+    layout = QHBoxLayout(window.bottom_button_area)
+    layout.setContentsMargins(5, 0, 5, 0)       # 设置边距：左5, 上0, 右5, 下0
+    layout.setSpacing(5)                        # 设置按钮之间的间距
+    layout.setAlignment(Qt.AlignLeft | Qt.AlignVCenter) # 靠左对齐，垂直居中
+
+    # --- 3. 定义通用样式和创建函数 (工厂模式) ---
+    # 这样你可以方便地添加任意数量的按钮，样式统一
+    def add_icon_button(text, tooltip):
+        btn = QPushButton(text) # 注意：使用布局时，父对象会在 addWidget 时自动指定
+        btn.setFixedSize(BTN_SIZE, BTN_SIZE)
+        btn.setToolTip(tooltip)
+        btn.setStyleSheet("""
+            QPushButton {
+                color: rgb(200, 200, 200);
+                background-color: rgba(60, 60, 60, 200);
+                border: 1px solid rgba(100, 100, 100, 100);
+                border-radius: 3px;
+                font-weight: bold;
+                font-family: Arial;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: rgba(80, 80, 80, 200);
+                color: white;
+                border: 1px solid rgba(150, 150, 150, 150);
+            }
+            QPushButton:pressed {
+                background-color: rgba(100, 100, 100, 200);
+            }
+        """)
+        layout.addWidget(btn) # <--- 关键：添加到布局中，自动排列
+        return btn
+
+    # --- 4. 依次添加按钮 ---
+    
+    window.memo_btn = add_icon_button("记", "笔记本")
+    window.set_position_btn = add_icon_button("定", "记录当前定位") 
+
+
+    # --- 5. 处理废弃的 Replace Commander Button (隐藏占位) ---
+    # 注意：这个按钮我们不放入布局，直接隐藏即可
+    window.replace_commander_btn = QPushButton(window.main_container)
+    window.replace_commander_btn.setFixedSize(0, 0)
     window.replace_commander_btn.hide()
-
-    window.main_container.setFixedHeight(window.replace_commander_btn.geometry().bottom() + 5)
-    window.setFixedHeight(window.main_container.height())
-
     window.commander_selector = CommanderSelector(window)
+
+    # --- 6. 最终调整主窗口高度 ---
+    final_height = window.bottom_button_area.geometry().bottom() + 5
+    window.main_container.setFixedHeight(final_height)
+    window.setFixedHeight(window.main_container.height())
+    
+    # 定位：左侧留 5px 边距，垂直居中
+    # 垂直居中计算: (AREA_HEIGHT - BTN_SIZE) / 2 = (35 - 27) / 2 = 4
+    window.memo_btn.move(5, 4)
+    
+    # 如果需要在 ui_setup 中绑定点击事件（建议在 qt_gui.py 中通过 memo_btn 绑定）
+    # window.memo_btn.clicked.connect(window.on_memo_clicked) 
+
+
+    # --- 3. 处理废弃的 Replace Commander Button (隐藏占位) ---
+    window.replace_commander_btn = QPushButton(window.main_container)
+    window.replace_commander_btn.setFixedSize(0, 0)
+    window.replace_commander_btn.hide()
+    # 指挥官选择器逻辑仍需保留初始化，以免报错
+    window.commander_selector = CommanderSelector(window)
+
+
+    # --- 4. 最终调整主窗口高度 ---
+    # 整个窗口的高度 = 底部按钮区域的底部 + 5px 底部边距
+    final_height = window.bottom_button_area.geometry().bottom() + 5
+    
+    window.main_container.setFixedHeight(final_height)
+    window.setFixedHeight(window.main_container.height())
 
 # 主 UI 初始化函数
 def init_ui(window):
@@ -302,8 +372,8 @@ def init_ui(window):
     setup_map_version_group(window)
     setup_table_area(window)
     setup_search_and_combo_box(window)
-    setup_mutator_commander(window)
-    
+    setup_mutator_ui(window)
+    setup_bottom_buttons(window)
     # 强制显示窗口 (保持原样)
     window.show()
     # Windows 置顶处理 (保持在 qt_gui.py 中调用)

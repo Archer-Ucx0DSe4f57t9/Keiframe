@@ -77,7 +77,7 @@ def handle_map_selection(window, map_name):
         window.table_area.setColumnCount(5)
         window.table_area.setColumnWidth(0, 40) # Count
         window.table_area.setColumnWidth(1, 50) # Time
-        window.table_area.setColumnWidth(2, config.MAIN_WINDOW_WIDTH - 95) # Event (宽列)
+        window.table_area.setColumnWidth(2, config.MAIN_WINDOW_WIDTH - config.MUTATOR_WIDTH - 95) # Event (宽列)
         window.table_area.setColumnWidth(3, 5) # 新增 Sound 列（隐藏）
         window.table_area.setColumnWidth(4, 5) # Hero 列（隐藏/留空）
 
@@ -95,7 +95,7 @@ def handle_map_selection(window, map_name):
         window.countdown_label.setText("")
         window.table_area.setColumnCount(5) 
         window.table_area.setColumnWidth(0, 50)          # Time
-        window.table_area.setColumnWidth(1, config.MAIN_WINDOW_WIDTH - 90) # Event
+        window.table_area.setColumnWidth(1, config.MAIN_WINDOW_WIDTH -config.MUTATOR_WIDTH - 90) # Event
         window.table_area.setColumnWidth(2, 30)          # Army/Note
         window.table_area.setColumnWidth(3, 5)           # Sound File (隐藏)
         window.table_area.setColumnWidth(4, 5)           # Hero Event (隐藏)
