@@ -14,6 +14,7 @@ from toast_manager import ToastManager
 from mutator_and_enemy_race_automatic_recognizer import Mutator_and_enemy_race_automatic_recognizer
 import ui_setup, game_monitor, config_hotkeys,game_time_handler,map_loader,app_window_manager,language_manager
 from memo_overlay import MemoOverlay
+from settings_window import SettingsWindow
 #from global_key_listener import GlobalKeyListener
 
 class TimerWindow(QMainWindow):
@@ -39,6 +40,9 @@ class TimerWindow(QMainWindow):
         #在最开始安全地初始化 control_window 为 None
         # 万一在真正创建前触发了 moveEvent，它可以通过 hasattr() 或 try/except 优雅地失败。
         self.control_window = None
+        
+        #启动时加载用户自定义配置 (这步最好放在程序入口最开始)
+        self.apply_user_settings()
 
         # 初始化突变因子和种族识别器
         self.mutator_and_enemy_race_recognizer = Mutator_and_enemy_race_automatic_recognizer(recognition_signal = self.mutator_and_enemy_race_recognition_signal)
@@ -61,6 +65,7 @@ class TimerWindow(QMainWindow):
         self.logger = get_logger(__name__)
         self.logger.info('SC2 Timer 启动')
 
+        
         # 初始化状态
         self.current_time = ""
         self.drag_position = QPoint(0, 0)
@@ -105,21 +110,32 @@ class TimerWindow(QMainWindow):
         if hasattr(self, 'set_position_btn'):
             self.set_position_btn.clicked.connect(self.save_current_position)
         
-        #笔记功能
+        #笔记按钮功能
         self.memo_overlay = MemoOverlay()
-        # 点击按钮默认使用 'temp' 模式，或者你可以自己定
+        # 点击按钮默认使用 'temp' 模式
         if hasattr(self, 'memo_btn'):
             self.memo_btn.clicked.connect(lambda: self.show_memo('temp'))
         #连接信号到槽 (为了解决线程安全问题)
         self.memo_signal.connect(self.show_memo)
+    
+        
+        
+        #设置按钮功能
+        if hasattr(self, 'setting_btn'): 
+            self.setting_btn.clicked.connect(self.open_settings)
+            
+        self.settings_window = None
+        
+        #退出按钮功能
+        if hasattr(self, 'exit_btn'): 
+            self.exit_btn.clicked.connect(self.closeEvent)
         
         # 初始化全局快捷键
         config_hotkeys.init_global_hotkeys(self)
-
+        
          # 启动游戏检查线程
         self.game_check_thread = threading.Thread(target=self._run_async_game_scheduler, args=(self.progress_signal,), daemon=True)
         self.game_check_thread.start()
-
 
         # 创建控制窗体
         self.control_window = ControlWindow()
@@ -517,15 +533,58 @@ class TimerWindow(QMainWindow):
                 self.logger.info("搜索框失去焦点，已恢复窗口锁定（事件穿透）。")
                 self.is_temp_unlocked = False # 重置临时标志
             # else: 如果控制窗口已经是解锁状态，则不设置穿透属性，保持解锁
+            
+            
+    def apply_user_settings(self):
+        """读取json并覆盖config.py中的变量"""
+        if os.path.exists('settings.json'):
+            try:
+                with open('settings.json', 'r', encoding='utf-8') as f:
+                    user_settings = json.load(f)
+                    
+                # 动态更新 config 模块的属性
+                for key, value in user_settings.items():
+                    if hasattr(config, key):
+                        setattr(config, key, value)
+                        # print(f"已更新配置: {key} = {value}")
+            except Exception as e:
+                print(f"加载用户配置失败: {e}")
 
-    '''
-    def set_ctrl_state(self, state):
-        """接收来自 GlobalKeyListener 的信号，在 Qt 主线程中更新状态"""
-        if self.ctrl_pressed != state:
-            self.ctrl_pressed = state
-            self.logger.warning(f"全局 L-Ctrl 状态更新: {state}")
-            # 如果需要，可以在这里触发 UI 视觉反馈
-    '''
+    def open_settings(self):
+        """打开设置窗口"""
+        if self.settings_window is None:
+            # 传递 self 作为父级，确保窗口在应用程序内正确管理
+            self.settings_window = SettingsWindow(self) 
+            self.settings_window.settings_saved.connect(self.handle_settings_update)
+        
+        # 【关键修改 2】使用 exec_() 或 setModal(True) 运行
+        # 使用 exec_() 运行是最保险的模态方式，它会阻塞主窗口直到设置窗口关闭。
+        self.settings_window.exec_() # <-- 使用 exec_()
+        
+        # 如果使用 show()，确保它被正确父子化
+        # self.settings_window.show() 
+        # self.settings_window.raise_()
+
+    def handle_settings_update(self, new_settings):
+        """
+        当设置窗口保存后，处理实时更新逻辑
+        有些设置可以直接生效（如颜色、透明度），有些可能需要重启
+        """
+        # 1. 更新 config 内存中的值
+        for key, value in new_settings.items():
+            setattr(config, key, value)
+            
+        # 2. 应用实时效果 (举例)
+        
+        # 示例：更新透明度
+        # self.setWindowOpacity(config.MAIN_WINDOW_BG_COLOR...) 
+        
+        # 示例：更新快捷键 (重新注册)
+        # unhook_global_hotkeys(self)
+        # init_global_hotkeys(self)
+        
+        self.logger.info("配置已更新，部分功能已重载")
+
     def closeEvent(self, event):
         """窗口关闭事件处理"""
         try:

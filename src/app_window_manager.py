@@ -121,13 +121,6 @@ def on_control_state_changed(window, unlocked):
     """处理控制窗口状态改变事件（点击穿透）(原 TimerWindow.on_control_state_changed)"""
     window.logger.info(f'控制窗口状态改变: unlocked={unlocked}')
 
-    # 根据解锁状态显示或隐藏替换指挥官按钮
-    if hasattr(window, 'replace_commander_btn'):
-        if unlocked and config.REPLACE_COMMANDER_FLAG:
-            window.replace_commander_btn.show()
-        else:
-            window.replace_commander_btn.hide()
-
     # 在Windows平台上，直接使用Windows API设置窗口样式
     if sys.platform == 'win32':
         try:

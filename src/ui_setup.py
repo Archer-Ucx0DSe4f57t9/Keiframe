@@ -321,7 +321,9 @@ def setup_bottom_buttons(window):
     # --- 4. 依次添加按钮 ---
     
     window.memo_btn = add_icon_button("📝", "笔记本")
-    window.set_position_btn = add_icon_button("⚙️", "记录当前定位") 
+    window.setting_btn = add_icon_button("⚙️", "设置当前定位") 
+    window.set_position_btn = add_icon_button("📌", "记录当前定位") 
+    window.exit_btn = add_icon_button("🏃", "退出") 
 
 
     # --- 5. 处理废弃的 Replace Commander Button (隐藏占位) ---

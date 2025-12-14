@@ -1,4 +1,19 @@
 {
-    "MAIN_WINDOW_X": 982,
-    "MAIN_WINDOW_Y": 1010
+    "current_region": "kr",
+    "current_language": "zh",
+    "LOG_LEVEL": "WARNING",
+    "debug_mode": false,
+    "TOAST_DURATION": 10000,
+    "MAIN_WINDOW_BG_COLOR": "rgba(43, 43, 43, 200)",
+    "TABLE_FONT_SIZE": 12,
+    "MAP_ALERT_SECONDS": 30,
+    "MEMO_OPACITY": 1.0,
+    "MAP_SHORTCUT": "ctrl + shift + [",
+    "LOCK_SHORTCUT": "ctrl + a",
+    "SCREENSHOT_SHORTCUT": "ctrl + shift + -",
+    "MEMO_TEMP_SHORTCUT": "`",
+    "MEMO_TOGGLE_SHORTCUT": "backslash",
+    "GAME_SCREEN_DPI": 96,
+    "GAME_ICO_RECONGIZE_CONFIDENCE": 0.9,
+    "DEBUG_SHOW_ENEMY_INFO_SQUARE": false
 }
