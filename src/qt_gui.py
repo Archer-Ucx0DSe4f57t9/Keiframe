@@ -128,7 +128,7 @@ class TimerWindow(QMainWindow):
         
         #退出按钮功能
         if hasattr(self, 'exit_btn'): 
-            self.exit_btn.clicked.connect(self.closeEvent)
+            self.exit_btn.clicked.connect(QApplication.instance().quit)
         
         # 初始化全局快捷键
         config_hotkeys.init_global_hotkeys(self)

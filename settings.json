@@ -9,7 +9,7 @@
     "MAP_ALERT_SECONDS": 30,
     "MEMO_OPACITY": 1.0,
     "MAP_SHORTCUT": "ctrl + shift + [",
-    "LOCK_SHORTCUT": "ctrl + a",
+    "LOCK_SHORTCUT": "ctrl + z",
     "SCREENSHOT_SHORTCUT": "ctrl + shift + -",
     "MEMO_TEMP_SHORTCUT": "`",
     "MEMO_TOGGLE_SHORTCUT": "backslash",
