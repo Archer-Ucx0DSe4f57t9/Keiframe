@@ -8,13 +8,6 @@ import sys
 current_region = 'kr'  # 当前地区 / Current region
 current_language = 'zh'  # 当前语言 / Current language
 
-# 调试模式配置
-debug_mode = False  # 设置为True启用调试模式 / Set to True to enable debug mode
-debug_time_factor = 5.0  # 调试模式下的时间流速因子 / Time flow factor in debug mode
-
-# 日志级别配置
-LOG_LEVEL = 'WARNING'  # 日志级别，可选值：DEBUG, INFO, WARNING, ERROR, CRITICAL / Log level, available values: DEBUG, INFO, WARNING, ERROR, CRITICAL
-
 # 快捷键
 MAP_SHORTCUT = 'ctrl + shift + ['  # 地图快捷键 / Map shortcut key
 LOCK_SHORTCUT = 'ctrl + shift + ]'  # 锁定快捷键 / Lock shortcut key
@@ -75,18 +68,17 @@ ALERT_SOUND_COOLDOWN = 10 # 同名警告最短间隔（秒），低于间隔的�
 ALERT_SOUND_VOLUME = 90 # 音量大小（0-100正整数）
 
 # 突变因子提示位置配置
-# 以下废案中
 MUTATOR_TOAST_POSITION = 0.7  # 垂直位置（窗口高度的比例）/ Vertical position (relative to window height)
 MUTATOR_ICON_TRANSPARENCY = 0.7  # 突变因子图标透明度 / Mutator icon transparency
 TOAST_MUTATOR_FONT_SIZE = 30  # 突变因子提示字体大小 / Mutator toast font size
 MUTATOR_DEPLOYMENT_POS = 0.2  # 突变因子部署位置 / Mutator deployment position
-MUTATOR_PROPAGATOR_POS = 0.35  # 突变因子传播者位置 / Mutator propagator position
+MUTATOR_PROPAGATOR_POS = 0.35  # 突变因子小软位置 / Mutator propagator position
 MUTATOR_RIFT_POS = 0.5  # 突变因子裂隙位置 / Mutator rift position
 MUTATOR_KILLBOTS_POS = 0.65  # 突变因子杀戮机器人位置 / Mutator killbots position
 MUTATOR_BOMBBOTS_POS = 0.8  # 突变因子炸弹机器人位置 / Mutator bombbots position
 
 # wiki url
-WIKI_URL = 'https://starcraft.huijiwiki.com/wiki/%E5%90%88%E4%BD%9C%E4%BB%BB%E5%8A%A1/%E7%AA%81%E5%8F%98%E5%88%97%E8%A1%A8'  # Wiki链接 / Wiki URL
+WIKI_URL = 'https://starcraft.huijiwiki.com/wiki/合作任务/'  # Wiki链接 / Wiki URL
 
 # 指挥官头像布局
 avatar = [
@@ -129,6 +121,14 @@ MEMO_FADE_TIME = 1000     # 淡出动画时间 (毫秒)
 # 笔记快捷键
 MEMO_TEMP_SHORTCUT = '`'  # 临时显示快捷键
 MEMO_TOGGLE_SHORTCUT = 'backslash' # 持续开关快捷键
+
+# 调试模式配置
+debug_mode = False  # 设置为True启用调试模式 / Set to True to enable debug mode
+debug_time_factor = 5.0  # 调试模式下的时间流速因子 / Time flow factor in debug mode
+
+# 日志级别配置
+LOG_LEVEL = 'WARNING'  # 日志级别，可选值：DEBUG, INFO, WARNING, ERROR, CRITICAL / Log level, available values: DEBUG, INFO, WARNING, ERROR, CRITICAL
+
 
 #############################
 # 下面配置主要用于图像识别

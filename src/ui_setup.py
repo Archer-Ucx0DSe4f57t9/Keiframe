@@ -281,7 +281,7 @@ def setup_bottom_buttons(window):
     
     window.bottom_button_area = QWidget(window.main_container)
     window.bottom_button_area.setStyleSheet("background-color: transparent;")
-    window.bottom_button_area.setGeometry(0, start_y, config.MAIN_WINDOW_WIDTH, AREA_HEIGHT)
+    window.bottom_button_area.setGeometry(0, start_y, config.MAIN_WINDOW_WIDTH - config.MUTATOR_WIDTH , AREA_HEIGHT)
 
     # --- 2. 设置水平布局 ---
     # 这就是"依次添加"的核心
@@ -320,8 +320,8 @@ def setup_bottom_buttons(window):
 
     # --- 4. 依次添加按钮 ---
     
-    window.memo_btn = add_icon_button("记", "笔记本")
-    window.set_position_btn = add_icon_button("定", "记录当前定位") 
+    window.memo_btn = add_icon_button("📝", "笔记本")
+    window.set_position_btn = add_icon_button("⚙️", "记录当前定位") 
 
 
     # --- 5. 处理废弃的 Replace Commander Button (隐藏占位) ---
@@ -340,24 +340,7 @@ def setup_bottom_buttons(window):
     # 垂直居中计算: (AREA_HEIGHT - BTN_SIZE) / 2 = (35 - 27) / 2 = 4
     window.memo_btn.move(5, 4)
     
-    # 如果需要在 ui_setup 中绑定点击事件（建议在 qt_gui.py 中通过 memo_btn 绑定）
-    # window.memo_btn.clicked.connect(window.on_memo_clicked) 
 
-
-    # --- 3. 处理废弃的 Replace Commander Button (隐藏占位) ---
-    window.replace_commander_btn = QPushButton(window.main_container)
-    window.replace_commander_btn.setFixedSize(0, 0)
-    window.replace_commander_btn.hide()
-    # 指挥官选择器逻辑仍需保留初始化，以免报错
-    window.commander_selector = CommanderSelector(window)
-
-
-    # --- 4. 最终调整主窗口高度 ---
-    # 整个窗口的高度 = 底部按钮区域的底部 + 5px 底部边距
-    final_height = window.bottom_button_area.geometry().bottom() + 5
-    
-    window.main_container.setFixedHeight(final_height)
-    window.setFixedHeight(window.main_container.height())
 
 # 主 UI 初始化函数
 def init_ui(window):
