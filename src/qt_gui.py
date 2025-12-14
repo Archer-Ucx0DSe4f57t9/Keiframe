@@ -13,7 +13,8 @@ import image_util
 from toast_manager import ToastManager
 from mutator_and_enemy_race_automatic_recognizer import Mutator_and_enemy_race_automatic_recognizer
 import ui_setup, game_monitor, config_hotkeys,game_time_handler,map_loader,app_window_manager,language_manager
-from global_key_listener import GlobalKeyListener
+from memo_overlay import MemoOverlay
+#from global_key_listener import GlobalKeyListener
 
 class TimerWindow(QMainWindow):
     # 创建信号用于地图更新
@@ -21,6 +22,9 @@ class TimerWindow(QMainWindow):
     toggle_artifact_signal = pyqtSignal()
     mutator_and_enemy_race_recognition_signal = QtCore.pyqtSignal(dict)
 
+    # 定义一个信号，用于线程安全地激活笔记本
+    memo_signal = pyqtSignal(str)
+    
     def get_screen_resolution(self):
         return app_window_manager.get_screen_resolution()
 
@@ -28,8 +32,10 @@ class TimerWindow(QMainWindow):
         """在新线程中启动 asyncio 事件循环"""
         asyncio.run(game_monitor.check_for_new_game_scheduler(progress_signal))
 
+
     def __init__(self):
         super().__init__()
+        
         #在最开始安全地初始化 control_window 为 None
         # 万一在真正创建前触发了 moveEvent，它可以通过 hasattr() 或 try/except 优雅地失败。
         self.control_window = None
@@ -98,7 +104,15 @@ class TimerWindow(QMainWindow):
         # 连接 "保存位置" 按钮信号
         if hasattr(self, 'set_position_btn'):
             self.set_position_btn.clicked.connect(self.save_current_position)
-
+        
+        #笔记功能
+        self.memo_overlay = MemoOverlay()
+        # 点击按钮默认使用 'temp' 模式，或者你可以自己定
+        if hasattr(self, 'memo_btn'):
+            self.memo_btn.clicked.connect(lambda: self.show_memo('temp'))
+        #连接信号到槽 (为了解决线程安全问题)
+        self.memo_signal.connect(self.show_memo)
+        
         # 初始化全局快捷键
         config_hotkeys.init_global_hotkeys(self)
 
@@ -361,6 +375,32 @@ class TimerWindow(QMainWindow):
                     #self.show_toast(selected_text, config.TOAST_DURATION, force_show=True)  # 设置5000毫秒（5秒）后自动消失
             event.accept()
 
+    def trigger_memo_display(self, mode):
+        """提供给 config_hotkeys.py 调用的线程安全接口"""
+        self.memo_signal.emit(mode)
+
+    def show_memo(self, mode):
+        """
+        核心调用逻辑
+        :param mode: 'temp' or 'toggle'
+        """
+        try:
+            # 假设 game_monitor 已在 TimerWindow 的模块中导入
+            current_map = game_monitor.state.current_selected_map
+            self.logger.info(f"通过 game_monitor 获取地图: {current_map}")
+        except Exception:
+            current_map = "Unknown_Map"
+            self.logger.warning("无法从 game_monitor 获取当前地图名称，使用默认值。")
+                
+        self.logger.info(f"触发 Memo 显示: 地图={current_map}, 模式={mode}")
+        
+        # 调用 Overlay 显示 (注意：如果地图名包含特殊字符，你可能需要清理它以匹配文件名)
+        if '-' in current_map:
+            cleaned_map_name = current_map.split('-')[0]
+        else:
+            cleaned_map_name = current_map
+        self.memo_overlay.load_and_show(cleaned_map_name, mode)
+    
     def save_current_position(self):
         """询问并保存当前窗口位置到 settings.json"""
         current_x = self.x()

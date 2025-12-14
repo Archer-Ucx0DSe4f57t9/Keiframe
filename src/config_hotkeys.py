@@ -11,7 +11,9 @@ def init_global_hotkeys(window):
         lock_shortcut = config.LOCK_SHORTCUT.replace(' ', '').lower()
         screenshot_shortcut = config.SCREENSHOT_SHORTCUT.replace(' ', '').lower()
         artifact_shortcut = config.SHOW_ARTIFACT_SHORTCUT.replace(' ', '').lower()
-
+        memo_temp_key = getattr(config, 'MEMO_TEMP_SHORTCUT', '`').replace(' ', '').lower()
+        memo_toggle_key = getattr(config, 'MEMO_TOGGLE_SHORTCUT', 'backslash').replace(' ', '').lower()
+        
         # 注册全局快捷键，使用 lambda 避免直接绑定实例方法
         keyboard.add_hotkey(map_shortcut, lambda: handle_map_switch_hotkey(window))
         keyboard.add_hotkey(lock_shortcut, lambda: handle_lock_shortcut(window))
@@ -21,6 +23,10 @@ def init_global_hotkeys(window):
         # 使用信号触发神器窗口的切换
         window.toggle_artifact_signal.connect(window.handle_artifact_shortcut)
         keyboard.add_hotkey(artifact_shortcut, window.toggle_artifact_signal.emit)
+        
+        #注册显示笔记的快捷键
+        keyboard.add_hotkey(memo_temp_key, lambda: handle_memo_hotkey(window, 'temp'))
+        keyboard.add_hotkey(memo_toggle_key, lambda: handle_memo_hotkey(window, 'toggle'))
         
         window.logger.info(
             f'成功注册全局快捷键: {config.MAP_SHORTCUT}, {config.LOCK_SHORTCUT}, {config.SCREENSHOT_SHORTCUT}')
@@ -58,6 +64,21 @@ def handle_map_switch_hotkey(window):
             window.version_buttons[next_idx].click()
     else:
         window.logger.info('当前地图不支持A/B版本切换')
+
+def handle_memo_hotkey(window, mode):
+    """处理 Memo 快捷键"""
+    # 确保在主线程执行 GUI 操作，通过信号或者 invokeMethod
+    # 这里假设 window 有一个 trigger_memo_signal 信号连接到了 memo_overlay 的方法
+    # 或者直接调用 window 的方法，让 window 去调用 overlay
+    
+    # 推荐做法：在 TimerWindow 中定义一个方法来中转
+    try:
+        if hasattr(window, 'trigger_memo_display'):
+             # 由于 keyboard 库在独立线程，直接调用 GUI 可能会崩，建议用信号
+             # 但如果 trigger_memo_display 里只是发射信号，则是安全的
+             window.trigger_memo_display(mode)
+    except Exception as e:
+        print(f"Memo hotkey error: {e}")
 
 def unhook_global_hotkeys(window):
     """窗口关闭时清理全局快捷键"""

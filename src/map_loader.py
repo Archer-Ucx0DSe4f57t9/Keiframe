@@ -7,7 +7,7 @@ from fileutil import get_resources_dir, list_files
 from map_handlers.map_event_manager import MapEventManager
 from map_handlers.malwarfare_event_manager import MapwarfareEventManager
 from map_handlers.malwarfare_map_handler import MalwarfareMapHandler # 确保导入正确
-import config
+import config,game_monitor
 
 def handle_version_selection(window):
     """处理地图版本按钮选择事件 (原 TimerWindow.on_version_selected)"""
@@ -42,6 +42,8 @@ def handle_map_selection(window, map_name):
     if not window.manual_map_selection and window.sender() == window.combo_box:
         window.manual_map_selection = True
         window.logger.info('用户手动选择了地图')
+        
+    game_monitor.state.current_selected_map = map_name
     
     # 在地嗪图识别到神族时，自动切换到神族模式
     if map_name == '机会渺茫-人虫' and window.game_state.enemy_race == 'Protoss':

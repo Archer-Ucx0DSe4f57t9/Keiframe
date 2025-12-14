@@ -21,6 +21,7 @@ class GlobalState:
         self.most_recent_playerdata = None
         self.player_winrate_data = []
         self.player_names = []
+        self.current_selected_map = None
         self.current_game_id = None
         self.troop = None
         self.game_screen = None
