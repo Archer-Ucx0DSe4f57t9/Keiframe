@@ -306,12 +306,6 @@ class TimerWindow(QMainWindow):
         """处理控制窗口状态改变事件"""
         app_window_manager.on_control_state_changed(self,unlocked)
 
-    def on_replace_commander(self):
-        """处理替换指挥官按钮的点击事件"""
-        if hasattr(self, 'commander_selector'):
-            # 切换指挥官选择器窗口的打开/关闭状态
-            self.commander_selector.toggle_window()
-
     def closeEvent(self, event):
         """关闭事件"""
         event.ignore()

@@ -47,10 +47,6 @@ def on_language_changed(window, lang):
         # 2. 更新config模块中的值
         config.current_language = lang
 
-        # 3. 更新 commander_selector 的语言设置
-        if hasattr(window, 'commander_selector'):
-            window.commander_selector.set_language(lang)
-
         # 4. 重新加载地图列表
         resources_dir = get_resources_dir('resources', 'maps', lang)
         all_files = list_files(resources_dir) if resources_dir else []

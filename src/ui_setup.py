@@ -9,7 +9,7 @@ from PyQt5.QtCore import Qt, QTimer
 import config
 from fileutil import get_resources_dir, list_files
 from mutator_manager import MutatorManager
-from misc.commander_selector import CommanderSelector
+
 
 
 # 辅助函数 1: 设置窗口样式
@@ -329,7 +329,7 @@ def setup_bottom_buttons(window):
     window.replace_commander_btn = QPushButton(window.main_container)
     window.replace_commander_btn.setFixedSize(0, 0)
     window.replace_commander_btn.hide()
-    window.commander_selector = CommanderSelector(window)
+
 
     # --- 6. 最终调整主窗口高度 ---
     final_height = window.bottom_button_area.geometry().bottom() + 5

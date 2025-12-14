@@ -128,10 +128,6 @@ def on_control_state_changed(window, unlocked):
         else:
             window.replace_commander_btn.hide()
 
-    # 同步更新指挥官选择器窗口的显示状态
-    if hasattr(window, 'commander_selector'):
-        window.commander_selector.set_visibility(unlocked)
-
     # 在Windows平台上，直接使用Windows API设置窗口样式
     if sys.platform == 'win32':
         try:

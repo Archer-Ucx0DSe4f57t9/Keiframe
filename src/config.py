@@ -28,7 +28,6 @@ MAIN_WINDOW_X = 1000
 MAIN_WINDOW_Y = 1049
 # 主窗口透明度配置 ，最后一个200为透明度，前面三个数是RGB数值，具体可以网上查一下选一个自己喜欢的颜色，0完全透明、255完全不透明 / 0 fully transparent, 255 fully opaque
 MAIN_WINDOW_BG_COLOR = 'rgba(43, 43, 43, 200)'  # 主界面背景设置
-COMMANDER_SELECTOR_BG_COLOR = 'rgba(43, 43, 43, 200)'  # 指挥官选择器背景设置
 # 窗体宽度 注意这里没有对按钮之类的宽度进行适配，改了之后主要影响的是表格中文字显示的宽度
 MAIN_WINDOW_WIDTH = 200  # 主窗口宽度 / Main window width
 
@@ -79,20 +78,6 @@ MUTATOR_BOMBBOTS_POS = 0.8  # 突变因子炸弹机器人位置 / Mutator bombbo
 
 # wiki url
 WIKI_URL = 'https://starcraft.huijiwiki.com/wiki/合作任务/'  # Wiki链接 / Wiki URL
-
-# 指挥官头像布局
-avatar = [
-    ['raynor', 'kerrigan', 'artanis', 'swann', 'zagara', 'vorazun', 'karax', 'abathur', 'alarak', 'nova'],
-    # 第一行指挥官头像 / First row of commander avatars
-    ['stukov', 'fenix', 'dehaka', 'horner', 'tychus', 'zeratul', 'stetmann', 'mengsk']
-    # 第二行指挥官头像 / Second row of commander avatars
-]
-
-# 替换指挥官黑名单 - Mutator commander blacklist
-# 添加格式 如：BLACK_LIST = ['raynor', 'kerrigan']， 这样在替换界面点击随机时，就不会替换到这两个了
-# If you add commanders like: BLACK_LIST = ['raynor', 'kerrigan'], they won't be selected in random replacement
-BLACK_LIST = []
-REPLACE_COMMANDER_FLAG = False
 
 # 搜索特殊关键词
 MAP_SEARCH_KEYWORDS = {
