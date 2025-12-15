@@ -4,11 +4,12 @@ import copy
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, 
                              QLabel, QLineEdit, QSpinBox, QDoubleSpinBox, 
                              QCheckBox, QPushButton, QColorDialog, QMessageBox, 
-                             QFormLayout, QScrollArea, QDialog, QComboBox)
+                             QFormLayout, QScrollArea, QDialog, QComboBox,QGroupBox)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QKeyEvent
 
 import config  # 导入你现有的 config.py 作为默认值
+from logging_util import get_logger
 
 # ==========================================
 # 1. 自定义快捷键录制控件
@@ -67,6 +68,7 @@ class SettingsWindow(QDialog):
         self.setWindowTitle("系统设置 / Settings")
         self.resize(800, 600)
         self.settings_file = 'settings.json'
+        self.logger = get_logger("setting window")
         
         # 加载初始配置
         self.current_config = self.load_config()
@@ -85,32 +87,76 @@ class SettingsWindow(QDialog):
         
         # === 默认值映射 (从 config.py 获取) ===
         default_cfg = {
-            # 常规
-            'current_region': getattr(config, 'current_region', 'kr'),
-            'current_language': getattr(config, 'current_language', 'zh'),
-            'LOG_LEVEL': getattr(config, 'LOG_LEVEL', 'WARNING'),
-            'debug_mode': getattr(config, 'debug_mode', False),
-            
-            # 快捷键
-            'MAP_SHORTCUT': getattr(config, 'MAP_SHORTCUT', ''),
-            'LOCK_SHORTCUT': getattr(config, 'LOCK_SHORTCUT', ''),
-            'SCREENSHOT_SHORTCUT': getattr(config, 'SCREENSHOT_SHORTCUT', ''),
-            'MEMO_TEMP_SHORTCUT': getattr(config, 'MEMO_TEMP_SHORTCUT', ''),
-            'MEMO_TOGGLE_SHORTCUT': getattr(config, 'MEMO_TOGGLE_SHORTCUT', ''),
+            # ===== 常规 =====
+            'current_language': config.current_language,
+            'LOG_LEVEL': config.LOG_LEVEL,
+            'debug_mode': config.debug_mode,
+            'debug_time_factor': config.debug_time_factor,
 
-            # 界面
-            'TOAST_DURATION': getattr(config, 'TOAST_DURATION', 10000),
-            'MAIN_WINDOW_BG_COLOR': getattr(config, 'MAIN_WINDOW_BG_COLOR', 'rgba(43, 43, 43, 200)'),
-            'TABLE_FONT_SIZE': getattr(config, 'TABLE_FONT_SIZE', 12),
+            # ===== 快捷键 =====
+            'MAP_SHORTCUT': config.MAP_SHORTCUT,
+            'LOCK_SHORTCUT': config.LOCK_SHORTCUT,
+            'SCREENSHOT_SHORTCUT': config.SCREENSHOT_SHORTCUT,
+            'SHOW_ARTIFACT_SHORTCUT': config.SHOW_ARTIFACT_SHORTCUT,
+            'MEMO_TEMP_SHORTCUT': config.MEMO_TEMP_SHORTCUT,
+            'MEMO_TOGGLE_SHORTCUT': config.MEMO_TOGGLE_SHORTCUT,
 
-            # 游戏提醒
-            'MAP_ALERT_SECONDS': getattr(config, 'MAP_ALERT_SECONDS', 30),
-            'MEMO_OPACITY': getattr(config, 'MEMO_OPACITY', 1.0),
-            
-            # 图像识别 (示例部分)
-            'GAME_SCREEN_DPI': getattr(config, 'GAME_SCREEN_DPI', 96),
-            'GAME_ICO_RECONGIZE_CONFIDENCE': getattr(config, 'GAME_ICO_RECONGIZE_CONFIDENCE', 0.9),
-            'DEBUG_SHOW_ENEMY_INFO_SQUARE': getattr(config, 'DEBUG_SHOW_ENEMY_INFO_SQUARE', False)
+            # ===== Toast =====
+            'TOAST_ALLOWED': config.TOAST_ALLOWED,
+            'TOAST_DURATION': config.TOAST_DURATION,
+            'TOAST_OPACITY': config.TOAST_OPACITY,
+            'TOAST_POSITION': config.TOAST_POSITION,
+            'TOAST_FONT_SIZE': config.TOAST_FONT_SIZE,
+
+            # ===== 主窗口 =====
+            'MAIN_WINDOW_X': config.MAIN_WINDOW_X,
+            'MAIN_WINDOW_Y': config.MAIN_WINDOW_Y,
+            'MAIN_WINDOW_WIDTH': config.MAIN_WINDOW_WIDTH,
+            'MAIN_WINDOW_BG_COLOR': config.MAIN_WINDOW_BG_COLOR,
+
+            # ===== 表格 =====
+            'TABLE_FONT_SIZE': config.TABLE_FONT_SIZE,
+            'TABLE_HEIGHT': config.TABLE_HEIGHT,
+
+            # ===== 地图提醒 =====
+            'MAP_ALERT_SECONDS': config.MAP_ALERT_SECONDS,
+            'MAP_ALERT_WARNING_THRESHOLD_SECONDS': config.MAP_ALERT_WARNING_THRESHOLD_SECONDS,
+
+            # ===== 突变因子提醒 =====
+            'MUTATION_FACTOR_ALERT_SECONDS': config.MUTATION_FACTOR_ALERT_SECONDS,
+            'MUTATION_FACTOR_WARNING_THRESHOLD_SECONDS': config.MUTATION_FACTOR_WARNING_THRESHOLD_SECONDS,
+
+            # ===== 声音 =====
+            'ALERT_SOUND_COOLDOWN': config.ALERT_SOUND_COOLDOWN,
+            'ALERT_SOUND_VOLUME': config.ALERT_SOUND_VOLUME,
+
+            # ===== 笔记 =====
+            'MEMO_OPACITY': config.MEMO_OPACITY,
+            'MEMO_DURATION': config.MEMO_DURATION,
+            'MEMO_FADE_TIME': config.MEMO_FADE_TIME,
+
+            # ===== 图像识别（仅可调部分）=====
+            'GAME_SCREEN_DPI': config.GAME_SCREEN_DPI,
+            'GAME_ICO_RECONGIZE_INTERVAL': config.GAME_ICO_RECONGIZE_INTERVAL,
+            'GAME_ICO_RECONGIZE_CONFIDENCE': config.GAME_ICO_RECONGIZE_CONFIDENCE,
+            'DEBUG_SHOW_ENEMY_INFO_SQUARE': config.DEBUG_SHOW_ENEMY_INFO_SQUARE,
+            'GAME_ICO_RECONGIZE_INTERVAL': config.GAME_ICO_RECONGIZE_INTERVAL,
+            'GAME_ICO_RECONGIZE_TIMEOUT': config.GAME_ICO_RECONGIZE_TIMEOUT,
+
+            'GAME_ICON_POS_AMON_RACE': config.GAME_ICON_POS_AMON_RACE,
+            'GAME_ICON_POS_AMON_TROOPS': config.GAME_ICON_POS_AMON_TROOPS,
+
+            'MUTATOR_AND_ENEMY_RACE_RECOGNIZER_ROI': config.MUTATOR_AND_ENEMY_RACE_RECOGNIZER_ROI,
+            'ENEMY_COMP_RECOGNIZER_ROI': config.ENEMY_COMP_RECOGNIZER_ROI,
+
+            'MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD': config.MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD,
+            'MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD': config.MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD,
+
+            'MALWARFARE_TIME_TOP_LFET_COORD': config.MALWARFARE_TIME_TOP_LFET_COORD,
+            'MALWARFARE_TIME_BOTTOM_RIGHT_COORD': config.MALWARFARE_TIME_BOTTOM_RIGHT_COORD,
+
+            'MALWARFARE_PAUSED_TOP_LFET_COORD': config.MALWARFARE_PAUSED_TOP_LFET_COORD,
+            'MALWARFARE_PAUSED_BOTTOM_RIGHT_COORD': config.MALWARFARE_PAUSED_BOTTOM_RIGHT_COORD,
         }
 
         # 尝试读取 JSON 覆盖默认值
@@ -133,7 +179,8 @@ class SettingsWindow(QDialog):
         self.create_interface_tab() # 2. 界面与显示
         self.create_alert_tab()     # 3. 游戏提醒
         self.create_hotkey_tab()    # 4. 快捷键
-        self.create_image_rec_tab() # 5. 图像识别
+        self.create_general_rec_tab() # 5. 通用图像识别
+        self.create_mwf_rec_tab() # 6. 净网识别
 
         main_layout.addWidget(self.tabs)
 
@@ -164,6 +211,10 @@ class SettingsWindow(QDialog):
         widget_type: 'line', 'spin', 'double', 'bool', 'combo', 'color', 'hotkey'
         """
         val = self.current_config.get(key)
+        
+        if val is None:
+          self.logger.error( f"配置项 '{key}' 未在 load_config() 中初始化")
+        
         widget = None
 
         if widget_type == 'line':
@@ -187,22 +238,73 @@ class SettingsWindow(QDialog):
         elif widget_type == 'hotkey':
             widget = HotkeyInput()
             widget.setText(str(val))
-        
+        elif widget_type == 'roi':
+            # ROI: (x1, y1, x2, y2)
+            x1, y1, x2, y2 = val
+
+            box = QWidget()
+            h = QHBoxLayout(box)
+            h.setContentsMargins(0, 0, 0, 0)
+
+            spins = []
+            for v in (x1, y1, x2, y2):
+                sb = QSpinBox()
+                sb.setRange(0, 10000)
+                sb.setValue(int(v))
+                sb.setFixedWidth(70)
+                spins.append(sb)
+                h.addWidget(sb)
+
+            widget = {
+                'box': box,     # 给 layout 用
+                'spins': spins  # 给取值用
+            }
+        elif widget_type == 'point':
+            # 点坐标: (x, y)
+            x, y = val
+            box = QWidget()
+            h = QHBoxLayout(box)
+            h.setContentsMargins(0, 0, 0, 0)
+
+            spins = []
+            for v in (x, y):
+                sb = QSpinBox()
+                sb.setRange(0, 10000)
+                sb.setValue(int(v))
+                sb.setFixedWidth(80)
+                spins.append(sb)
+                h.addWidget(sb)
+
+            widget = {
+                'box': box,
+                'spins': spins
+            }
         # 记录控件，以便获取值
         if widget:
             self.widgets[key] = {'widget': widget, 'type': widget_type, 'label': label_text}
-            layout.addRow(label_text, widget)
+            if widget_type in ('roi', 'point'):
+                layout.addRow(label_text, widget['box'])
+            else:
+                layout.addRow(label_text, widget)
 
     # ---------------- 分页构建 ----------------
 
     def create_general_tab(self):
         tab = QWidget()
         layout = QFormLayout()
+
         
-        self.add_row(layout, "当前地区 (Region):", 'current_region', 'combo', items=['kr', 'cn', 'tw', 'us'])
-        self.add_row(layout, "语言 (Language):", 'current_language', 'combo', items=['zh', 'en'])
-        self.add_row(layout, "日志等级 (Log Level):", 'LOG_LEVEL', 'combo', items=['DEBUG', 'INFO', 'WARNING', 'ERROR'])
-        self.add_row(layout, "调试模式 (Debug Mode):", 'debug_mode', 'bool')
+        logging_box = QGroupBox("日志和调试相关设置")
+        logging_layout = QFormLayout(logging_box)
+        self.add_row(logging_layout, "日志等级:", 'LOG_LEVEL', 'combo',
+                    items=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'])
+        self.add_row(logging_layout, "调试模式:", 'debug_mode', 'bool')
+        self.add_row(logging_layout, "调试时间倍率:", 'debug_time_factor', 'double', min=0.1, max=20.0)
+        
+        layout.addRow(logging_box)
+        
+        #语言设置
+        self.add_row(layout, "语言:", 'current_language', 'combo', items=['zh', 'en'])
         
         tab.setLayout(layout)
         self.tabs.addTab(tab, "常规设置")
@@ -211,9 +313,18 @@ class SettingsWindow(QDialog):
         tab = QWidget()
         layout = QFormLayout()
         
-        self.add_row(layout, "Toast 显示时长 (ms):", 'TOAST_DURATION', 'spin', max=60000)
-        self.add_row(layout, "主界面背景颜色 (RGBA):", 'MAIN_WINDOW_BG_COLOR', 'line') # 可以改造成颜色选择器
-        self.add_row(layout, "表格字体大小:", 'TABLE_FONT_SIZE', 'spin', min=8, max=72)
+        self.add_row(layout, "允许 Toast:", 'TOAST_ALLOWED', 'bool')
+        self.add_row(layout, "Toast 显示时间(ms):", 'TOAST_DURATION', 'spin', max=60000)
+        self.add_row(layout, "Toast 背景透明度:", 'TOAST_OPACITY', 'spin', max=255)
+        self.add_row(layout, "Toast 垂直位置(0-1):", 'TOAST_POSITION', 'double')
+
+        self.add_row(layout, "主窗口 X:", 'MAIN_WINDOW_X', 'spin', max=5000)
+        self.add_row(layout, "主窗口 Y:", 'MAIN_WINDOW_Y', 'spin', max=5000)
+        self.add_row(layout, "主窗口宽度:", 'MAIN_WINDOW_WIDTH', 'spin', max=1000)
+        self.add_row(layout, "主窗口背景 RGBA:", 'MAIN_WINDOW_BG_COLOR', 'line')
+
+        self.add_row(layout, "表格字体大小:", 'TABLE_FONT_SIZE', 'spin', min=8, max=48)
+        self.add_row(layout, "表格高度:", 'TABLE_HEIGHT', 'spin', max=500)
         
         tab.setLayout(layout)
         self.tabs.addTab(tab, "界面与显示")
@@ -222,8 +333,14 @@ class SettingsWindow(QDialog):
         tab = QWidget()
         layout = QFormLayout()
         
-        self.add_row(layout, "地图提前提醒 (秒):", 'MAP_ALERT_SECONDS', 'spin')
-        self.add_row(layout, "笔记透明度 (0-1):", 'MEMO_OPACITY', 'double')
+        self.add_row(layout, "地图提前提醒(秒):", 'MAP_ALERT_SECONDS', 'spin', max=300)
+        self.add_row(layout, "警告阈值(秒):", 'MAP_ALERT_WARNING_THRESHOLD_SECONDS', 'spin')
+
+        self.add_row(layout, "突变因子提前提醒时间:", 'MUTATION_FACTOR_ALERT_SECONDS', 'spin')
+        self.add_row(layout, "突变警告时间:", 'MUTATION_FACTOR_WARNING_THRESHOLD_SECONDS', 'spin')
+
+        self.add_row(layout, "同一提示音最短冷却(秒):", 'ALERT_SOUND_COOLDOWN', 'spin', max=60)
+        self.add_row(layout, "音量(0-100):", 'ALERT_SOUND_VOLUME', 'spin', max=100)
         
         tab.setLayout(layout)
         self.tabs.addTab(tab, "游戏提醒")
@@ -240,9 +357,9 @@ class SettingsWindow(QDialog):
 
         tab.setLayout(layout)
         self.tabs.addTab(tab, "快捷键")
-
-    def create_image_rec_tab(self):
-        # 图像识别项非常多，使用滚动区域
+        
+    def create_general_rec_tab(self):
+        # 净网识别项非常多，使用滚动区域
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content_widget = QWidget()
@@ -250,15 +367,95 @@ class SettingsWindow(QDialog):
         
         layout.addRow(QLabel("<b>[ 高级设置 ] 修改此处可能导致识别失效</b>"))
         
-        self.add_row(layout, "屏幕 DPI (96/120/144...):", 'GAME_SCREEN_DPI', 'spin', max=500)
-        self.add_row(layout, "图标识别置信度 (0.1-1.0):", 'GAME_ICO_RECONGIZE_CONFIDENCE', 'double')
-        self.add_row(layout, "显示敌方信息调试框:", 'DEBUG_SHOW_ENEMY_INFO_SQUARE', 'bool')
+        #基本参数
+        basic_box = QGroupBox("基础识别参数")
+        basic_layout = QFormLayout(basic_box)
+
+        self.add_row(basic_layout, "屏幕 DPI:", 'GAME_SCREEN_DPI', 'spin', max=400)
+        self.add_row(basic_layout, "识别间隔(秒):", 'GAME_ICO_RECONGIZE_INTERVAL', 'spin', max=10)
+        self.add_row(basic_layout, "识别超时(秒):", 'GAME_ICO_RECONGIZE_TIMEOUT', 'spin', max=600)
+        self.add_row(basic_layout, "识别置信度:", 'GAME_ICO_RECONGIZE_CONFIDENCE', 'double', min=0.1, max=1.0)
+        self.add_row(basic_layout, "显示调试框:", 'DEBUG_SHOW_ENEMY_INFO_SQUARE', 'bool')
+
+        layout.addRow(basic_box)
         
-        # 这里可以继续添加所有的坐标配置，建议只开放常用微调项
+        #图标识别区域
+        icon_box = QGroupBox("图标识别区域 (像素坐标)")
+        icon_layout = QFormLayout(icon_box)
+
+        self.add_row(icon_layout, "种族图标:", 'GAME_ICON_POS_AMON_RACE', 'roi')
+        self.add_row(icon_layout, "部队区域:", 'GAME_ICON_POS_AMON_TROOPS', 'roi')
+
+        layout.addRow(icon_box)
+        
+
+        #因子和种族识别区域
+        roi_box = QGroupBox("因子 & 敌方种族识别区域")
+        roi_layout = QFormLayout(roi_box)
+
+        self.add_row(
+            roi_layout,
+            "突变因子 + 敌方种族 ROI:",
+            'MUTATOR_AND_ENEMY_RACE_RECOGNIZER_ROI',
+            'roi'
+        )
+
+        self.add_row(
+            roi_layout,
+            "敌方 AI 组成 ROI:",
+            'ENEMY_COMP_RECOGNIZER_ROI',
+            'roi'
+        )
+
+        layout.addRow(roi_box)
+
+
+        content_widget.setLayout(layout)
+        scroll.setWidget(content_widget)
+        self.tabs.addTab(scroll, "识别设置")
+
+    def create_mwf_rec_tab(self):
+        # 净网识别项非常多，使用滚动区域
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        content_widget = QWidget()
+        layout = QFormLayout()
+        
+        layout.addRow(QLabel("<b>[ 高级设置 ] 修改此处可能导致识别失效</b>"))
+        
+        #基本参数
+        basic_box = QGroupBox("基础识别参数")
+        basic_layout = QFormLayout(basic_box)
+
+        self.add_row(basic_layout, "屏幕 DPI:", 'GAME_SCREEN_DPI', 'spin', max=400)
+        self.add_row(basic_layout, "识别间隔(秒):", 'GAME_ICO_RECONGIZE_INTERVAL', 'spin', max=10)
+        self.add_row(basic_layout, "识别超时(秒):", 'GAME_ICO_RECONGIZE_TIMEOUT', 'spin', max=600)
+        self.add_row(basic_layout, "识别置信度:", 'GAME_ICO_RECONGIZE_CONFIDENCE', 'double', min=0.1, max=1.0)
+        self.add_row(basic_layout, "显示调试框:", 'DEBUG_SHOW_ENEMY_INFO_SQUARE', 'bool')
+
+        layout.addRow(basic_box)
+        
+        #净网识别roi设置
+        mw_box = QGroupBox("净网行动 (Malwarefare)")
+        mw_layout = QFormLayout(mw_box)
+
+        self.add_row(mw_layout, "启用净网识别:", 'MALWARFARE_REP_TRACKING_ALLOWED', 'bool')
+
+        self.add_row(mw_layout,"已净化 左上角:",'MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD','point')
+        self.add_row(mw_layout, "已净化 右下角:", 'MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD', 'point')
+
+        self.add_row(mw_layout, "时间 左上角:", 'MALWARFARE_TIME_TOP_LFET_COORD', 'point')
+        self.add_row(mw_layout, "时间 右下角:", 'MALWARFARE_TIME_BOTTOM_RIGHT_COORD', 'point')
+
+        self.add_row(mw_layout, "暂停标识 左上角:", 'MALWARFARE_PAUSED_TOP_LFET_COORD', 'point')
+        self.add_row(mw_layout, "暂停标识 右下角:", 'MALWARFARE_PAUSED_BOTTOM_RIGHT_COORD', 'point')
+
+        layout.addRow(mw_box)
+
         
         content_widget.setLayout(layout)
         scroll.setWidget(content_widget)
-        self.tabs.addTab(scroll, "图像识别")
+        self.tabs.addTab(scroll, "净网识别")
 
     # ---------------- 逻辑处理 ----------------
 
@@ -280,7 +477,12 @@ class SettingsWindow(QDialog):
                 val = widget.isChecked()
             elif w_type == 'combo':
                 val = widget.currentText()
-            
+            elif w_type == 'roi':
+                val = tuple(sb.value() for sb in widget['spins'])
+
+            elif w_type == 'point':
+                val = tuple(sb.value() for sb in widget['spins'])
+                        
             new_values[key] = val
         return new_values
 

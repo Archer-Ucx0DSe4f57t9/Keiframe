@@ -50,7 +50,6 @@ MAP_ALERT_HORIZONTAL_INDENT_PERCENT = 0.01  # 距离游戏边框左侧的水平�
 # 突变因子提醒配置
 MUTATION_FACTOR_ALERT_SECONDS = 49  # 突变因子提前提醒时间（秒）/ Mutation factor alert time (in seconds)，我还没做多重提醒，最长间隔就是49秒
 MUTATION_FACTOR_WARNING_THRESHOLD_SECONDS = 10  # 倒计时转为警告颜色的阈值（秒）
-MUTATION_FACTOR_ALERT_DURATION_SECONDS = 5  # 突变因子提醒持续时间（秒）/ Duration of mutation factor alert (in seconds)
 MUTATION_FACTOR_NORMAL_COLOR = 'rgb(255, 255, 255)'  # 倒计时提醒的正常颜色
 MUTATION_FACTOR_WARNING_COLOR = 'rgb(255, 0, 0)'  # 倒计时提醒的警告颜色
 MUTATOR_DEPLOYMENT_COLOR = 'rgb(0, 255, 128)'  # 突变因子部署颜色 / Mutator deployment color
