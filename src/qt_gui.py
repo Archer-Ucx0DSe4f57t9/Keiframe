@@ -382,7 +382,6 @@ class TimerWindow(QMainWindow):
                     army_text = army_item.text().strip() if army_item else ""
                     selected_text = f"{time_text}\t{event_text}\t{army_text}" if time_text and army_text.strip() else (
                         f"{time_text}\t{event_text}" if time_text else event_text)
-                    #self.show_toast(selected_text, config.TOAST_DURATION, force_show=True)  # 设置5000毫秒（5秒）后自动消失
             event.accept()
 
     def trigger_memo_display(self, mode):

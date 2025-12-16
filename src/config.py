@@ -14,14 +14,6 @@ LOCK_SHORTCUT = 'ctrl + shift + ]'  # 锁定快捷键 / Lock shortcut key
 SCREENSHOT_SHORTCUT = 'ctrl + shift + -'  # 截图快捷键 / Screenshot shortcut key
 SHOW_ARTIFACT_SHORTCUT = 'ctrl + shift + \\'
 
-# Toast提示配置
-TOAST_ALLOWED = True  # 是否允许显示Toast提示 / Whether to allow displaying Toast notifications
-TOAST_DURATION = 10000  # 显示时间（毫秒）/ Display time (in milliseconds)
-TOAST_OPACITY = 0  # 背景透明度（0-255）/ Background opacity (0-255)
-TOAST_POSITION = 0.9  # 垂直位置（窗口高度的比例）/ Vertical position (relative to window height)
-TOAST_FONT_SIZE = 45  # 字体大小 / Font size
-TOAST_FONT_COLOR = 'rgb(0, 191, 255)'  # 字体颜色 / Font color
-TOAST_OUTLINE_COLOR = 'rgb(0, 0, 0)'  # 字体描边颜色/Outline Color
 
 # 窗体设置项(主界面位置)
 MAIN_WINDOW_X = 1000
@@ -157,7 +149,6 @@ MUTATOR_AND_ENEMY_RACE_RECOGNIZER_ROI = (1850, 50, 1920, 800)
 ENEMY_COMP_RECOGNIZER_ROI = (1450, 373 ,1920 ,800)
 
 #净网行动限定
-MALWARFARE_REP_TRACKING_ALLOWED = True
 #以下是1920*1080窗口英文模式下的参数。
 MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD = (298, 85)
 MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD = (334, 103)

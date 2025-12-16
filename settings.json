@@ -2,7 +2,6 @@
     "current_language": "zh",
     "LOG_LEVEL": "WARNING",
     "debug_mode": false,
-    "TOAST_DURATION": 10000,
     "MAIN_WINDOW_BG_COLOR": "rgba(43, 43, 43, 200)",
     "TABLE_FONT_SIZE": 12,
     "MAP_ALERT_SECONDS": 30,

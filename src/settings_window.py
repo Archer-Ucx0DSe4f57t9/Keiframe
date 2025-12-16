@@ -102,15 +102,10 @@ class SettingsWindow(QDialog):
             'MEMO_TOGGLE_SHORTCUT': config.MEMO_TOGGLE_SHORTCUT,
 
             # ===== Toast =====
-            'TOAST_ALLOWED': config.TOAST_ALLOWED,
-            'TOAST_DURATION': config.TOAST_DURATION,
-            'TOAST_OPACITY': config.TOAST_OPACITY,
-            'TOAST_POSITION': config.TOAST_POSITION,
-            'TOAST_FONT_SIZE': config.TOAST_FONT_SIZE,
+
 
             # ===== 主窗口 =====
-            'MAIN_WINDOW_X': config.MAIN_WINDOW_X,
-            'MAIN_WINDOW_Y': config.MAIN_WINDOW_Y,
+            'MAIN_WINDOW_POS': (config.MAIN_WINDOW_X, config.MAIN_WINDOW_Y),
             'MAIN_WINDOW_WIDTH': config.MAIN_WINDOW_WIDTH,
             'MAIN_WINDOW_BG_COLOR': config.MAIN_WINDOW_BG_COLOR,
 
@@ -214,6 +209,7 @@ class SettingsWindow(QDialog):
         
         if val is None:
           self.logger.error( f"配置项 '{key}' 未在 load_config() 中初始化")
+          return
         
         widget = None
 
@@ -239,54 +235,124 @@ class SettingsWindow(QDialog):
             widget = HotkeyInput()
             widget.setText(str(val))
         elif widget_type == 'roi':
-            # ROI: (x1, y1, x2, y2)
-            x1, y1, x2, y2 = val
-
-            box = QWidget()
-            h = QHBoxLayout(box)
-            h.setContentsMargins(0, 0, 0, 0)
-
-            spins = []
-            for v in (x1, y1, x2, y2):
-                sb = QSpinBox()
-                sb.setRange(0, 10000)
-                sb.setValue(int(v))
-                sb.setFixedWidth(70)
-                spins.append(sb)
-                h.addWidget(sb)
-
-            widget = {
-                'box': box,     # 给 layout 用
-                'spins': spins  # 给取值用
+            widget = self.create_roi_widget(*val)
+            self.widgets[key] = {
+              'widget': widget['spins'],
+              'type': 'roi',
+              'label': label_text
             }
+            layout.addRow(label_text, widget['box'])
+            return
         elif widget_type == 'point':
-            # 点坐标: (x, y)
             x, y = val
-            box = QWidget()
-            h = QHBoxLayout(box)
-            h.setContentsMargins(0, 0, 0, 0)
-
-            spins = []
-            for v in (x, y):
-                sb = QSpinBox()
-                sb.setRange(0, 10000)
-                sb.setValue(int(v))
-                sb.setFixedWidth(80)
-                spins.append(sb)
-                h.addWidget(sb)
-
-            widget = {
-                'box': box,
-                'spins': spins
+            widget = self.create_point_widget(x, y)
+            self.widgets[key] = {
+                'widget': widget['spins'],
+                'type': 'point',
+                'label': label_text
             }
+            layout.addRow(label_text, widget['box'])
+            return
         # 记录控件，以便获取值
         if widget:
             self.widgets[key] = {'widget': widget, 'type': widget_type, 'label': label_text}
-            if widget_type in ('roi', 'point'):
-                layout.addRow(label_text, widget['box'])
-            else:
-                layout.addRow(label_text, widget)
+            layout.addRow(label_text, widget)
 
+
+    #辅助函数，针对roi内容
+    def create_roi_widget(self, x1, y1, x2, y2):
+      box = QWidget()
+      h = QHBoxLayout(box)
+      h.setContentsMargins(0, 0, 0, 0)
+      h.setSpacing(4)
+
+      def spin(v):
+          sb = QSpinBox()
+          sb.setRange(0, 10000)
+          sb.setValue(int(v))
+          sb.setFixedWidth(65)
+          return sb
+
+      def label(text):
+          l = QLabel(text)
+          l.setStyleSheet("color: #666;")
+          return l
+
+      # 左上
+      h.addWidget(label("左上"))
+      h.addWidget(label("X"))
+      sb_x1 = spin(x1)
+      h.addWidget(sb_x1)
+      h.addWidget(label("Y"))
+      sb_y1 = spin(y1)
+      h.addWidget(sb_y1)
+
+      h.addSpacing(10)
+
+      # 右下
+      h.addWidget(label("右下"))
+      h.addWidget(label("X"))
+      sb_x2 = spin(x2)
+      h.addWidget(sb_x2)
+      h.addWidget(label("Y"))
+      sb_y2 = spin(y2)
+      h.addWidget(sb_y2)
+
+      h.addStretch()
+
+      return {
+          'box': box,
+          'spins': [sb_x1, sb_y1, sb_x2, sb_y2]
+      }
+      
+    #辅助函数，创建点
+    def create_point_widget(self, x, y):
+      box = QWidget()
+      h = QHBoxLayout(box)
+      h.setContentsMargins(0, 0, 0, 0)
+      h.setSpacing(4)
+
+      def spin(v):
+          sb = QSpinBox()
+          sb.setRange(0, 10000)
+          sb.setValue(int(v))
+          sb.setFixedWidth(70)
+          return sb
+
+      def label(t):
+          l = QLabel(t)
+          l.setStyleSheet("color:#666;")
+          return l
+
+      h.addWidget(label("X"))
+      sb_x = spin(x)
+      h.addWidget(sb_x)
+
+      h.addSpacing(6)
+
+      h.addWidget(label("Y"))
+      sb_y = spin(y)
+      h.addWidget(sb_y)
+
+      h.addStretch()
+
+      return {
+          'box': box,
+          'spins': [sb_x, sb_y]
+      }
+      
+    #辅助函数，点打包
+    def normalize_config(self, cfg: dict):
+      point_map = {
+          'MAIN_WINDOW_POS': ('MAIN_WINDOW_X', 'MAIN_WINDOW_Y'),
+          # 以后需要再加
+      }
+
+      for k, (xk, yk) in point_map.items():
+          if k in cfg:
+              x, y = cfg.pop(k)
+              cfg[xk] = x
+              cfg[yk] = y
     # ---------------- 分页构建 ----------------
 
     def create_general_tab(self):
@@ -313,13 +379,9 @@ class SettingsWindow(QDialog):
         tab = QWidget()
         layout = QFormLayout()
         
-        self.add_row(layout, "允许 Toast:", 'TOAST_ALLOWED', 'bool')
-        self.add_row(layout, "Toast 显示时间(ms):", 'TOAST_DURATION', 'spin', max=60000)
-        self.add_row(layout, "Toast 背景透明度:", 'TOAST_OPACITY', 'spin', max=255)
-        self.add_row(layout, "Toast 垂直位置(0-1):", 'TOAST_POSITION', 'double')
 
-        self.add_row(layout, "主窗口 X:", 'MAIN_WINDOW_X', 'spin', max=5000)
-        self.add_row(layout, "主窗口 Y:", 'MAIN_WINDOW_Y', 'spin', max=5000)
+
+        self.add_row(layout, "主窗口位置:", 'MAIN_WINDOW_POS', 'point')
         self.add_row(layout, "主窗口宽度:", 'MAIN_WINDOW_WIDTH', 'spin', max=1000)
         self.add_row(layout, "主窗口背景 RGBA:", 'MAIN_WINDOW_BG_COLOR', 'line')
 
@@ -436,10 +498,8 @@ class SettingsWindow(QDialog):
         layout.addRow(basic_box)
         
         #净网识别roi设置
-        mw_box = QGroupBox("净网行动 (Malwarefare)")
+        mw_box = QGroupBox("净网行动识别区域坐标 (Malwarefare)")
         mw_layout = QFormLayout(mw_box)
-
-        self.add_row(mw_layout, "启用净网识别:", 'MALWARFARE_REP_TRACKING_ALLOWED', 'bool')
 
         self.add_row(mw_layout,"已净化 左上角:",'MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD','point')
         self.add_row(mw_layout, "已净化 右下角:", 'MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD', 'point')
@@ -456,7 +516,7 @@ class SettingsWindow(QDialog):
         content_widget.setLayout(layout)
         scroll.setWidget(content_widget)
         self.tabs.addTab(scroll, "净网识别")
-
+    
     # ---------------- 逻辑处理 ----------------
 
     def get_ui_values(self):
@@ -478,41 +538,49 @@ class SettingsWindow(QDialog):
             elif w_type == 'combo':
                 val = widget.currentText()
             elif w_type == 'roi':
-                val = tuple(sb.value() for sb in widget['spins'])
-
+                val = tuple(sb.value() for sb in widget)
             elif w_type == 'point':
-                val = tuple(sb.value() for sb in widget['spins'])
+                val = tuple(sb.value() for sb in widget)
                         
             new_values[key] = val
         return new_values
 
     def on_save(self):
-        new_config = self.get_ui_values()
-        changes = []
-        
-        # 比对差异
-        for key, new_val in new_config.items():
-            old_val = self.original_config.get(key)
-            # 注意类型转换导致的虚假差异 (例如 '30' vs 30)
-            if str(new_val) != str(old_val):
-                label = self.widgets[key]['label']
-                changes.append(f"【{label}】\n   原值: {old_val}  ->  新值: {new_val}")
-        
-        if not changes:
-            QMessageBox.information(self, "提示", "没有检测到任何修改。")
-            self.accept() 
-            return
+      new_config = self.get_ui_values()
 
-        # 弹出确认框
-        confirm_text = "检测到以下修改，确认保存吗？\n\n" + "\n".join(changes)
-        reply = QMessageBox.question(self, "确认修改", confirm_text, 
-                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-        
-        if reply == QMessageBox.Yes:
-            self.save_to_json(new_config)
-            self.settings_saved.emit(new_config) # 发送信号通知主窗口更新
-            self.original_config = copy.deepcopy(new_config) # 更新基准值
-            self.accept()
+      changes = []
+
+      # ① 先用 UI key 对比
+      for key, new_val in new_config.items():
+          old_val = self.original_config.get(key)
+          if str(new_val) != str(old_val):
+              label = self.widgets[key]['label']
+              changes.append(
+                  f"【{label}】\n   原值: {old_val}  ->  新值: {new_val}"
+              )
+
+      if not changes:
+          QMessageBox.information(self, "提示", "没有检测到任何修改。")
+          self.accept()
+          return
+
+      confirm_text = "检测到以下修改，确认保存吗？\n\n" + "\n".join(changes)
+      reply = QMessageBox.question(
+          self, "确认修改",
+          confirm_text,
+          QMessageBox.Yes | QMessageBox.No,
+          QMessageBox.No
+      )
+
+      if reply == QMessageBox.Yes:
+          # ② 只在最终保存前 normalize
+          self.normalize_config(new_config)
+
+          self.save_to_json(new_config)
+          self.settings_saved.emit(new_config)
+
+          self.original_config = copy.deepcopy(new_config)
+          self.accept()
 
     def save_to_json(self, config_data):
         try:
