@@ -1,5 +1,5 @@
 import json
-import os
+import os, sys
 import copy
 import re
 from PyQt5 import QtCore 
@@ -92,45 +92,62 @@ class ColorInput(QWidget):
         return self.line.text()
 
 class DictTable(QTableWidget):
-    """字典编辑器表格"""
-    def __init__(self, data_dict, parent=None):
+    """字典编辑器表格 - 第二列改为下拉选择"""
+    def __init__(self, data_dict, map_list, parent=None):
         super().__init__(0, 2, parent)
+        self.map_list = map_list # 外部传入的地图全名列表
         self.setHorizontalHeaderLabels(["简写关键词 (Key)", "地图全名 (Value)"])
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.setMinimumHeight(150)
         
         row = 0
         for k, v in data_dict.items():
-            self.insertRow(row)
-            self.setItem(row, 0, QTableWidgetItem(str(k)))
-            self.setItem(row, 1, QTableWidgetItem(str(v)))
+            self.add_new_row(str(k), str(v))
             row += 1
+
+    def add_new_row(self, key_text="", value_text=""):
+        """添加一行，并为第二列设置下拉框"""
+        row = self.rowCount()
+        self.insertRow(row)
+        
+        # 第一列：手动输入关键词
+        self.setItem(row, 0, QTableWidgetItem(key_text))
+        
+        # 第二列：下拉选择地图全名
+        combo = QComboBox()
+        combo.addItems(self.map_list)
+        if value_text in self.map_list:
+            combo.setCurrentText(value_text)
+        elif self.map_list:
+            combo.setCurrentIndex(0)
+            
+        self.setCellWidget(row, 1, combo)
 
     def get_data(self):
         data = {}
         for r in range(self.rowCount()):
             k_item = self.item(r, 0)
-            v_item = self.item(r, 1)
-            if k_item and v_item:
+            v_widget = self.cellWidget(r, 1) # 获取下拉框控件
+            if k_item and isinstance(v_widget, QComboBox):
                 k = k_item.text().strip()
-                v = v_item.text().strip()
+                v = v_widget.currentText()
                 if k and v:
                     data[k] = v
         return data
 
 class DictInput(QWidget):
     """字典编辑器容器"""
-    def __init__(self, data_dict, parent=None):
+    def __init__(self, data_dict, map_list, parent=None):
         super().__init__(parent)
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(0,0,0,0)
         
-        self.table = DictTable(data_dict)
+        self.table = DictTable(data_dict, map_list) # 传入地图列表
         
         btn_layout = QHBoxLayout()
         self.add_btn = QPushButton("添加行")
         self.del_btn = QPushButton("删除选中行")
-        self.add_btn.clicked.connect(self.add_row)
+        self.add_btn.clicked.connect(lambda: self.table.add_new_row())
         self.del_btn.clicked.connect(self.del_row)
         
         btn_layout.addWidget(self.add_btn)
@@ -306,6 +323,37 @@ class SettingsWindow(QDialog):
         main_layout.addLayout(btn_layout)
         self.setLayout(main_layout)
 
+    def get_available_maps(self):
+        """根据当前设置的语言读取地图文件列表"""
+        # 获取当前 UI 中选择的语言（而不是 config 里的，这样可以实时预览切换）
+        lang = "zh"
+        if 'current_language' in self.widgets:
+            lang = self.widgets['current_language']['widget'].currentText()
+        else:
+            lang = self.current_config.get('current_language', 'zh')
+
+        # 计算路径
+        if getattr(sys, 'frozen', False):
+            base_path = os.path.dirname(sys.executable)
+        else:
+            # 假设 settings_window.py 在 src/ 下
+            base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            
+        maps_dir = os.path.join(base_path, 'resources', 'maps', lang)
+        
+        map_files = []
+        if os.path.exists(maps_dir):
+            try:
+                # 读取文件列表，过滤掉后缀名
+                for f in os.listdir(maps_dir):
+                    if os.path.isfile(os.path.join(maps_dir, f)):
+                        name, _ = os.path.splitext(f)
+                        map_files.append(name)
+            except Exception as e:
+                self.logger.error(f"读取地图列表失败: {e}")
+        
+        return sorted(map_files)
+
     def add_row(self, layout, label_text, key, widget_type, **kwargs):
         val = self.current_config.get(key)
         if val is None and widget_type != 'dict': # dict可能为空字典
@@ -337,7 +385,8 @@ class SettingsWindow(QDialog):
         elif widget_type == 'color':
             widget = ColorInput(str(val))
         elif widget_type == 'dict':
-            widget = DictInput(val if isinstance(val, dict) else {})
+            map_list = self.get_available_maps()
+            widget = DictInput(val if isinstance(val, dict) else {}, map_list)
             self.widgets[key] = {'widget': widget, 'type': 'dict', 'label': label_text}
             layout.addRow(QLabel(label_text))
             layout.addRow(widget)
@@ -387,7 +436,6 @@ class SettingsWindow(QDialog):
                 x, y = cfg.pop(k)
                 cfg[xk] = x; cfg[yk] = y
 
-    
     def create_point_widget(self, x, y,show_get_btn = False):
         """修改位置组件：增加获取当前位置按钮"""
         box = QWidget()
