@@ -106,9 +106,6 @@ class TimerWindow(QMainWindow):
         self.global_listener.ctrl_state_changed.connect(self.set_ctrl_state)
         self.global_listener.start_listening()
         '''
-        # 连接 "保存位置" 按钮信号
-        if hasattr(self, 'set_position_btn'):
-            self.set_position_btn.clicked.connect(self.save_current_position)
         
         #笔记按钮功能
         self.memo_overlay = MemoOverlay()
@@ -410,62 +407,6 @@ class TimerWindow(QMainWindow):
             cleaned_map_name = current_map
         self.memo_overlay.load_and_show(cleaned_map_name, mode)
     
-    def save_current_position(self):
-        """询问并保存当前窗口位置到 settings.json"""
-        current_x = self.x()
-        current_y = self.y()
-
-        reply = QMessageBox.question(
-            self, 
-            '保存位置', 
-            f"确定要将当前位置 (X:{current_x}, Y:{current_y}) 保存为默认启动位置吗？",
-            QMessageBox.Yes | QMessageBox.No, 
-            QMessageBox.No
-        )
-
-        if reply == QMessageBox.Yes:
-            try:
-                # 1. 确定文件路径 (使用与 config.py 中相同的逻辑)
-                CONFIG_FILE_NAME = 'settings.json'
-                
-                if getattr(sys, 'frozen', False):
-                    # 打包环境
-                    project_root_path = os.path.dirname(sys.executable)
-                else:
-                    # 源码环境: qt_gui.py 在 src/，需要向上两级目录到项目根目录
-                    current_dir = os.path.dirname(os.path.abspath(__file__))
-                    project_root_path = os.path.dirname(current_dir) 
-
-                config_path = os.path.join(project_root_path, CONFIG_FILE_NAME)
-
-                # 2. 读取现有配置（如果存在），以便保留其他设置
-                settings = {}
-                if os.path.exists(config_path):
-                    try:
-                        with open(config_path, 'r', encoding='utf-8') as f:
-                            settings = json.load(f)
-                    except:
-                        self.logger.warning("settings.json 文件损坏，将覆盖写入。")
-
-                # 3. 更新位置信息
-                settings['MAIN_WINDOW_X'] = current_x
-                settings['MAIN_WINDOW_Y'] = current_y
-
-                # 4. 写入文件
-                with open(config_path, 'w', encoding='utf-8') as f:
-                    json.dump(settings, f, indent=4) # 使用 indent=4 格式化，方便用户阅读
-
-                # 5. 更新内存中的 config 变量
-                config.MAIN_WINDOW_X = current_x
-                config.MAIN_WINDOW_Y = current_y
-
-                self.logger.info(f"位置已保存到 settings.json: X={current_x}, Y={current_y}")
-                QMessageBox.information(self, "成功", "窗口位置已保存到 settings.json 文件。")
-
-            except Exception as e:
-                self.logger.error(f"保存位置失败: {traceback.format_exc()}")
-                QMessageBox.warning(self, "错误", f"无法保存配置文件：请检查文件权限。\n错误详情: {str(e)}")
-    
     def get_text(self, key):
         """获取多语言文本"""
         return language_manager.get_text(self,key)
@@ -473,6 +414,7 @@ class TimerWindow(QMainWindow):
     def on_language_changed(self, lang):
         return language_manager.on_language_changed(self,lang)
 
+    '''
     def handle_artifact_shortcut(self):
         # 如果窗口可见，则销毁图片
         if self.artifact_window.isVisible():
@@ -488,7 +430,7 @@ class TimerWindow(QMainWindow):
             except Exception as e:
                 self.logger.error(f'draw artifacts layer failed: {str(e)}')
                 self.logger.error(traceback.format_exc())
-
+    '''
     # 处理识别器传回突变因子和种族的数据
     def handle_mutator_and_enemy_race_recognition_update(self, results):
         """处理种族和突变因子识别结果的更新"""

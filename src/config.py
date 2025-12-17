@@ -12,7 +12,6 @@ current_language = 'zh'  # 当前语言 / Current language
 MAP_SHORTCUT = 'ctrl + shift + ['  # 地图快捷键 / Map shortcut key
 LOCK_SHORTCUT = 'ctrl + shift + ]'  # 锁定快捷键 / Lock shortcut key
 SCREENSHOT_SHORTCUT = 'ctrl + shift + -'  # 截图快捷键 / Screenshot shortcut key
-SHOW_ARTIFACT_SHORTCUT = 'ctrl + shift + \\'
 
 
 # 窗体设置项(主界面位置)
@@ -26,8 +25,8 @@ MAIN_WINDOW_WIDTH = 200  # 主窗口宽度 / Main window width
 # 表格字体大小
 TABLE_FONT_SIZE = 12  # 表格字体大小 / Table font size
 TABLE_HEIGHT = 150  # 表格高度
-TABLE_NEXT_FONT_COLOR = [0, 255, 128]  # 表格下一个事件字体颜色 绿色/ Table font color
-TABLE_NEXT_FONT_BG_COLOR = [0, 255, 128, 30]  # 表格下一个事件背景颜色，最后一个值是透明度
+TABLE_NEXT_FONT_COLOR = (0, 255, 128)  # 表格下一个事件字体颜色 绿色/ Table font color
+TABLE_NEXT_FONT_BG_COLOR = (0, 255, 128, 30)  # 表格下一个事件背景颜色，最后一个值是透明度
 
 # 地图提醒配置
 MAP_ALERT_SECONDS = 30  # 提前提醒时间（秒）/ Time before alert (in seconds)
@@ -44,9 +43,6 @@ MUTATION_FACTOR_ALERT_SECONDS = 49  # 突变因子提前提醒时间（秒）/ M
 MUTATION_FACTOR_WARNING_THRESHOLD_SECONDS = 10  # 倒计时转为警告颜色的阈值（秒）
 MUTATION_FACTOR_NORMAL_COLOR = 'rgb(255, 255, 255)'  # 倒计时提醒的正常颜色
 MUTATION_FACTOR_WARNING_COLOR = 'rgb(255, 0, 0)'  # 倒计时提醒的警告颜色
-MUTATOR_DEPLOYMENT_COLOR = 'rgb(0, 255, 128)'  # 突变因子部署颜色 / Mutator deployment color
-MUTATOR_RIFTS_COLOR = 'rgb(0, 255, 128)'  # 突变因子裂隙颜色 / Mutator rifts color
-MUTATOR_PROPAGATOR_COLOR = 'rgb(0, 255, 128)'  # 突变因子传播者颜色 / Mutator propagator color
 # 提醒大小(基于“StarCraft II”窗口的尺寸)
 MUTATOR_ALERT_TOP_OFFSET_PERCENT = 0.35  # 提醒区域距离窗口顶部的百分比
 MUTATOR_ALERT_LINE_HEIGHT_PERCENT = 0.03  # 每行提醒占窗口高度的百分比
@@ -58,14 +54,7 @@ ALERT_SOUND_COOLDOWN = 10 # 同名警告最短间隔（秒），低于间隔的�
 ALERT_SOUND_VOLUME = 90 # 音量大小（0-100正整数）
 
 # 突变因子提示位置配置
-MUTATOR_TOAST_POSITION = 0.7  # 垂直位置（窗口高度的比例）/ Vertical position (relative to window height)
 MUTATOR_ICON_TRANSPARENCY = 0.7  # 突变因子图标透明度 / Mutator icon transparency
-TOAST_MUTATOR_FONT_SIZE = 30  # 突变因子提示字体大小 / Mutator toast font size
-MUTATOR_DEPLOYMENT_POS = 0.2  # 突变因子部署位置 / Mutator deployment position
-MUTATOR_PROPAGATOR_POS = 0.35  # 突变因子小软位置 / Mutator propagator position
-MUTATOR_RIFT_POS = 0.5  # 突变因子裂隙位置 / Mutator rift position
-MUTATOR_KILLBOTS_POS = 0.65  # 突变因子杀戮机器人位置 / Mutator killbots position
-MUTATOR_BOMBBOTS_POS = 0.8  # 突变因子炸弹机器人位置 / Mutator bombbots position
 
 # wiki url
 WIKI_URL = 'https://starcraft.huijiwiki.com/wiki/合作任务/'  # Wiki链接 / Wiki URL
@@ -118,6 +107,7 @@ GAME_SCREEN_DPI = 96
 # 192 DPI	200%	4K 显示器常用
 # 288 DPI	300%	8K 显示器可能使用
 
+'''
 GAME_ICON_POS_AMON_RACE = [45, 300, 36, 36]  #
 GAME_ICON_POS_AMON_TROOPS = [1710, 938, 1904, 1035]  #
 GAME_ICON_POS_SHOW = True
@@ -141,6 +131,7 @@ ARTIFACTS_POS_净网行动 = [398 / 1496, 688 / 996, 40, 40]
 ARTIFACTS_POS_营救矿工 = [1080 / 1755, 391 / 844, 40, 40]
 ARTIFACTS_POS_亡者之夜 = [468 / 1242, 495 / 938, 40, 40]
 ARTIFACTS_POS_熔火危机 = [730 / 1783, 1200 / 1334, 40, 40]
+'''
 
 #突变因子和敌方种族识别区域（默认1920）
 MUTATOR_AND_ENEMY_RACE_RECOGNIZER_ROI = (1850, 50, 1920, 800)
@@ -161,18 +152,9 @@ MALWARFARE_PAUSED_BOTTOM_RIGHT_COORD = (420, 103)
 BASE_RESOLUTION_WIDTH = 1920.0 # 基准分辨率宽度(窗口模式下的1920)
 
 # 模板文件夹的相对路径
-MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD_DEFAULT = (298, 85)
 MALWARFARE_TEMPLATE_DIR = 'char_templates_1920w' # 建议与基准分辨率匹配
 
-# 各ROI在基准分辨率下的尺寸 (宽度, 高度)
-MALWARFARE_COUNT_SIZE = (36, 18)   # (342-306, 183-164)
-MALWARFARE_TIME_SIZE = (44, 18)    # (483-439, 183-165)
-MALWARFARE_PAUSED_SIZE = (77, 18)  # (428-351, 183-165)
-
-# 各ROI相对于Count区域左上角的偏移量 (请替换为您在第二步中计算出的值)
-MALWARFARE_TIME_OFFSET_FROM_COUNT = (133, 0)    # 示例: (439-306, 165-164)
-MALWARFARE_PAUSED_OFFSET_FROM_COUNT = (45, 0)   # 示例: (351-306, 165-164)
-# 各roi y轴方向下偏移量
+# roi 下英雄y轴方向下偏移量
 MALWARFARE_HERO_OFFSET = 97
 MALWARFARE_ZWEIHAKA_OFFSET = 181
 MALWARFARE_REPLAY_OFFSET = 49
@@ -212,13 +194,18 @@ def load_external_settings():
         with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
             settings = json.load(f)
             
-        allowed_keys = ['MAIN_WINDOW_X', 'MAIN_WINDOW_Y']
         g = globals()
         
         for key, value in settings.items():
-            if key in allowed_keys and isinstance(value, int):
-                g[key] = value
-
+            # 只有当变量已经在 config.py 中定义过时才进行覆盖（防止注入未知变量）
+            if key in g:
+                # 如果 JSON 里的值是列表，且 config.py 原始值是元组，则转换
+                if isinstance(value, list) and isinstance(g[key], tuple):
+                    g[key] = tuple(value)
+                else:
+                    # 其他类型（int, float, str, bool）直接赋值
+                    g[key] = value
+        
     except Exception as e:
         # 打印错误，但不中断程序运行
         print(f"警告：加载外部配置失败，将使用默认值。错误信息: {e}")

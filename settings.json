@@ -2,16 +2,88 @@
     "current_language": "zh",
     "LOG_LEVEL": "WARNING",
     "debug_mode": false,
+    "debug_time_factor": 5.0,
+    "ALERT_SOUND_VOLUME": 90,
+    "ALERT_SOUND_COOLDOWN": 10,
+    "MAIN_WINDOW_WIDTH": 200,
     "MAIN_WINDOW_BG_COLOR": "rgba(43, 43, 43, 200)",
     "TABLE_FONT_SIZE": 12,
-    "MAP_ALERT_SECONDS": 30,
+    "TABLE_HEIGHT": 150,
     "MEMO_OPACITY": 1.0,
-    "MAP_SHORTCUT": "ctrl + shift + [",
-    "LOCK_SHORTCUT": "ctrl + z",
+    "MEMO_DURATION": 5000,
+    "MEMO_FADE_TIME": 1000,
+    "MAP_ALERT_SECONDS": 30,
+    "MAP_ALERT_WARNING_THRESHOLD_SECONDS": 10,
+    "MAP_ALERT_NORMAL_COLOR": "rgb(239, 255, 238)",
+    "MAP_ALERT_WARNING_COLOR": "rgb(255, 0, 0)",
+    "MAP_ALERT_FONT_SIZE_PERCENT_OF_LINE": 0.6,
+    "MAP_ALERT_TOP_OFFSET_PERCENT": 0.6,
+    "MAP_ALERT_LINE_HEIGHT_PERCENT": 0.03,
+    "MAP_ALERT_HORIZONTAL_INDENT_PERCENT": 0.01,
+    "MAP_SEARCH_KEYWORDS": {
+        "火车": "湮灭快车",
+        "黑杀": "黑暗杀星",
+        "天锁": "天界封锁",
+        "庙a": "往日神庙-A",
+        "庙b": "往日神庙-B",
+        "撕裂a": "虚空撕裂-左",
+        "撕裂b": "虚空撕裂-右",
+        "地勤": "机会渺茫-人虫",
+        "地勤p": "机会渺茫-神",
+        "零件": "聚铁成兵",
+        "杀毒": "净网行动",
+        "穿梭机": "虚空降临",
+        "记者": "熔火危机"
+    },
+    "MUTATION_FACTOR_ALERT_SECONDS": 49,
+    "MUTATION_FACTOR_WARNING_THRESHOLD_SECONDS": 10,
+    "MUTATION_FACTOR_NORMAL_COLOR": "rgb(255, 255, 255)",
+    "MUTATION_FACTOR_WARNING_COLOR": "rgb(255, 0, 0)",
+    "MUTATOR_ALERT_LINE_HEIGHT_PERCENT": 0.03,
+    "MUTATOR_ALERT_FONT_SIZE_PERCENT_OF_LINE": 0.6,
+    "MUTATOR_ICON_TRANSPARENCY": 0.7,
+    "MUTATOR_ALERT_TOP_OFFSET_PERCENT": 0.35,
+    "MUTATOR_ALERT_HORIZONTAL_INDENT_PERCENT": 0.01,
+    "MAP_SHORTCUT": "ctrl + z",
+    "LOCK_SHORTCUT": "ctrl + x",
     "SCREENSHOT_SHORTCUT": "ctrl + shift + -",
     "MEMO_TEMP_SHORTCUT": "`",
     "MEMO_TOGGLE_SHORTCUT": "backslash",
-    "GAME_SCREEN_DPI": 96,
-    "GAME_ICO_RECONGIZE_CONFIDENCE": 0.9,
-    "DEBUG_SHOW_ENEMY_INFO_SQUARE": false
+    "MUTATOR_AND_ENEMY_RACE_RECOGNIZER_ROI": [
+        1850,
+        50,
+        1920,
+        800
+    ],
+    "ENEMY_COMP_RECOGNIZER_ROI": [
+        1450,
+        373,
+        1920,
+        800
+    ],
+    "MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD": [
+        298,
+        85
+    ],
+    "MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD": [
+        334,
+        103
+    ],
+    "MALWARFARE_TIME_TOP_LFET_COORD": [
+        431,
+        85
+    ],
+    "MALWARFARE_TIME_BOTTOM_RIGHT_COORD": [
+        475,
+        103
+    ],
+    "MALWARFARE_PAUSED_TOP_LFET_COORD": [
+        343,
+        85
+    ],
+    "MALWARFARE_HERO_OFFSET": 97,
+    "MALWARFARE_ZWEIHAKA_OFFSET": 181,
+    "MALWARFARE_REPLAY_OFFSET": 49,
+    "MAIN_WINDOW_X": 1000,
+    "MAIN_WINDOW_Y": 1049
 }

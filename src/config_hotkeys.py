@@ -10,7 +10,6 @@ def init_global_hotkeys(window):
         map_shortcut = config.MAP_SHORTCUT.replace(' ', '').lower()
         lock_shortcut = config.LOCK_SHORTCUT.replace(' ', '').lower()
         screenshot_shortcut = config.SCREENSHOT_SHORTCUT.replace(' ', '').lower()
-        artifact_shortcut = config.SHOW_ARTIFACT_SHORTCUT.replace(' ', '').lower()
         memo_temp_key = getattr(config, 'MEMO_TEMP_SHORTCUT', '`').replace(' ', '').lower()
         memo_toggle_key = getattr(config, 'MEMO_TOGGLE_SHORTCUT', 'backslash').replace(' ', '').lower()
         
@@ -19,10 +18,6 @@ def init_global_hotkeys(window):
         keyboard.add_hotkey(lock_shortcut, lambda: handle_lock_shortcut(window))
         # 截图逻辑保留在主类，这里直接调用
         keyboard.add_hotkey(screenshot_shortcut, lambda: window.handle_screenshot_hotkey()) 
-        
-        # 使用信号触发神器窗口的切换
-        window.toggle_artifact_signal.connect(window.handle_artifact_shortcut)
-        keyboard.add_hotkey(artifact_shortcut, window.toggle_artifact_signal.emit)
         
         #注册显示笔记的快捷键
         keyboard.add_hotkey(memo_temp_key, lambda: handle_memo_hotkey(window, 'temp'))
