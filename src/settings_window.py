@@ -235,10 +235,10 @@ class SettingsWindow(QDialog):
             'MAP_SEARCH_KEYWORDS': getattr(config, 'MAP_SEARCH_KEYWORDS', {}),
 
             # ===== 突变事件配置 =====
-            'MUTATION_FACTOR_ALERT_SECONDS': getattr(config, 'MUTATION_FACTOR_ALERT_SECONDS', 49),
-            'MUTATION_FACTOR_WARNING_THRESHOLD_SECONDS': getattr(config, 'MUTATION_FACTOR_WARNING_THRESHOLD_SECONDS', 10),
-            'MUTATION_FACTOR_NORMAL_COLOR': getattr(config, 'MUTATION_FACTOR_NORMAL_COLOR', 'rgb(255, 255, 255)'),
-            'MUTATION_FACTOR_WARNING_COLOR': getattr(config, 'MUTATION_FACTOR_WARNING_COLOR', 'rgb(255, 0, 0)'),
+            'MUTATOR_ALERT_SECONDS': getattr(config, 'MUTATOR_ALERT_SECONDS', 49),
+            'MUTATOR_WARNING_THRESHOLD_SECONDS': getattr(config, 'MUTATOR_WARNING_THRESHOLD_SECONDS', 10),
+            'MUTATOR_NORMAL_COLOR': getattr(config, 'MUTATOR_NORMAL_COLOR', 'rgb(255, 255, 255)'),
+            'MUTATOR_WARNING_COLOR': getattr(config, 'MUTATOR_WARNING_COLOR', 'rgb(255, 0, 0)'),
 
             'MUTATOR_ALERT_TOP_OFFSET_PERCENT': getattr(config, 'MUTATOR_ALERT_TOP_OFFSET_PERCENT', 0.35),
             'MUTATOR_ALERT_LINE_HEIGHT_PERCENT': getattr(config, 'MUTATOR_ALERT_LINE_HEIGHT_PERCENT', 0.03),
@@ -564,10 +564,10 @@ class SettingsWindow(QDialog):
         # 1. 倒计时
         gb_alert = QGroupBox("倒计时与警告")
         gl_alert = QFormLayout(gb_alert)
-        self.add_row(gl_alert, "提前提示时间 (秒):", 'MUTATION_FACTOR_ALERT_SECONDS', 'spin')
-        self.add_row(gl_alert, "警告阈值时间 (秒):", 'MUTATION_FACTOR_WARNING_THRESHOLD_SECONDS', 'spin')
-        self.add_row(gl_alert, "正常文本颜色:", 'MUTATION_FACTOR_NORMAL_COLOR', 'color')
-        self.add_row(gl_alert, "警告文本颜色:", 'MUTATION_FACTOR_WARNING_COLOR', 'color')
+        self.add_row(gl_alert, "提前提示时间 (秒):", 'MUTATOR_ALERT_SECONDS', 'spin')
+        self.add_row(gl_alert, "警告阈值时间 (秒):", 'MUTATOR_WARNING_THRESHOLD_SECONDS', 'spin')
+        self.add_row(gl_alert, "正常文本颜色:", 'MUTATOR_NORMAL_COLOR', 'color')
+        self.add_row(gl_alert, "警告文本颜色:", 'MUTATOR_WARNING_COLOR', 'color')
         layout.addRow(gb_alert)
 
         # 3. 提示布局

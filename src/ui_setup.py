@@ -321,6 +321,7 @@ def setup_bottom_buttons(window):
     # --- 4. 依次添加按钮 ---
     
     window.memo_btn = add_icon_button("📝", "笔记本")
+    window.countdown_btn = add_icon_button("⏰", "自定义倒计时")
     window.setting_btn = add_icon_button("⚙️", "设置界面") 
     window.exit_btn = add_icon_button("🏃", "退出") 
 

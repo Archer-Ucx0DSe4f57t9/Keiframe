@@ -39,10 +39,10 @@ MAP_ALERT_FONT_SIZE_PERCENT_OF_LINE = 0.6  # 字体大小占每行高度的百�
 MAP_ALERT_HORIZONTAL_INDENT_PERCENT = 0.01  # 距离游戏边框左侧的水平缩进
 
 # 突变因子提醒配置
-MUTATION_FACTOR_ALERT_SECONDS = 49  # 突变因子提前提醒时间（秒）/ Mutation factor alert time (in seconds)，我还没做多重提醒，最长间隔就是49秒
-MUTATION_FACTOR_WARNING_THRESHOLD_SECONDS = 10  # 倒计时转为警告颜色的阈值（秒）
-MUTATION_FACTOR_NORMAL_COLOR = 'rgb(255, 255, 255)'  # 倒计时提醒的正常颜色
-MUTATION_FACTOR_WARNING_COLOR = 'rgb(255, 0, 0)'  # 倒计时提醒的警告颜色
+MUTATOR_ALERT_SECONDS = 49  # 突变因子提前提醒时间（秒）/ Mutation factor alert time (in seconds)，我还没做多重提醒，最长间隔就是49秒
+MUTATOR_WARNING_THRESHOLD_SECONDS = 10  # 倒计时转为警告颜色的阈值（秒）
+MUTATOR_NORMAL_COLOR = 'rgb(255, 255, 255)'  # 倒计时提醒的正常颜色
+MUTATOR_WARNING_COLOR = 'rgb(255, 0, 0)'  # 倒计时提醒的警告颜色
 # 提醒大小(基于“StarCraft II”窗口的尺寸)
 MUTATOR_ALERT_TOP_OFFSET_PERCENT = 0.35  # 提醒区域距离窗口顶部的百分比
 MUTATOR_ALERT_LINE_HEIGHT_PERCENT = 0.03  # 每行提醒占窗口高度的百分比

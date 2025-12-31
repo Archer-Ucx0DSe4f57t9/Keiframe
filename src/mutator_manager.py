@@ -222,7 +222,7 @@ class MutatorManager(QWidget):
             content_to_show = next_deployment_info[1]
             warning_sound_filename = next_deployment_info[2] if len(next_deployment_info[2]) > 0 else None
 
-            if (next_deployment_time - current_seconds) <= config.MUTATION_FACTOR_ALERT_SECONDS:
+            if (next_deployment_time - current_seconds) <= config.MUTATOR_ALERT_SECONDS:
                 time_remaining = next_deployment_time - current_seconds
 
                 if (mutator_type == "AggressiveDeploymentProtoss" or mutator_type == "AggressiveDeployment"):
@@ -286,10 +286,10 @@ class MutatorManager(QWidget):
             #)
 
         # 动态更新文本、颜色和字体大小
-        text_color = config.MUTATION_FACTOR_NORMAL_COLOR
+        text_color = config.MUTATOR_NORMAL_COLOR
 
-        if time_remaining is not None and time_remaining <= config.MUTATION_FACTOR_WARNING_THRESHOLD_SECONDS:
-            text_color = config.MUTATION_FACTOR_WARNING_COLOR
+        if time_remaining is not None and time_remaining <= config.MUTATOR_WARNING_THRESHOLD_SECONDS:
+            text_color = config.MUTATOR_WARNING_COLOR
             sound_filename = warning_sound_filename
         else:
             sound_filename = None
