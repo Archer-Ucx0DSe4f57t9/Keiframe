@@ -67,7 +67,6 @@ class MapEventManager:
             is_heroes_from_the_storm_active = False
             if game_monitor.state.active_mutators and 'HeroesFromtheStorm' in game_monitor.state.active_mutators:
                 is_heroes_from_the_storm_active = True
-                self.logger.warning("HeroesFromtheStorm 突变因子已激活。")
             
             # 第二次遍历：设置颜色和触发提示
             for row in range(self.table_area.rowCount()):

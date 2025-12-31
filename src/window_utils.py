@@ -18,6 +18,7 @@ class WindowHandleManager:
             hwnd = win32gui.FindWindow(None, title)
             if hwnd:
                 return hwnd
+        logger.warning(f"未找到游戏窗口: {e}")
         return None
 
     def get_hwnd(self):
@@ -47,7 +48,7 @@ def get_sc2_window_geometry() -> object:
             h = content_right_bottom[1] - y
             return x, y, w, h
     except Exception as e:
-        logger.info(f"获取'StarCraft II'窗口几何信息失败: {e}")
+        logger.warning(f"获取'星际争霸2'窗口几何信息失败: {e}")
     return None
 
 #判断是不是全屏游戏
