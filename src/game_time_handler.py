@@ -1,3 +1,4 @@
+#game_time_handler
 import time
 import traceback
 import config 
@@ -113,8 +114,11 @@ def update_game_time(window):
                     
                 #===倒计时模块相关===
                 if hasattr(window, 'countdown_manager'):
-                    # window.logger.debug(f'正在更新倒计时: {current_seconds}')
-                    window.countdown_manager.update_game_time(current_seconds)
+                    # window.game_state.game_screen 是当前的游戏状态 ('in_game', 'loading' 等)
+                    window.countdown_manager.update_game_time(
+                        current_seconds, 
+                        window.game_state.game_screen
+                    )
 
             except Exception as e:
                 window.logger.error(f'调整表格滚动位置和颜色失败: {str(e)}\n{traceback.format_exc()}')

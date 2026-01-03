@@ -28,11 +28,29 @@ TABLE_HEIGHT = 150  # 表格高度
 TABLE_NEXT_FONT_COLOR = (0, 255, 128)  # 表格下一个事件字体颜色 绿色/ Table font color
 TABLE_NEXT_FONT_BG_COLOR = (0, 255, 128, 30)  # 表格下一个事件背景颜色，最后一个值是透明度
 
+# === 提示信息显示位置配置 (像素偏移) ===
+# 基准点为游戏窗口(SC2)的左上角 (0, 0)
+# 向右为 X 正方向，向下为 Y 正方向
+
+# 提示框距离左侧边框的像素距离
+TOAST_OFFSET_X = 19 #0.01*1920
+
+# 第一条提示距离顶部边框的像素距离
+TOAST_OFFSET_Y = 540 #0.5*1080
+
+# 提示框行高 (像素，如果设为 0 则自动根据窗口高度计算，建议设置固定值以配合像素定位)
+TOAST_LINE_HEIGHT = 32
+
+# 提示文字大小 (像素)
+TOAST_FONT_SIZE = 20
+
 # 地图提醒配置
 MAP_ALERT_SECONDS = 30  # 提前提醒时间（秒）/ Time before alert (in seconds)
 MAP_ALERT_WARNING_THRESHOLD_SECONDS = 10  # 倒计时转为警告颜色的阈值（秒）
 MAP_ALERT_NORMAL_COLOR = 'rgb(239, 255, 238)'  # 倒计时提醒的正常颜色
 MAP_ALERT_WARNING_COLOR = 'rgb(255, 0, 0)'  # 倒计时提醒的警告颜色
+
+
 MAP_ALERT_TOP_OFFSET_PERCENT = 0.60  # 提醒区域距离窗口顶部的百分比
 MAP_ALERT_LINE_HEIGHT_PERCENT = 0.03  # 每行提醒占窗口高度的百分比
 MAP_ALERT_FONT_SIZE_PERCENT_OF_LINE = 0.6  # 字体大小占每行高度的百分比
@@ -84,8 +102,37 @@ MEMO_DURATION = 5000      # 临时显示时的持续时间 (毫秒)，不含淡�
 MEMO_FADE_TIME = 1000     # 淡出动画时间 (毫秒)
 
 # 笔记快捷键
-MEMO_TEMP_SHORTCUT = '`'  # 临时显示快捷键
+MEMO_TEMP_SHORTCUT = '-'  # 临时显示快捷键
 MEMO_TOGGLE_SHORTCUT = 'backslash' # 持续开关快捷键
+
+
+# === 倒计时功能配置 ===
+# 格式: {'time': 秒数, 'label': '显示名称', 'sound': '音频文件名'}
+COUNTDOWN_OPTIONS = [
+    {'time': 120, 'label': '神器/二三哥', 'sound': 'alert.wav'},
+    {'time': 100,  'label': '分矿',   'sound': 'alert.wav'},
+    {'time': 60, 'label': 'bb',   'sound': 'alert.wav'},
+    {'time': 90, 'label': '大哥巢', 'sound': 'alert.wav'},
+]
+
+# 最大同时存在的倒计时数量
+COUNTDOWN_MAX_CONCURRENT = 3
+
+# 倒计时警告阈值
+COUNTDOWN_WARNING_THRESHOLD_SECONDS = 10
+
+# 默认颜色
+COUNTDOWN_DISPLAY_COLOR = "rgb(0, 255, 255)"
+
+# 倒计时快捷键
+COUNTDOWN_SHORTCUT = "`"
+
+# 倒计时显示位置 (相对于SC2窗口的百分比)
+COUNTDOWN_DISPLAY_Y_PERCENT = 0.15 
+COUNTDOWN_DISPLAY_FONT_SIZE = 24
+
+
+
 
 # 调试模式配置
 debug_mode = False  # 设置为True启用调试模式 / Set to True to enable debug mode

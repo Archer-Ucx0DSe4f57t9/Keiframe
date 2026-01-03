@@ -15,6 +15,8 @@ from mutator_and_enemy_race_automatic_recognizer import Mutator_and_enemy_race_a
 import ui_setup, game_monitor, config_hotkeys,game_time_handler,map_loader,app_window_manager,language_manager
 from memo_overlay import MemoOverlay
 from settings_window import SettingsWindow
+from countdown_manager import CountdownManager
+
 #from global_key_listener import GlobalKeyListener
 
 class TimerWindow(QMainWindow):
@@ -22,6 +24,7 @@ class TimerWindow(QMainWindow):
     progress_signal = QtCore.pyqtSignal(list)
     toggle_artifact_signal = pyqtSignal()
     mutator_and_enemy_race_recognition_signal = QtCore.pyqtSignal(dict)
+    countdown_hotkey_signal = pyqtSignal()
 
     # 定义一个信号，用于线程安全地激活笔记本
     memo_signal = pyqtSignal(str)
@@ -109,13 +112,16 @@ class TimerWindow(QMainWindow):
         
         #笔记按钮功能
         self.memo_overlay = MemoOverlay()
-        # 点击按钮默认使用 'temp' 模式
         if hasattr(self, 'memo_btn'):
-            self.memo_btn.clicked.connect(lambda: self.show_memo('temp'))
+            self.memo_btn.clicked.connect(lambda: self.show_memo('temp'))#temp模式防止遮住导致按不了按钮
         #连接信号到槽 (为了解决线程安全问题)
         self.memo_signal.connect(self.show_memo)
-    
-        
+
+        #倒计时按钮功能
+        self.countdown_manager = CountdownManager(self, self.toast_manager)
+        if hasattr(self, 'countdown_btn'):
+            self.countdown_btn.clicked.connect(self.trigger_countdown_selection)
+        self.countdown_hotkey_signal.connect(self.process_countdown_hotkey_logic)
         
         #设置按钮功能
         if hasattr(self, 'setting_btn'): 
@@ -431,6 +437,30 @@ class TimerWindow(QMainWindow):
                 self.logger.error(f'draw artifacts layer failed: {str(e)}')
                 self.logger.error(traceback.format_exc())
     '''
+    
+    #倒计时功能相关
+    def trigger_countdown_selection(self):
+        # 尝试获取当前游戏秒数
+        game_time = 0
+        if self.game_state.most_recent_playerdata:
+             game_time = float(self.game_state.most_recent_playerdata.get('time', 0))
+        
+        self.countdown_manager.start_interaction(game_time)
+
+    def handle_countdown_hotkey(self):
+        self.countdown_hotkey_signal.emit()
+
+    def process_countdown_hotkey_logic(self):
+        # 获取最新的游戏时间（在主线程读取也是更安全的）
+        game_time = 0
+        if self.game_state.most_recent_playerdata:
+             game_time = float(self.game_state.most_recent_playerdata.get('time', 0))
+        
+        # 调用管理器的逻辑（包含UI操作）
+        self.countdown_manager.handle_hotkey_trigger(game_time)
+
+    
+    
     # 处理识别器传回突变因子和种族的数据
     def handle_mutator_and_enemy_race_recognition_update(self, results):
         """处理种族和突变因子识别结果的更新"""

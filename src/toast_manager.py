@@ -59,23 +59,56 @@ class ToastManager:
 
 
         sc2_x, sc2_y, sc2_width, sc2_height = sc2_rect
+        
+        # 使用自定义 key 进行排序
+        # 结果示例: [map_event_1, map_event_5, custom_cd_1, custom_cd_2]
+        
 
         # 动态计算字体大小和行高
-        line_height = int(sc2_height * config.MAP_ALERT_LINE_HEIGHT_PERCENT)
-        font_size = int(line_height * config.MAP_ALERT_FONT_SIZE_PERCENT_OF_LINE)
+        # 1. 计算行高和字体大小
+        # 如果 config 里指定了固定高度，就用固定的，否则还是按比例算（可选）
+        if hasattr(config, 'TOAST_LINE_HEIGHT') and config.TOAST_LINE_HEIGHT > 0:
+            line_height = config.TOAST_LINE_HEIGHT
+        else:
+            # 兼容旧逻辑：按窗口高度比例
+            line_height = int(sc2_height * getattr(config, 'MAP_ALERT_LINE_HEIGHT_PERCENT', 0.05))
 
-        # 根据事件ID确定垂直位置
-        # 例如，可以创建一个列表来维护事件的显示顺序
-        # 假设你的事件ID可以按顺序排列
-        event_ids = sorted(self.map_alerts.keys())
+
+        if hasattr(config, 'TOAST_FONT_SIZE') and config.TOAST_FONT_SIZE > 0:
+             font_size = config.TOAST_FONT_SIZE
+        else:
+             # 兼容旧逻辑
+             font_size = int(line_height * getattr(config, 'MAP_ALERT_FONT_SIZE_PERCENT_OF_LINE', 0.6))
+
+        # 2. 计算垂直位置 (Y)
+        # 获取当前所有的事件ID并排序，决定谁在第一行，谁在第二行
+        def get_sort_key(eid):
+            # 如果是 map_event 开头，优先级为 0 (最高，排在最上面)
+            if eid.startswith('map_event'):
+                return (0, eid)
+            # 其他（如 custom_cd），优先级为 1 (排在地图事件下面)
+            else:
+                return (1, eid)
+        event_ids = sorted(self.map_alerts.keys(), key=get_sort_key)
         try:
+            # 获取当前事件在排序后的列表中的索引
+            # 这个索引直接决定了它在第几行 (index * line_height)
             event_index = event_ids.index(event_id)
-            alert_label_y = sc2_y + int(sc2_height * config.MAP_ALERT_TOP_OFFSET_PERCENT) + (event_index * line_height)
+            
+            # ... (后续位置计算代码不变，直接利用 event_index 即可) ...
+             # 2. 计算垂直位置 (Y)
+            offset_y = getattr(config, 'TOAST_OFFSET_Y', 150)
+            # 行高逻辑...
+            line_height = getattr(config, 'TOAST_LINE_HEIGHT', 40) # 假设你设置了固定值
+            
+            alert_label_y = sc2_y + offset_y + (event_index * line_height)
+            
         except ValueError:
-            return  # 如果事件不在列表中，则不显示
-
+            return
+        
         # 确定水平位置
-        alert_label_x = sc2_x + int(sc2_width * config.MAP_ALERT_HORIZONTAL_INDENT_PERCENT)
+        offset_x = getattr(config, 'TOAST_OFFSET_X', 19) # 默认1920*0.01防报错
+        alert_label_x = sc2_x + offset_x
 
         # 根据时间差设置颜色
         text_color = config.MAP_ALERT_NORMAL_COLOR  # 默认颜色
@@ -90,7 +123,8 @@ class ToastManager:
             message,
             text_color,
             x=alert_label_x, y=alert_label_y,
-            width=sc2_width, height=line_height,
+            width=sc2_width, # 宽度依然可以保持跟随窗口，或者你也想改成固定宽度？
+            height=line_height,
             font_size=font_size,
             sound_filename=final_sound_filename
         )

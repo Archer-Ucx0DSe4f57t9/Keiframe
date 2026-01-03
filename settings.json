@@ -47,7 +47,6 @@
     "MAP_SHORTCUT": "ctrl + z",
     "LOCK_SHORTCUT": "ctrl + x",
     "SCREENSHOT_SHORTCUT": "ctrl + shift + -",
-    "MEMO_TEMP_SHORTCUT": "`",
     "MEMO_TOGGLE_SHORTCUT": "backslash",
     "MUTATOR_AND_ENEMY_RACE_RECOGNIZER_ROI": [
         1800,
@@ -84,6 +83,6 @@
     "MALWARFARE_HERO_OFFSET": 97,
     "MALWARFARE_ZWEIHAKA_OFFSET": 181,
     "MALWARFARE_REPLAY_OFFSET": 49,
-    "MAIN_WINDOW_X": 1000,
-    "MAIN_WINDOW_Y": 1049
+    "MAIN_WINDOW_X": 970,
+    "MAIN_WINDOW_Y": 1002
 }

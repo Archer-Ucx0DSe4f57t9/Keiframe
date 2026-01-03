@@ -12,6 +12,8 @@ def init_global_hotkeys(window):
         screenshot_shortcut = config.SCREENSHOT_SHORTCUT.replace(' ', '').lower()
         memo_temp_key = getattr(config, 'MEMO_TEMP_SHORTCUT', '`').replace(' ', '').lower()
         memo_toggle_key = getattr(config, 'MEMO_TOGGLE_SHORTCUT', 'backslash').replace(' ', '').lower()
+        countdown_key = getattr(config, 'COUNTDOWN_SHORTCUT', 'F8').replace(' ', '').lower()
+        
         
         # 注册全局快捷键，使用 lambda 避免直接绑定实例方法
         keyboard.add_hotkey(map_shortcut, lambda: handle_map_switch_hotkey(window))
@@ -22,6 +24,8 @@ def init_global_hotkeys(window):
         #注册显示笔记的快捷键
         keyboard.add_hotkey(memo_temp_key, lambda: handle_memo_hotkey(window, 'temp'))
         keyboard.add_hotkey(memo_toggle_key, lambda: handle_memo_hotkey(window, 'toggle'))
+        #注册倒计时功能快捷键
+        keyboard.add_hotkey(countdown_key, lambda: window.handle_countdown_hotkey())
         
         window.logger.info(
             f'成功注册全局快捷键: {config.MAP_SHORTCUT}, {config.LOCK_SHORTCUT}, {config.SCREENSHOT_SHORTCUT}')
