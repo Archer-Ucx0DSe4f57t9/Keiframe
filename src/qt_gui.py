@@ -351,6 +351,7 @@ class TimerWindow(QMainWindow):
             else:
                 self.logger.warning(f'未在下拉框中找到地图: {map_name}')
 
+        #新游戏时清除所有原有的计时器
         elif action == 'reset_game_info':
             self.logger.warning('收到新游戏信号，正在重置识别器和游戏状态')
             # 重置识别器状态，并重新开始扫描
@@ -360,6 +361,14 @@ class TimerWindow(QMainWindow):
             # 清除全局状态中的种族和突变因子
             game_monitor.state.enemy_race = None
             game_monitor.state.active_mutators = None
+            
+            # 清空自定义倒计时
+            if hasattr(self, 'countdown_manager') and self.countdown_manager:
+                self.countdown_manager.clear_all_countdowns()
+            
+            # 清除所有残留的 Toast（包括地图事件）
+            if hasattr(self, 'toast_manager') and self.toast_manager:
+                self.toast_manager.clear_all_alerts()
 
 
     def on_version_selected(self):

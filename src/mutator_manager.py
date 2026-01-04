@@ -254,8 +254,8 @@ class MutatorManager(QWidget):
             self.logger.warning(f"警告：未找到 mutator_type: {mutator_type} 对应的提醒标签。")
             return
 
-        line_height = int(sc2_height * config.MUTATOR_ALERT_LINE_HEIGHT_PERCENT)
-        font_size = int(line_height * config.MUTATOR_ALERT_FONT_SIZE_PERCENT_OF_LINE)
+        line_height = int(getattr(config, 'MUTATOR_ALERT_LINE_HEIGHT', 32))
+        font_size = int(getattr(config, 'MUTATOR_ALERT_FONT_SIZE', 19))
 
         if not isinstance(alert_label, MessagePresenter):
             icon_name = f"{mutator_type}.png"
@@ -263,7 +263,8 @@ class MutatorManager(QWidget):
             self.mutator_alert_labels[mutator_type] = alert_label
 
         # 1. 设置标签的几何信息
-        alert_area_y = sc2_y + int(sc2_height * config.MUTATOR_ALERT_TOP_OFFSET_PERCENT)
+        start_offset_y = int(getattr(config, 'MUTATOR_ALERT_OFFSET_Y', 324))
+        alert_area_y = sc2_y + start_offset_y
 
         try:
             mutator_index = mutator_types.index(mutator_type)
@@ -272,7 +273,7 @@ class MutatorManager(QWidget):
             self.logger.warning(f"未知的 mutator 类型: {mutator_type}")
             return
 
-        horizontal_indent = int(sc2_width * config.MUTATOR_ALERT_HORIZONTAL_INDENT_PERCENT)
+        horizontal_indent = int(getattr(config, 'MUTATOR_ALERT_OFFSET_X', 19))
         alert_label_x = sc2_x + horizontal_indent
 
         # 设置窗口属性和大小

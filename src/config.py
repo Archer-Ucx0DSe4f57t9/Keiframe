@@ -67,6 +67,15 @@ MUTATOR_ALERT_LINE_HEIGHT_PERCENT = 0.03  # 每行提醒占窗口高度的百分
 MUTATOR_ALERT_FONT_SIZE_PERCENT_OF_LINE = 0.6  # 字体大小占每行高度的百分比
 MUTATOR_ALERT_HORIZONTAL_INDENT_PERCENT = 0.01  # 距离游戏边框左侧的水平缩进
 
+# 提示列表距离顶部边框的像素距离 (原 0.35 -> 324px)
+MUTATOR_ALERT_OFFSET_Y = 324
+# 提示框距离左侧边框的像素距离 (原 0.01 -> 19px)
+MUTATOR_ALERT_OFFSET_X = 19
+# 提示框单行高度 (原 0.03 -> 32px)
+MUTATOR_ALERT_LINE_HEIGHT = 32
+# 提示文字大小 (原 0.6 * LineHeight -> 19px)
+MUTATOR_ALERT_FONT_SIZE = 19
+
 # 提醒配置：
 ALERT_SOUND_COOLDOWN = 10 # 同名警告最短间隔（秒），低于间隔的音频不播放
 ALERT_SOUND_VOLUME = 90 # 音量大小（0-100正整数）

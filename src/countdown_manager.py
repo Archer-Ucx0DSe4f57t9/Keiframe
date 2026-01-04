@@ -221,3 +221,16 @@ class CountdownManager(QWidget):
             self.start_interaction(current_game_seconds)
         else:
             self.cycle_selection()
+            
+    def clear_all_countdowns(self):
+        """清空所有当前的倒计时"""
+        self.logger.info("正在清空所有自定义倒计时...")
+        # 遍历当前列表，通知 ToastManager 移除每一个
+        for entry in self.active_countdowns:
+            if self.toast_manager:
+                self.toast_manager.remove_alert(entry['id'])
+        
+        # 清空列表
+        self.active_countdowns.clear()
+        # 重置状态
+        self.cancel_selection()
