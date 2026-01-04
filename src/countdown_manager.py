@@ -54,6 +54,19 @@ class CountdownSelectionWindow(QWidget):
             btn.clicked.connect(lambda checked, o=opt: self.option_selected.emit(o))
             layout.addWidget(btn)
             self.buttons.append(btn)
+    
+        # 2. 添加 "清除最近" 按钮
+        clear_btn = QPushButton("清除最近")
+        # 发送特殊动作字典
+        clear_btn.clicked.connect(lambda: self.option_selected.emit({'action': 'clear_recent'}))
+        layout.addWidget(clear_btn)
+        self.buttons.append(clear_btn)
+
+        # 3. 添加 "(X)" 关闭按钮
+        close_btn = QPushButton("(X)")
+        close_btn.clicked.connect(lambda: self.option_selected.emit({'action': 'close'}))
+        layout.addWidget(close_btn)
+        self.buttons.append(close_btn)
             
     def highlight_button(self, index):
         for i, btn in enumerate(self.buttons):
@@ -111,27 +124,59 @@ class CountdownManager(QWidget):
     def cycle_selection(self):
         if not self.is_selecting:
             return
+        
+        # [修改] 循环长度 = 配置项数量 + 2个固定选项(清除/关闭)
+        total_options = len(config.COUNTDOWN_OPTIONS) + 2
+        
         if self.current_option_index == -1:
             self.current_option_index = 0
         else:
-            self.current_option_index = (self.current_option_index + 1) % len(config.COUNTDOWN_OPTIONS)
+            self.current_option_index = (self.current_option_index + 1) % total_options
+            
         self.selection_window.highlight_button(self.current_option_index)
         self.hotkey_commit_timer.start(5000)
 
     def commit_current_hotkey_selection(self):
+
         if self.is_selecting:
-            # === [修改] 判断当前是否有有效选择 ===
             if self.current_option_index == -1:
                 self.logger.info("倒计时选择超时且未选择任何项，取消操作。")
                 self.cancel_selection()
             else:
-                # 如果有选中项，则确认
-                selected_opt = config.COUNTDOWN_OPTIONS[self.current_option_index]
-                self.logger.info(f"倒计时选择超时，自动确认选项: {selected_opt.get('label')}")
-                self.confirm_selection(selected_opt)
+                # [修改] 根据索引构建选中的选项数据
+                num_config_options = len(config.COUNTDOWN_OPTIONS)
+                
+                selected_opt = None
+                if self.current_option_index < num_config_options:
+                    # 选中了常规倒计时
+                    selected_opt = config.COUNTDOWN_OPTIONS[self.current_option_index]
+                elif self.current_option_index == num_config_options:
+                    # 选中了倒数第二个：清除最近
+                    selected_opt = {'action': 'clear_recent'}
+                elif self.current_option_index == num_config_options + 1:
+                    # 选中了最后一个：关闭
+                    selected_opt = {'action': 'close'}
+                
+                if selected_opt:
+                    self.logger.info(f"倒计时选择超时，自动确认选项索引: {self.current_option_index}")
+                    self.confirm_selection(selected_opt)
 
     def confirm_selection(self, opt_dict):
         """确认选择，添加倒计时到队列"""
+        
+        # 处理特殊动作：关闭
+        if opt_dict.get('action') == 'close':
+            self.logger.info("用户选择关闭倒计时菜单")
+            self.cancel_selection()
+            return
+
+        # 处理特殊动作：清除最近
+        if opt_dict.get('action') == 'clear_recent':
+            self.logger.info("用户选择清除最近的倒计时")
+            self.remove_recent_countdown()
+            self.cancel_selection()
+            return
+        
         if self.anchor_game_time is None:
             self.cancel_selection()
             return
@@ -170,11 +215,34 @@ class CountdownManager(QWidget):
         self.hotkey_commit_timer.stop()
         self.anchor_game_time = None
 
+    def remove_recent_countdown(self):
+        """移除最近添加的一个倒计时 (LIFO: Last-In, First-Out)"""
+        if not self.active_countdowns:
+            self.logger.info("当前没有倒计时可清除")
+            return
+
+        # 移除列表末尾的元素（最近添加的）
+        removed_entry = self.active_countdowns.pop()
+        self.logger.info(f"已移除倒计时: {removed_entry['label']}")
+        
+        # 通知 ToastManager 清除显示
+        if self.toast_manager:
+            self.toast_manager.remove_alert(removed_entry['id'])
+
     def cancel_selection(self):
         self.is_selecting = False
         self.selection_window.hide()
         self.hotkey_commit_timer.stop()
         self.anchor_game_time = None
+    
+    def clear_all_countdowns(self):
+        """清空所有当前的倒计时"""
+        self.logger.info("正在清空所有自定义倒计时...")
+        for entry in self.active_countdowns:
+            if self.toast_manager:
+                self.toast_manager.remove_alert(entry['id'])
+        self.active_countdowns.clear()
+        self.cancel_selection()
 
     def update_game_time(self, current_seconds, game_screen):
         """
