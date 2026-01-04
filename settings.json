@@ -12,14 +12,14 @@
     "MEMO_OPACITY": 1.0,
     "MEMO_DURATION": 5000,
     "MEMO_FADE_TIME": 1000,
+    "TOAST_OFFSET_X": 19,
+    "TOAST_OFFSET_Y": 540,
+    "TOAST_LINE_HEIGHT": 32,
+    "TOAST_FONT_SIZE": 20,
     "MAP_ALERT_SECONDS": 30,
     "MAP_ALERT_WARNING_THRESHOLD_SECONDS": 10,
     "MAP_ALERT_NORMAL_COLOR": "rgb(239, 255, 238)",
     "MAP_ALERT_WARNING_COLOR": "rgb(255, 0, 0)",
-    "MAP_ALERT_FONT_SIZE_PERCENT_OF_LINE": 0.6,
-    "MAP_ALERT_TOP_OFFSET_PERCENT": 0.6,
-    "MAP_ALERT_LINE_HEIGHT_PERCENT": 0.03,
-    "MAP_ALERT_HORIZONTAL_INDENT_PERCENT": 0.01,
     "MAP_SEARCH_KEYWORDS": {
         "火车": "湮灭快车",
         "黑杀": "黑暗杀星",
@@ -35,19 +35,46 @@
         "穿梭机": "虚空降临",
         "记者": "熔火危机"
     },
+    "COUNTDOWN_MAX_CONCURRENT": 3,
+    "COUNTDOWN_WARNING_THRESHOLD_SECONDS": 10,
+    "COUNTDOWN_DISPLAY_COLOR": "rgb(0, 255, 255)",
+    "COUNTDOWN_OPTIONS": [
+        {
+            "time": 120,
+            "label": "神器/二三哥",
+            "sound": "Default.mp3"
+        },
+        {
+            "time": 100,
+            "label": "基地",
+            "sound": "Default.mp3"
+        },
+        {
+            "time": 60,
+            "label": "bb/孵化场",
+            "sound": "Default.mp3"
+        },
+        {
+            "time": 90,
+            "label": "大哥巢",
+            "sound": "Default.mp3"
+        }
+    ],
     "MUTATOR_ALERT_SECONDS": 49,
     "MUTATOR_WARNING_THRESHOLD_SECONDS": 10,
     "MUTATOR_NORMAL_COLOR": "rgb(255, 255, 255)",
     "MUTATOR_WARNING_COLOR": "rgb(255, 0, 0)",
-    "MUTATOR_ALERT_LINE_HEIGHT_PERCENT": 0.03,
-    "MUTATOR_ALERT_FONT_SIZE_PERCENT_OF_LINE": 0.6,
+    "MUTATOR_ALERT_LINE_HEIGHT": 32,
+    "MUTATOR_ALERT_FONT_SIZE": 19,
     "MUTATOR_ICON_TRANSPARENCY": 0.7,
-    "MUTATOR_ALERT_TOP_OFFSET_PERCENT": 0.35,
-    "MUTATOR_ALERT_HORIZONTAL_INDENT_PERCENT": 0.01,
+    "MUTATOR_ALERT_OFFSET_Y": 324,
+    "MUTATOR_ALERT_OFFSET_X": 19,
     "MAP_SHORTCUT": "ctrl + z",
     "LOCK_SHORTCUT": "ctrl + x",
     "SCREENSHOT_SHORTCUT": "ctrl + shift + -",
+    "MEMO_TEMP_SHORTCUT": "-",
     "MEMO_TOGGLE_SHORTCUT": "backslash",
+    "COUNTDOWN_SHORTCUT": "`",
     "MUTATOR_AND_ENEMY_RACE_RECOGNIZER_ROI": [
         1800,
         50,

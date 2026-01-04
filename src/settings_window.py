@@ -100,11 +100,19 @@ class DictTable(QTableWidget):
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.setMinimumHeight(150)
         
+         # 连接点击事件到编辑
+        self.cellClicked.connect(self.on_click_to_edit)
+        
         row = 0
         for k, v in data_dict.items():
             self.add_new_row(str(k), str(v))
             row += 1
 
+    def on_click_to_edit(self, row, col):
+        """单击单元格时，如果是第一列（关键词），立即进入编辑模式"""
+        if col == 0:
+            self.edit(self.model().index(row, col))
+    
     def add_new_row(self, key_text="", value_text=""):
         """添加一行，并为第二列设置下拉框"""
         row = self.rowCount()
@@ -167,6 +175,128 @@ class DictInput(QWidget):
     def value(self):
         return self.table.get_data()
 
+class CountdownOptionsTable(QTableWidget):
+    """倒计时选项编辑器"""
+    def __init__(self, options_list, parent=None):
+        super().__init__(0, 3, parent) # 3列: 时间, 名称, 声音
+        self.setHorizontalHeaderLabels(["秒数 (Time)", "名称 (Label)", "声音文件 (Sound)"])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.setMinimumHeight(180)
+        
+        # 连接点击事件到编辑
+        self.cellClicked.connect(self.on_click_to_edit)
+        
+        # 预先获取声音列表，避免重复IO
+        self.sound_files = self.get_sound_files()
+        
+        for opt in options_list:
+            t = opt.get('time', 60)
+            l = opt.get('label', '')
+            s = opt.get('sound', '')
+            self.add_new_row(t, l, s)
+
+    def on_click_to_edit(self, row, col):
+        """单击单元格时，如果是第二列（名称），立即进入编辑模式"""
+        # Column 1 是名称 (Label), Column 0 和 2 分别是 SpinBox 和 ComboBox，本身就需要点击操作
+        if col == 1:
+            self.edit(self.model().index(row, col))
+  
+    def add_new_row(self, time_val=60, label_text="倒计时", sound_text=""):
+        row = self.rowCount()
+        self.insertRow(row)
+        
+        # 1. 时间 (SpinBox)
+        sb = QSpinBox()
+        sb.setRange(1, 9999)
+        sb.setValue(int(time_val))
+        self.setCellWidget(row, 0, sb)
+        
+        # 2. 名称 (普通 Item，允许直接打字编辑)
+        self.setItem(row, 1, QTableWidgetItem(str(label_text)))
+        
+        # 3. 声音 (下拉框)
+        combo = QComboBox()
+        # 添加一个空选项，代表无声音
+        combo.addItem("")
+        combo.addItems(self.sound_files)
+        
+        # 尝试选中已有的声音文件
+        idx = combo.findText(sound_text)
+        if idx >= 0:
+            combo.setCurrentIndex(idx)
+        else:
+            # 如果配置文件里有，但文件夹里没有，依然添加进去显示，防止配置丢失
+            if sound_text:
+                combo.addItem(sound_text)
+                combo.setCurrentText(sound_text)
+                
+        self.setCellWidget(row, 2, combo)
+
+    def get_data(self):
+        data = []
+        for r in range(self.rowCount()):
+            sb = self.cellWidget(r, 0)
+            label_item = self.item(r, 1)
+            combo = self.cellWidget(r, 2)
+            
+            if sb and label_item and combo:
+                entry = {
+                    'time': sb.value(),
+                    'label': label_item.text().strip(),
+                    'sound': combo.currentText().strip()
+                }
+                data.append(entry)
+        return data
+      
+    def get_sound_files(self):
+        """扫描 resources/sounds 文件夹下的所有文件"""
+        if getattr(sys, 'frozen', False):
+            base_path = os.path.dirname(sys.executable)
+        else:
+            base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
+        sound_dir = os.path.join(base_path, 'resources', 'sounds')
+        files = []
+        
+        if os.path.exists(sound_dir):
+            try:
+                for f in os.listdir(sound_dir):
+                    if os.path.isfile(os.path.join(sound_dir, f)):
+                        files.append(f)
+            except Exception:
+                pass
+        # 返回排序后的文件列表，方便查找
+        return sorted(files)
+
+class CountdownOptionsInput(QWidget):
+    def __init__(self, options_list, parent=None):
+        super().__init__(parent)
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(0,0,0,0)
+        
+        self.table = CountdownOptionsTable(options_list)
+        
+        btn_layout = QHBoxLayout()
+        self.add_btn = QPushButton("添加倒计时")
+        self.del_btn = QPushButton("删除选中")
+        self.add_btn.clicked.connect(lambda: self.table.add_new_row())
+        self.del_btn.clicked.connect(self.del_row)
+        
+        btn_layout.addWidget(self.add_btn)
+        btn_layout.addWidget(self.del_btn)
+        
+        self.layout.addWidget(self.table)
+        self.layout.addLayout(btn_layout)
+
+    def del_row(self):
+        r = self.table.currentRow()
+        if r >= 0:
+            self.table.removeRow(r)
+
+    def value(self):
+        return self.table.get_data()
+      
+      
 # ==========================================
 # 2. 设置窗口主类
 # ==========================================
@@ -215,6 +345,7 @@ class SettingsWindow(QDialog):
             'SCREENSHOT_SHORTCUT': getattr(config, 'SCREENSHOT_SHORTCUT', ''),
             'MEMO_TEMP_SHORTCUT': getattr(config, 'MEMO_TEMP_SHORTCUT', ''),
             'MEMO_TOGGLE_SHORTCUT': getattr(config, 'MEMO_TOGGLE_SHORTCUT', ''),
+            'COUNTDOWN_SHORTCUT': getattr(config, 'COUNTDOWN_SHORTCUT', ''),
 
             # ===== 主窗口与界面 =====
             'MAIN_WINDOW_POS': (getattr(config, 'MAIN_WINDOW_X', 1000), getattr(config, 'MAIN_WINDOW_Y', 100)),
@@ -228,10 +359,10 @@ class SettingsWindow(QDialog):
             'MAP_ALERT_WARNING_THRESHOLD_SECONDS': getattr(config, 'MAP_ALERT_WARNING_THRESHOLD_SECONDS', 10),
             'MAP_ALERT_NORMAL_COLOR': getattr(config, 'MAP_ALERT_NORMAL_COLOR', 'rgb(239, 255, 238)'),
             'MAP_ALERT_WARNING_COLOR': getattr(config, 'MAP_ALERT_WARNING_COLOR', 'rgb(255, 0, 0)'),
-            'MAP_ALERT_TOP_OFFSET_PERCENT': getattr(config, 'MAP_ALERT_TOP_OFFSET_PERCENT', 0.60),
-            'MAP_ALERT_LINE_HEIGHT_PERCENT': getattr(config, 'MAP_ALERT_LINE_HEIGHT_PERCENT', 0.03),
-            'MAP_ALERT_FONT_SIZE_PERCENT_OF_LINE': getattr(config, 'MAP_ALERT_FONT_SIZE_PERCENT_OF_LINE', 0.6),
-            'MAP_ALERT_HORIZONTAL_INDENT_PERCENT': getattr(config, 'MAP_ALERT_HORIZONTAL_INDENT_PERCENT', 0.01),
+            'TOAST_OFFSET_X': getattr(config, 'TOAST_OFFSET_X', 19),
+            'TOAST_OFFSET_Y': getattr(config, 'TOAST_OFFSET_Y', 540),
+            'TOAST_LINE_HEIGHT': getattr(config, 'TOAST_LINE_HEIGHT', 32),
+            'TOAST_FONT_SIZE': getattr(config, 'TOAST_FONT_SIZE', 20),
             'MAP_SEARCH_KEYWORDS': getattr(config, 'MAP_SEARCH_KEYWORDS', {}),
 
             # ===== 突变事件配置 =====
@@ -240,13 +371,18 @@ class SettingsWindow(QDialog):
             'MUTATOR_NORMAL_COLOR': getattr(config, 'MUTATOR_NORMAL_COLOR', 'rgb(255, 255, 255)'),
             'MUTATOR_WARNING_COLOR': getattr(config, 'MUTATOR_WARNING_COLOR', 'rgb(255, 0, 0)'),
 
-            'MUTATOR_ALERT_TOP_OFFSET_PERCENT': getattr(config, 'MUTATOR_ALERT_TOP_OFFSET_PERCENT', 0.35),
-            'MUTATOR_ALERT_LINE_HEIGHT_PERCENT': getattr(config, 'MUTATOR_ALERT_LINE_HEIGHT_PERCENT', 0.03),
-            'MUTATOR_ALERT_FONT_SIZE_PERCENT_OF_LINE': getattr(config, 'MUTATOR_ALERT_FONT_SIZE_PERCENT_OF_LINE', 0.6),
-            'MUTATOR_ALERT_HORIZONTAL_INDENT_PERCENT': getattr(config, 'MUTATOR_ALERT_HORIZONTAL_INDENT_PERCENT', 0.01),
+            'MUTATOR_ALERT_OFFSET_X': getattr(config, 'MUTATOR_ALERT_OFFSET_X', 19),
+            'MUTATOR_ALERT_OFFSET_Y': getattr(config, 'MUTATOR_ALERT_OFFSET_Y', 324),
+            'MUTATOR_ALERT_LINE_HEIGHT': getattr(config, 'MUTATOR_ALERT_LINE_HEIGHT', 32),
+            'MUTATOR_ALERT_FONT_SIZE': getattr(config, 'MUTATOR_ALERT_FONT_SIZE', 19),
             
             'MUTATOR_ICON_TRANSPARENCY': getattr(config, 'MUTATOR_ICON_TRANSPARENCY', 0.7),
             
+            # ===== 自定义倒计时配置 =====
+            'COUNTDOWN_OPTIONS': getattr(config, 'COUNTDOWN_OPTIONS', []),
+            'COUNTDOWN_MAX_CONCURRENT': getattr(config, 'COUNTDOWN_MAX_CONCURRENT', 3),
+            'COUNTDOWN_WARNING_THRESHOLD_SECONDS': getattr(config, 'COUNTDOWN_WARNING_THRESHOLD_SECONDS', 10),
+            'COUNTDOWN_DISPLAY_COLOR': getattr(config, 'COUNTDOWN_DISPLAY_COLOR', 'rgb(0, 255, 255)'),
 
             # ===== 声音配置 =====
             'ALERT_SOUND_COOLDOWN': getattr(config, 'ALERT_SOUND_COOLDOWN', 10),
@@ -353,7 +489,8 @@ class SettingsWindow(QDialog):
                 self.logger.error(f"读取地图列表失败: {e}")
         
         return sorted(map_files)
-
+      
+      
     def add_row(self, layout, label_text, key, widget_type, **kwargs):
         val = self.current_config.get(key)
         if val is None and widget_type != 'dict': # dict可能为空字典
@@ -391,6 +528,12 @@ class SettingsWindow(QDialog):
             layout.addRow(QLabel(label_text))
             layout.addRow(widget)
             return
+        elif widget_type == 'countdown_list':
+            widget = CountdownOptionsInput(val if isinstance(val, list) else [])
+            self.widgets[key] = {'widget': widget, 'type': 'countdown_list', 'label': label_text}
+            layout.addRow(QLabel(label_text))
+            layout.addRow(widget)
+            return
         elif widget_type == 'roi':
             widget = self.create_roi_widget(*val)
             self.widgets[key] = {'widget': widget['spins'], 'type': 'roi', 'label': label_text}
@@ -398,7 +541,6 @@ class SettingsWindow(QDialog):
             return
         elif widget_type == 'point':
             x, y = val
-            
             show_btn = (key == 'MAIN_WINDOW_POS')
             widget_data = self.create_point_widget(x, y, show_get_btn=show_btn)
             self.widgets[key] = {'widget': widget_data['spins'], 'type': 'point', 'label': label_text}
@@ -524,14 +666,26 @@ class SettingsWindow(QDialog):
         self.tabs.addTab(tab, "界面显示")
 
     def create_map_settings_tab(self):
-        """地图提醒标签页"""
+        """地图与倒计时标签页"""
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content = QWidget()
         layout = QFormLayout(content)
 
-        # 1. 倒计时与逻辑
-        gb_alert = QGroupBox("倒计时与警告")
+        # 1. 提示框通用布局 (Toast Layout)
+        gb_layout = QGroupBox("提示框通用布局 (地图 & 倒计时) - 像素偏移 (Pixel Offset)")
+        gl_layout = QFormLayout(gb_layout)
+        hint = QLabel("基准点为游戏窗口左上角 (0, 0)")
+        hint.setStyleSheet("color: gray; font-style: italic;")
+        gl_layout.addRow(hint)
+        self.add_row(gl_layout, "距离左侧 (X Offset):", 'TOAST_OFFSET_X', 'spin', max=3000)
+        self.add_row(gl_layout, "距离顶部 (Y Offset):", 'TOAST_OFFSET_Y', 'spin', max=2000)
+        self.add_row(gl_layout, "每行高度 (Line Height):", 'TOAST_LINE_HEIGHT', 'spin', max=200)
+        self.add_row(gl_layout, "字体大小 (Font Size):", 'TOAST_FONT_SIZE', 'spin', max=100)
+        layout.addRow(gb_layout)
+
+        # 2. 地图事件逻辑
+        gb_alert = QGroupBox("地图事件逻辑 (Map Events)")
         gl_alert = QFormLayout(gb_alert)
         self.add_row(gl_alert, "提前提醒时间 (秒):", 'MAP_ALERT_SECONDS', 'spin')
         self.add_row(gl_alert, "警告阈值 (秒):", 'MAP_ALERT_WARNING_THRESHOLD_SECONDS', 'spin')
@@ -539,20 +693,22 @@ class SettingsWindow(QDialog):
         self.add_row(gl_alert, "警告倒计时颜色:", 'MAP_ALERT_WARNING_COLOR', 'color')
         layout.addRow(gb_alert)
 
-        # 2. 布局设置
-        gb_layout = QGroupBox("提示文本布局 (百分比 0.0-1.0)")
-        gl_layout = QFormLayout(gb_layout)
-        self.add_row(gl_layout, "字体大小 (占行高):", 'MAP_ALERT_FONT_SIZE_PERCENT_OF_LINE', 'double', step=0.1, min=0.0, max=1.0)
-        self.add_row(gl_layout, "距离顶部位置:", 'MAP_ALERT_TOP_OFFSET_PERCENT', 'double', step=0.01, min=0.0, max=1.0)
-        self.add_row(gl_layout, "每行高度:", 'MAP_ALERT_LINE_HEIGHT_PERCENT', 'double', step=0.01, min=0.0, max=1.0)
-        self.add_row(gl_layout, "左侧缩进:", 'MAP_ALERT_HORIZONTAL_INDENT_PERCENT', 'double', step=0.01, min=0.0, max=1.0)
-        layout.addRow(gb_layout)
-
         # 3. 搜索关键词
-        self.add_row(layout, "地图搜索关键词映射 (Search Aliases):", 'MAP_SEARCH_KEYWORDS', 'dict')
+        self.add_row(layout, "地图搜索别名映射:", 'MAP_SEARCH_KEYWORDS', 'dict')
+
+        # 4. 自定义倒计时配置
+        gb_cd = QGroupBox("自定义倒计时 (Custom Countdown)")
+        gl_cd = QFormLayout(gb_cd)
+        self.add_row(gl_cd, "最大同时存在数量:", 'COUNTDOWN_MAX_CONCURRENT', 'spin', min=1, max=10)
+        self.add_row(gl_cd, "警告阈值 (秒):", 'COUNTDOWN_WARNING_THRESHOLD_SECONDS', 'spin')
+        self.add_row(gl_cd, "显示颜色:", 'COUNTDOWN_DISPLAY_COLOR', 'color')
+        
+        # 使用新的倒计时列表编辑器
+        self.add_row(gl_cd, "倒计时选项列表:", 'COUNTDOWN_OPTIONS', 'countdown_list')
+        layout.addRow(gb_cd)
 
         scroll.setWidget(content)
-        self.tabs.addTab(scroll, "地图提醒")
+        self.tabs.addTab(scroll, "地图与倒计时")
 
     def create_mutation_settings_tab(self):
         """因子提示配置标签页"""
@@ -573,15 +729,15 @@ class SettingsWindow(QDialog):
         # 3. 提示布局
         gb_layout = QGroupBox("因子图标消息设置 (占窗口大小的比例大小)")
         gl_layout = QFormLayout(gb_layout)
-        self.add_row(gl_layout, "每行高度:", 'MUTATOR_ALERT_LINE_HEIGHT_PERCENT', 'double', min=0.0, max=1.0)
-        self.add_row(gl_layout, "字体大小 (占行高):", 'MUTATOR_ALERT_FONT_SIZE_PERCENT_OF_LINE', 'double', min=0.0, max=1.0)
+        self.add_row(gl_layout, "每行高度 (Line Height):", 'MUTATOR_ALERT_LINE_HEIGHT', 'spin', max=200)
+        self.add_row(gl_layout, "字体大小 (Font Size):", 'MUTATOR_ALERT_FONT_SIZE', 'spin', max=100)
         self.add_row(gl_layout, "图标透明度:", 'MUTATOR_ICON_TRANSPARENCY', 'double')
         label_hint = QLabel("以下填入的是占窗口大小的比例的位移,数字越大越靠近右/下")
         label_hint.setStyleSheet("color: gray; font-size: 10pt; font-style: italic;")
         gl_layout.addRow(label_hint)
         
-        self.add_row(gl_layout, "距离顶部位置:", 'MUTATOR_ALERT_TOP_OFFSET_PERCENT', 'double', min=0.0, max=1.0)
-        self.add_row(gl_layout, "左侧缩进:", 'MUTATOR_ALERT_HORIZONTAL_INDENT_PERCENT', 'double', min=0.0, max=1.0)
+        self.add_row(gl_layout, "距离顶部 (Y Offset):", 'MUTATOR_ALERT_OFFSET_Y', 'spin', max=2000)
+        self.add_row(gl_layout, "距离左侧 (X Offset):", 'MUTATOR_ALERT_OFFSET_X', 'spin', max=3000)
         layout.addRow(gb_layout)
 
         scroll.setWidget(content)
@@ -596,7 +752,8 @@ class SettingsWindow(QDialog):
         self.add_row(layout, "截图快捷键:", 'SCREENSHOT_SHORTCUT', 'hotkey')
         self.add_row(layout, "笔记临时显示:", 'MEMO_TEMP_SHORTCUT', 'hotkey')
         self.add_row(layout, "笔记开关显示:", 'MEMO_TOGGLE_SHORTCUT', 'hotkey')
-
+        self.add_row(layout, "自定义倒计时菜单:", 'COUNTDOWN_SHORTCUT', 'hotkey')
+        
         tab.setLayout(layout)
         self.tabs.addTab(tab, "快捷键")
 
@@ -665,7 +822,9 @@ class SettingsWindow(QDialog):
             elif w_type == 'point':
                 val = list(sb.value() for sb in widget)
             elif w_type == 'dict':
-                val = widget.value() # 调用 DictInput.value()
+                val = widget.value() 
+            elif w_type == 'countdown_list': # [新增]
+                val = widget.value()
             
             new_values[key] = val
         return new_values

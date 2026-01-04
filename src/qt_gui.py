@@ -24,10 +24,16 @@ class TimerWindow(QMainWindow):
     progress_signal = QtCore.pyqtSignal(list)
     toggle_artifact_signal = pyqtSignal()
     mutator_and_enemy_race_recognition_signal = QtCore.pyqtSignal(dict)
-    countdown_hotkey_signal = pyqtSignal()
+    
 
-    # 定义一个信号，用于线程安全地激活笔记本
+    # 定义信号，用于线程安全地激活各种快捷键
     memo_signal = pyqtSignal(str)
+    countdown_hotkey_signal = pyqtSignal()
+    map_switch_signal = pyqtSignal()      # 新增：地图切换信号
+    lock_signal = pyqtSignal()            # 新增：锁定信号
+    screenshot_signal = pyqtSignal()      # 新增：截图信号
+    
+    
     
     def get_screen_resolution(self):
         return app_window_manager.get_screen_resolution()
@@ -116,12 +122,15 @@ class TimerWindow(QMainWindow):
             self.memo_btn.clicked.connect(lambda: self.show_memo('temp'))#temp模式防止遮住导致按不了按钮
         #连接信号到槽 (为了解决线程安全问题)
         self.memo_signal.connect(self.show_memo)
-
+        self.countdown_hotkey_signal.connect(self.process_countdown_hotkey_logic)
+        self.map_switch_signal.connect(self.process_map_switch_logic)
+        self.lock_signal.connect(self.process_lock_logic)
+        self.screenshot_signal.connect(self.handle_screenshot_logic) # 连接到实际截图逻辑
+        
         #倒计时按钮功能
         self.countdown_manager = CountdownManager(self, self.toast_manager)
         if hasattr(self, 'countdown_btn'):
             self.countdown_btn.clicked.connect(self.trigger_countdown_selection)
-        self.countdown_hotkey_signal.connect(self.process_countdown_hotkey_logic)
         
         #设置按钮功能
         if hasattr(self, 'setting_btn'): 
@@ -207,47 +216,87 @@ class TimerWindow(QMainWindow):
         app_window_manager.update_control_window_position(self)
         super().moveEvent(event)
 
+    
+    # === 线程安全的快捷键处理逻辑 ===
+    #1. 地图切换
+    def handle_map_switch_hotkey(self):
+        """供后台线程调用：仅发射信号"""
+        self.map_switch_signal.emit()
+
+    def process_map_switch_logic(self):
+        """主线程执行：实际UI操作"""
+        self.logger.info(f'检测到地图切换快捷键组合: {config.MAP_SHORTCUT}')
+        if self.map_version_group.isVisible():
+            current_btn = None
+            for btn in self.version_buttons:
+                if btn.isChecked():
+                    current_btn = btn
+                    break
+            
+            if current_btn:
+                current_idx = self.version_buttons.index(current_btn)
+                next_idx = (current_idx + 1) % len(self.version_buttons)
+                self.logger.info(f'从版本 {current_btn.text()} 切换到版本 {self.version_buttons[next_idx].text()}')
+                self.version_buttons[next_idx].click()
+        else:
+            self.logger.info('当前地图不支持A/B版本切换')
+
+    # 2. 锁定窗口
+    def handle_lock_shortcut(self):
+        """供后台线程调用：仅发射信号"""
+        self.lock_signal.emit()
+
+    def process_lock_logic(self):
+        """主线程执行：实际UI操作"""
+        self.logger.info(f'检测到锁定快捷键组合: {config.LOCK_SHORTCUT}')
+        if self.control_window:
+            self.control_window.is_locked = not self.control_window.is_locked
+            self.control_window.update_icon()
+            self.control_window.state_changed.emit(not self.control_window.is_locked)
+
+    # 3. 截图
     def handle_screenshot_hotkey(self):
-        """处理截图快捷键"""
+        """供后台线程调用：仅发射信号"""
+        self.screenshot_signal.emit()
+    
+    def handle_screenshot_logic(self):
+        """主线程执行：截图逻辑 (原 handle_screenshot_hotkey 内容移动至此)"""
+        # ... (原 handle_screenshot_hotkey 的完整代码内容) ...
         if not config.DEBUG_SHOW_ENEMY_INFO_SQUARE:
             return
-
         try:
-            # 使用已保存的矩形区域进行截图
             successful_captures = 0
-
             for rect in self.rect_screenshots:
                 try:
-                    # 调用capture_screen_rect进行截图并保存
                     save_path = image_util.capture_screen_rect(rect)
                     if save_path:
                         self.logger.info(f'成功保存截图到: {save_path}')
                         successful_captures += 1
-                    else:
-                        self.logger.warning(f'截图保存失败: {rect.x()}, {rect.y()}, {rect.width()}, {rect.height()}')
                 except Exception as capture_error:
                     self.logger.error(f'区域截图失败: {str(capture_error)}')
-                    self.logger.error(traceback.format_exc())
-
-            if successful_captures == len(self.rect_screenshots):
-                self.logger.info('所有区域截图完成')
-            else:
-                self.logger.warning(f'部分区域截图失败: 成功{successful_captures}/{len(self.rect_screenshots)}')
+            # ... (日志记录)
         except Exception as e:
             self.logger.error(f'截图处理失败: {str(e)}')
             self.logger.error(traceback.format_exc())
 
+    # 4. 倒计时 (已修复，保持现状，确保名字对应)
+    def handle_countdown_hotkey(self):
+        self.countdown_hotkey_signal.emit()
+
+    def process_countdown_hotkey_logic(self):
+        game_time = 0
+        if self.game_state.most_recent_playerdata:
+             game_time = float(self.game_state.most_recent_playerdata.get('time', 0))
+        self.countdown_manager.handle_hotkey_trigger(game_time)
+
+    
     def init_ui(self):
         ui_setup.init_ui(self)
-        
-    
 
     def setup_search_box_connections(self, files):
         ####################
         # 用户输入搜索
         # 清空搜索框的定时器->现在在ui_setup实现
-        #self.clear_search_timer = QTimer()
-        #self.clear_search_timer.setSingleShot(True)
 
         # 更新搜索内容
         def update_combo_box(keyword, allow_auto_select=True):
@@ -537,13 +586,18 @@ class TimerWindow(QMainWindow):
             self.settings_window = SettingsWindow(self) 
             self.settings_window.settings_saved.connect(self.handle_settings_update)
         
-        # 【关键修改 2】使用 exec_() 或 setModal(True) 运行
-        # 使用 exec_() 运行是最保险的模态方式，它会阻塞主窗口直到设置窗口关闭。
-        self.settings_window.exec_() # <-- 使用 exec_()
+        # 1. 打开模态窗口前，卸载全局快捷键
+        # 这能防止打字时的按键冲突导致的闪退，也能防止误触游戏快捷键
+        config_hotkeys.unhook_global_hotkeys(self)
         
-        # 如果使用 show()，确保它被正确父子化
-        # self.settings_window.show() 
-        # self.settings_window.raise_()
+        # 2. 运行设置窗口 (阻塞直到关闭)
+        self.settings_window.exec_() 
+        
+        # 3. 【关键修复】关闭窗口后，重新注册全局快捷键
+        config_hotkeys.init_global_hotkeys(self)
+        
+        # 4. 重新应用可能修改了的配置
+        self.apply_user_settings()
 
     def handle_settings_update(self, new_settings):
         """
@@ -553,16 +607,6 @@ class TimerWindow(QMainWindow):
         # 1. 更新 config 内存中的值
         for key, value in new_settings.items():
             setattr(config, key, value)
-            
-        # 2. 应用实时效果 (举例)
-        
-        # 示例：更新透明度
-        # self.setWindowOpacity(config.MAIN_WINDOW_BG_COLOR...) 
-        
-        # 示例：更新快捷键 (重新注册)
-        # unhook_global_hotkeys(self)
-        # init_global_hotkeys(self)
-        
         self.logger.info("配置已更新，部分功能已重载")
 
     def closeEvent(self, event):

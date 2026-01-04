@@ -31,18 +31,10 @@ TABLE_NEXT_FONT_BG_COLOR = (0, 255, 128, 30)  # 表格下一个事件背景颜�
 # === 提示信息显示位置配置 (像素偏移) ===
 # 基准点为游戏窗口(SC2)的左上角 (0, 0)
 # 向右为 X 正方向，向下为 Y 正方向
-
-# 提示框距离左侧边框的像素距离
-TOAST_OFFSET_X = 19 #0.01*1920
-
-# 第一条提示距离顶部边框的像素距离
-TOAST_OFFSET_Y = 540 #0.5*1080
-
-# 提示框行高 (像素，如果设为 0 则自动根据窗口高度计算，建议设置固定值以配合像素定位)
-TOAST_LINE_HEIGHT = 32
-
-# 提示文字大小 (像素)
-TOAST_FONT_SIZE = 20
+TOAST_OFFSET_X = 19 #提示框距离左侧边框的像素距离 0.01*1920
+TOAST_OFFSET_Y = 540 # 第一条提示距离顶部边框的像素距离 0.5*1080
+TOAST_LINE_HEIGHT = 32 # 提示框行高 (像素，如果设为 0 则自动根据窗口高度计算，建议设置固定值以配合像素定位)
+TOAST_FONT_SIZE = 20 # 提示文字大小 (像素)
 
 # 地图提醒配置
 MAP_ALERT_SECONDS = 30  # 提前提醒时间（秒）/ Time before alert (in seconds)
@@ -50,31 +42,15 @@ MAP_ALERT_WARNING_THRESHOLD_SECONDS = 10  # 倒计时转为警告颜色的阈值
 MAP_ALERT_NORMAL_COLOR = 'rgb(239, 255, 238)'  # 倒计时提醒的正常颜色
 MAP_ALERT_WARNING_COLOR = 'rgb(255, 0, 0)'  # 倒计时提醒的警告颜色
 
-
-MAP_ALERT_TOP_OFFSET_PERCENT = 0.60  # 提醒区域距离窗口顶部的百分比
-MAP_ALERT_LINE_HEIGHT_PERCENT = 0.03  # 每行提醒占窗口高度的百分比
-MAP_ALERT_FONT_SIZE_PERCENT_OF_LINE = 0.6  # 字体大小占每行高度的百分比
-MAP_ALERT_HORIZONTAL_INDENT_PERCENT = 0.01  # 距离游戏边框左侧的水平缩进
-
 # 突变因子提醒配置
 MUTATOR_ALERT_SECONDS = 49  # 突变因子提前提醒时间（秒）/ Mutation factor alert time (in seconds)，我还没做多重提醒，最长间隔就是49秒
 MUTATOR_WARNING_THRESHOLD_SECONDS = 10  # 倒计时转为警告颜色的阈值（秒）
 MUTATOR_NORMAL_COLOR = 'rgb(255, 255, 255)'  # 倒计时提醒的正常颜色
 MUTATOR_WARNING_COLOR = 'rgb(255, 0, 0)'  # 倒计时提醒的警告颜色
-# 提醒大小(基于“StarCraft II”窗口的尺寸)
-MUTATOR_ALERT_TOP_OFFSET_PERCENT = 0.35  # 提醒区域距离窗口顶部的百分比
-MUTATOR_ALERT_LINE_HEIGHT_PERCENT = 0.03  # 每行提醒占窗口高度的百分比
-MUTATOR_ALERT_FONT_SIZE_PERCENT_OF_LINE = 0.6  # 字体大小占每行高度的百分比
-MUTATOR_ALERT_HORIZONTAL_INDENT_PERCENT = 0.01  # 距离游戏边框左侧的水平缩进
-
-# 提示列表距离顶部边框的像素距离 (原 0.35 -> 324px)
-MUTATOR_ALERT_OFFSET_Y = 324
-# 提示框距离左侧边框的像素距离 (原 0.01 -> 19px)
-MUTATOR_ALERT_OFFSET_X = 19
-# 提示框单行高度 (原 0.03 -> 32px)
-MUTATOR_ALERT_LINE_HEIGHT = 32
-# 提示文字大小 (原 0.6 * LineHeight -> 19px)
-MUTATOR_ALERT_FONT_SIZE = 19
+MUTATOR_ALERT_OFFSET_Y = 324 # 提示列表距离顶部边框的像素距离 (原 0.35 -> 324px)
+MUTATOR_ALERT_OFFSET_X = 19 # 提示框距离左侧边框的像素距离 (原 0.01 -> 19px)
+MUTATOR_ALERT_LINE_HEIGHT = 32 # 提示框单行高度 (原 0.03 -> 32px)
+MUTATOR_ALERT_FONT_SIZE = 19 # 提示文字大小 (原 0.6 * LineHeight -> 19px)
 
 # 提醒配置：
 ALERT_SOUND_COOLDOWN = 10 # 同名警告最短间隔（秒），低于间隔的音频不播放
@@ -119,8 +95,8 @@ MEMO_TOGGLE_SHORTCUT = 'backslash' # 持续开关快捷键
 # 格式: {'time': 秒数, 'label': '显示名称', 'sound': '音频文件名'}
 COUNTDOWN_OPTIONS = [
     {'time': 120, 'label': '神器/二三哥', 'sound': 'alert.wav'},
-    {'time': 100,  'label': '分矿',   'sound': 'alert.wav'},
-    {'time': 60, 'label': 'bb',   'sound': 'alert.wav'},
+    {'time': 100,  'label': '基地',   'sound': 'alert.wav'},
+    {'time': 60, 'label': 'bb/孵化场',   'sound': 'alert.wav'},
     {'time': 90, 'label': '大哥巢', 'sound': 'alert.wav'},
 ]
 

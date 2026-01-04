@@ -200,20 +200,25 @@ class CountdownManager(QWidget):
             
             # 3. 检查是否需要播放声音
             sound_to_play = None
-            if remaining <= config.COUNTDOWN_WARNING_THRESHOLD_SECONDS:
+            
+            warn_threshold = getattr(config, 'COUNTDOWN_WARNING_THRESHOLD_SECONDS', 10)
+            if remaining <= warn_threshold:
                 if not entry['warned']:
                     sound_to_play = entry['sound']
                     entry['warned'] = True
             
             # 4. 调用 ToastManager 显示
             # ToastManager 会自动处理 event_id 对应的堆叠位置
+            custom_color = getattr(config, 'COUNTDOWN_DISPLAY_COLOR', 'rgb(0, 255, 255)')
+
             if self.toast_manager:
                 self.toast_manager.show_map_countdown_alert(
                     event_id, 
                     remaining, 
                     message, 
                     game_screen, 
-                    sound_to_play
+                    sound_filename=sound_to_play,
+                    default_color=custom_color # <--- 传入自定义颜色
                 )
 
     def handle_hotkey_trigger(self, current_game_seconds):

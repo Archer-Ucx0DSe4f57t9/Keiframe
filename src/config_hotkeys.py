@@ -14,25 +14,61 @@ def init_global_hotkeys(window):
         memo_toggle_key = getattr(config, 'MEMO_TOGGLE_SHORTCUT', 'backslash').replace(' ', '').lower()
         countdown_key = getattr(config, 'COUNTDOWN_SHORTCUT', 'F8').replace(' ', '').lower()
         
-        
-        # 注册全局快捷键，使用 lambda 避免直接绑定实例方法
-        keyboard.add_hotkey(map_shortcut, lambda: handle_map_switch_hotkey(window))
-        keyboard.add_hotkey(lock_shortcut, lambda: handle_lock_shortcut(window))
-        # 截图逻辑保留在主类，这里直接调用
-        keyboard.add_hotkey(screenshot_shortcut, lambda: window.handle_screenshot_hotkey()) 
-        
-        #注册显示笔记的快捷键
-        keyboard.add_hotkey(memo_temp_key, lambda: handle_memo_hotkey(window, 'temp'))
-        keyboard.add_hotkey(memo_toggle_key, lambda: handle_memo_hotkey(window, 'toggle'))
-        #注册倒计时功能快捷键
-        keyboard.add_hotkey(countdown_key, lambda: window.handle_countdown_hotkey())
-        
-        window.logger.info(
-            f'成功注册全局快捷键: {config.MAP_SHORTCUT}, {config.LOCK_SHORTCUT}, {config.SCREENSHOT_SHORTCUT}')
+        def safe_emit(sig, *args):
+            try:
+                if hasattr(window, sig):
+                    s = getattr(window, sig)
+                    # 如果是可调用 (pyqtSignal 在对象上是 bound signal callable)
+                    try:
+                        s.emit(*args)
+                    except Exception as e:
+                        # 某些 PyQt 绑定可能不是直接 emit callable，这里尽量保护
+                        try:
+                            # 尝试通过 Qt 调用回主线程（更保险）
+                            from PyQt5 import QtCore
+                            QtCore.QMetaObject.invokeMethod(window, s.__name__, QtCore.Qt.QueuedConnection)
+                        except Exception:
+                            # 最后回退到直接调用（不建议）
+                            pass
+            except Exception:
+                # 记录但不抛出
+                try:
+                    window.logger.error("hotkey safe_emit failed: " + traceback.format_exc())
+                except Exception:
+                    pass
+
+        if map_shortcut:
+            keyboard.add_hotkey(map_shortcut, lambda: safe_emit('map_switch_signal'))
+
+        if lock_shortcut:
+            keyboard.add_hotkey(lock_shortcut, lambda: safe_emit('lock_signal'))
+
+        if screenshot_shortcut:
+            keyboard.add_hotkey(screenshot_shortcut, lambda: safe_emit('screenshot_signal'))
+
+        if memo_temp_key:
+            # 需要传参数的，用 memo_signal 发射参数
+            keyboard.add_hotkey(memo_temp_key, lambda: safe_emit('memo_signal', 'temp'))
+
+        if memo_toggle_key:
+            keyboard.add_hotkey(memo_toggle_key, lambda: safe_emit('memo_signal', 'toggle'))
+
+        if countdown_key:
+            keyboard.add_hotkey(countdown_key, lambda: safe_emit('countdown_hotkey_signal'))
+
+        # 记录成功
+        try:
+            window.logger.info(
+                f'成功注册全局快捷键: {map_shortcut}, {lock_shortcut}, {screenshot_shortcut}, {memo_temp_key}, {memo_toggle_key},{countdown_key}')
+        except Exception:
+            pass
 
     except Exception as e:
-        window.logger.error(f'注册全局快捷键失败: {str(e)}')
-        window.logger.error(traceback.format_exc())
+        try:
+            window.logger.error(f'注册全局快捷键失败: {str(e)}')
+            window.logger.error(traceback.format_exc())
+        except Exception:
+            print("注册全局快捷键失败:", e)
         
 def handle_lock_shortcut(window):
     """处理锁定快捷键 (原 handle_lock_shortcut)"""
