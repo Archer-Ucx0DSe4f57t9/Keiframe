@@ -2,9 +2,9 @@
 import time
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
-import config
-from logging_util import get_logger
-from window_utils import get_sc2_window_geometry
+from src import config
+from src.logging_util import get_logger
+from src.window_utils import get_sc2_window_geometry
 
 class CountdownSelectionWindow(QWidget):
     """倒计时选择的小弹窗"""

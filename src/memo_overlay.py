@@ -6,9 +6,9 @@ from PyQt5.QtGui import QPixmap, QColor
 import win32gui
 import win32con
 
-import config
-import window_utils
-from logging_util import get_logger
+from src import config, window_utils
+from src.fileutil import get_resources_dir
+from src.logging_util import get_logger
 
 logger = get_logger('memo_overlay')
 
@@ -77,8 +77,9 @@ class MemoOverlay(QWidget):
             return
 
         # 2. 获取图片路径
-        memo_image_path = os.path.join(os.getcwd(), 'memo', f'{map_name}.png')
-        bg_image_path = os.path.join(os.getcwd(), 'memo', 'background.png')
+        memo_dir = get_resources_dir('memo')
+        memo_image_path = os.path.join(memo_dir, f'{map_name}.png')
+        bg_image_path = os.path.join(memo_dir, 'background.png')
         
         if not os.path.exists(memo_image_path):
             logger.warning(f"Memo图片不存在: {memo_image_path}")

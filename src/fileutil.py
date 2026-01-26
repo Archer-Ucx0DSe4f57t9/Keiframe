@@ -1,38 +1,36 @@
 import os
 import sys
-from logging_util import get_logger, setup_logger
+from src.logging_util import get_logger, setup_logger
 logger = get_logger(__name__)
+
+def get_project_root():
+    """
+    获取项目根目录：
+    - 源码运行：main.py 的上一级目录
+    - exe 运行：exe 文件所在目录
+    """
+    if getattr(sys, 'frozen', False):
+        # PyInstaller 打包后的 exe
+        return os.path.dirname(sys.executable)
+    else:
+        # 源码运行，假设 main.py 在项目根目录下一级
+        main_path = os.path.abspath(sys.modules['__main__'].__file__)
+        return os.path.dirname(os.path.dirname(main_path))
+
 
 def get_resources_dir(*subdirs):
     """
-    获取资源目录的路径，支持多级子目录
-    :param subdirs: 子目录路径，可以传入多个参数
-    :return: 完整的目录路径
+    获取项目根目录下的 resources 目录（支持子目录）
     """
-    # 获取当前工作目录
-    current_dir = os.getcwd()
-    # 将当前工作目录与子目录路径拼接
-    resource_dir = os.path.join(current_dir, *subdirs)
-    
-    # 如果当前工作目录没有找到资源目录，则尝试在程序目录查找
-    if not os.path.exists(resource_dir):
-        logger.info(f'当前工作目录下未找到目录，尝试在程序目录查找')
-        program_dir = os.path.dirname(os.path.dirname(__file__))
-        resource_dir = os.path.join(program_dir, *subdirs)
-    
-    # 如果在程序目录也没有找到资源目录，尝试在 exe 目录下查找
-    if not os.path.exists(resource_dir):
-        logger.info(f'程序目录下也未找到目录，尝试在打包后的 exe 所在目录查找')
-        if getattr(sys, 'frozen', False):  # 判断是否是打包后的 exe 文件
-            program_dir = os.path.dirname(sys.executable)
-            resource_dir = os.path.join(program_dir, *subdirs)
-    
-    if not os.path.exists(resource_dir):
-        logger.error(f'资源目录不存在: {resource_dir}')
+    project_root = get_project_root()
+    resources_dir = os.path.join(project_root, 'resources', *subdirs)
+
+    if not os.path.exists(resources_dir):
+        logger.error(f'资源目录不存在: {resources_dir}')
         return None
-    
-    logger.info(f'使用资源目录: {resource_dir}')
-    return resource_dir
+
+    logger.info(f'使用资源目录: {resources_dir}')
+    return resources_dir
 
 def list_files(directory):
     """

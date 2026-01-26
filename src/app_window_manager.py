@@ -5,7 +5,7 @@ from ctypes import wintypes
 import win32con # 需要在环境中安装 pypiwin32 库
 from PyQt5.QtCore import Qt, QRect, QPoint
 from PyQt5.QtWidgets import QApplication
-import config
+from src import config
 
 
 

@@ -4,9 +4,10 @@ from PyQt5.QtWidgets import QSystemTrayIcon, QMenu, QAction
 from PyQt5.QtGui import QIcon, QCursor
 from PyQt5.QtCore import QPoint
 from PyQt5.QtWidgets import QApplication
-from fileutil import get_resources_dir
-import config
-from logging_util import get_logger
+
+from src import config
+from src.fileutil import get_resources_dir
+from src.logging_util import get_logger
 
 class TrayManager:
     def __init__(self, parent=None):
@@ -24,18 +25,8 @@ class TrayManager:
             self.logger.info('已删除旧的托盘图标')
 
         self.tray_icon = QSystemTrayIcon(self.parent)
-        
-        # 修改图标路径获取方式
-        if getattr(sys, 'frozen', False):
-            # 如果是打包后的exe
-            base_path = os.path.dirname(sys.executable)
-            self.logger.info(f'准备修改tray，检测到exe环境：{base_path}')
-        else:
-            # 如果是开发环境
-            base_path = os.path.dirname(os.path.dirname(__file__))
-            self.logger.info(f'准备修改tray，检测到开发环境：{base_path}')
-            
-        icon_path = os.path.join(base_path, 'ico', 'fav.ico')
+
+        icon_path = os.path.join(get_resources_dir('ico'), 'fav.ico')
         self.logger.info(f'加载托盘图标: {icon_path}')
         
         if not os.path.exists(icon_path):
@@ -55,7 +46,7 @@ class TrayManager:
         
         # 添加语言设置菜单
         language_menu = QMenu(self.parent.get_text("language_menu"), self.parent)
-        maps_dir = get_resources_dir('resources', 'maps')
+        maps_dir = get_resources_dir('maps')
         for lang_dir in os.listdir(maps_dir):
             if os.path.isdir(os.path.join(maps_dir, lang_dir)) and lang_dir not in ['.', '..']:
                 language_action = QAction(lang_dir, self.parent)

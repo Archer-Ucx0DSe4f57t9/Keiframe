@@ -4,12 +4,12 @@ import re
 import traceback
 import json
 import config
-from fileutil import get_resources_dir, list_files
+from src.fileutil import get_resources_dir, list_files, get_project_root
 
 def get_text(window, key):
     """获取多语言文本 (原 TimerWindow.get_text)"""
     try:
-        config_path = get_resources_dir('resources', 'words.conf')
+        config_path = get_resources_dir('words.conf')
         with open(config_path, 'r', encoding='utf-8') as f:
             content = json.load(f)
             texts = content['qt_gui']
@@ -23,14 +23,7 @@ def get_text(window, key):
 def on_language_changed(window, lang):
     """处理语言切换事件 (原 TimerWindow.on_language_changed)"""
     # 1. 更新 config.py 中的语言配置
-    if getattr(sys, 'frozen', False):  # 是否为打包的 exe
-        base_dir = os.path.dirname(sys.executable)
-        config_file = os.path.join(base_dir, 'config.py')
-    else:
-        # 假设 config.py 位于项目根目录下的 'src' 目录或上一级目录的 'src'
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        config_file = os.path.join(base_dir, 'src', 'config.py')
-
+    config_file = os.path.join(get_project_root(), 'src', 'config.py')
     window.logger.info(f"load config: {config_file}")
 
     try:
@@ -48,7 +41,7 @@ def on_language_changed(window, lang):
         config.current_language = lang
 
         # 4. 重新加载地图列表
-        resources_dir = get_resources_dir('resources', 'maps', lang)
+        resources_dir = get_resources_dir('maps', lang)
         all_files = list_files(resources_dir) if resources_dir else []
         files = []
         for file_name in all_files:

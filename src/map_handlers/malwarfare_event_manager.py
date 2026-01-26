@@ -1,10 +1,8 @@
 import traceback
 from PyQt5.QtGui import QBrush, QColor
 from PyQt5.QtCore import Qt
-import sys, os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import config
-import time # 用于调试
+import time, sys, os
+from src import config
 
 class MapwarfareEventManager:
     def __init__(self, table_area, toast_manager, logger):

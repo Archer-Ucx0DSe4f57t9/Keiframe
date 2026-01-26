@@ -3,11 +3,11 @@ import traceback
 from PyQt5.QtWidgets import QTableWidgetItem, QPushButton
 from PyQt5.QtGui import QBrush, QColor
 from PyQt5.QtCore import Qt
-from fileutil import get_resources_dir, list_files
-from map_handlers.map_event_manager import MapEventManager
-from map_handlers.malwarfare_event_manager import MapwarfareEventManager
-from map_handlers.malwarfare_map_handler import MalwarfareMapHandler # 确保导入正确
-import config,game_monitor
+from src.fileutil import get_resources_dir, list_files
+from src.map_handlers.map_event_manager import MapEventManager
+from src.map_handlers.malwarfare_event_manager import MapwarfareEventManager
+from src.map_handlers.malwarfare_map_handler import MalwarfareMapHandler # 确保导入正确
+from src import config, game_monitor
 
 def handle_version_selection(window):
     """处理地图版本按钮选择事件 (原 TimerWindow.on_version_selected)"""
@@ -148,7 +148,7 @@ def handle_map_selection(window, map_name):
     # 加载地图文件内容并填充表格 (原有的文件加载和表格填充逻辑)
     try:
         map_file_name_with_ext = map_name + ".csv" # 构造带扩展名的文件名
-        map_file_path = get_resources_dir('resources', 'maps', config.current_language, map_file_name_with_ext)
+        map_file_path = get_resources_dir('maps', config.current_language, map_file_name_with_ext)
         window.logger.info(f'尝试加载地图文件: {map_file_path}')
 
         if os.path.exists(map_file_path):

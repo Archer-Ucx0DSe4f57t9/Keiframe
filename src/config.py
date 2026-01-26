@@ -3,6 +3,7 @@
 import os
 import json
 import sys
+import cv2
 
 # current region
 current_region = 'kr'  # 当前地区 / Current region
@@ -190,6 +191,88 @@ MALWARFARE_TEMPLATE_DIR = 'char_templates_1920w' # 建议与基准分辨率匹�
 MALWARFARE_HERO_OFFSET = 97
 MALWARFARE_ZWEIHAKA_OFFSET = 181
 MALWARFARE_REPLAY_OFFSET = 49
+
+#############################
+# 净网行动识别用
+#############################
+
+# === 基础路径配置 ===
+TEMPLATE_BASE_DIR = 'templates'
+
+# === 算法参数配置 (Master Config 2026) ===
+# 结构: OCR_CONFIG[lang][color_type]
+OCR_CONFIG = {
+    'zh': {
+        # 黄色中文 (HSV方案 - 宽范围)
+        'yellow': {
+            'method': 'hsv',
+            'h_min': 21, 'h_max': 35,
+            's_min': 50, 'v_min': 50,
+            'thresh': 110,
+            'morph_op': None  # HSV模式下通常不需要闭运算，如有需要可设为 (cv2.MORPH_CLOSE, 1)
+        },
+        # 绿色中文 (G-R 方案 - 降阈值防断笔)
+        'green': {
+            'method': 'green_minus_red',
+            'tophat': 3,
+            'thresh': 30,
+            'morph_op': (cv2.MORPH_ERODE, 2), # (操作类型, 次数)
+            'normalize': True
+        },
+        # 蓝色中文 (蓝通道 - 强去纹理)
+        'blue': {
+            'method': 'blue_channel',
+            'tophat': 4,
+            'thresh': 29,
+            'morph_op': (cv2.MORPH_ERODE, 2)
+        },
+        # 橙色中文 (通用 R-B)
+        'orange': {
+            'method': 'red_minus_blue',
+            'tophat': 3,
+            'thresh': 41,
+            'morph_op': (cv2.MORPH_ERODE, 1)
+        }
+    },
+    'en': {
+        # 黄色英文 (HSV方案 - 窄范围解决6/8粘连)
+        'yellow': {
+            'method': 'hsv',
+            'h_min': 28, 'h_max': 35,
+            's_min': 50, 'v_min': 50,
+            'thresh': 110,
+            'morph_op': None
+        },
+        # 绿色英文 (G-R 方案 - 高阈值去光晕)
+        'green': {
+            'method': 'green_minus_red',
+            'tophat': 0,
+            'thresh': 60,
+            'morph_op': (cv2.MORPH_OPEN, 1), # 开运算
+            'normalize': False
+        },
+        # 蓝色英文 (蓝通道 - 锐利)
+        'blue': {
+            'method': 'blue_channel',
+            'tophat': 4,
+            'thresh': 45,
+            'morph_op': (cv2.MORPH_ERODE, 2)
+        },
+        # 橙色英文 (同中文通用)
+        'orange': {
+            'method': 'red_minus_blue',
+            'tophat': 3,
+            'thresh': 41,
+            'morph_op': (cv2.MORPH_ERODE, 1)
+        }
+    }
+}
+
+# === 目录名映射 ===
+# 根据当前的 self.lang 和 target_color 找到对应的文件夹名
+# 例如: ('zh', 'blue') -> 'zh_blue'
+def get_template_folder(lang, color):
+    return f"{lang}_{color}"
 
 #############################
 # 配置用参数，如无必要请勿修改

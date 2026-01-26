@@ -1,7 +1,7 @@
 import sys, os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
-from logging_util import get_logger
 import json
+from src.logging_util import get_logger
+
 
 logger = get_logger(__name__)
 
@@ -14,7 +14,7 @@ class MapProcessor:
         """加载地图模板数据"""
         try:
             from fileutil import get_resources_dir
-            resources_dir = get_resources_dir('resources', 'maps', 'zh')
+            resources_dir = get_resources_dir('maps', 'zh')
             if not resources_dir:
                 return
 

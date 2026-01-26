@@ -1,7 +1,7 @@
 import keyboard
 import traceback
-import config
 from PyQt5.QtCore import Qt
+from src import config
 
 def init_global_hotkeys(window):
     """初始化全局快捷键，并绑定到 TimerWindow 实例的方法 (原 init_global_hotkeys)"""

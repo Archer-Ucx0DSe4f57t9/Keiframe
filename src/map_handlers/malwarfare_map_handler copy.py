@@ -9,10 +9,8 @@ import sys
 import os
 
 # 自带模块
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-BASE_DIR = os.path.dirname(__file__)
-from window_utils import get_sc2_window_geometry, is_game_active
-from logging_util import get_logger
+from src.window_utils import get_sc2_window_geometry, is_game_active
+from src.logging_util import get_logger
 import config
 
 

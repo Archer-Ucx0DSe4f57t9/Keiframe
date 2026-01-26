@@ -72,7 +72,7 @@
     "MAP_SHORTCUT": "ctrl + z",
     "LOCK_SHORTCUT": "ctrl + x",
     "SCREENSHOT_SHORTCUT": "ctrl + shift + -",
-    "MEMO_TEMP_SHORTCUT": "-",
+    "MEMO_TEMP_SHORTCUT": "ctrl + b",
     "MEMO_TOGGLE_SHORTCUT": "backslash",
     "COUNTDOWN_SHORTCUT": "`",
     "MUTATOR_AND_ENEMY_RACE_RECOGNIZER_ROI": [

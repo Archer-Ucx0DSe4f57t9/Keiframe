@@ -4,6 +4,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtCore import pyqtSignal
 import os
 import sys
+from src.fileutil import get_resources_dir
 
 class ControlWindow(QMainWindow):
     # 创建状态改变信号
@@ -27,15 +28,7 @@ class ControlWindow(QMainWindow):
         self.icon_label = QLabel(self)
         self.icon_label.setGeometry(5, 12, 20, 20)
 
-        # 修改图标路径获取方式
-        if getattr(sys, 'frozen', False):
-            # 如果是打包后的exe
-            base_path = os.path.dirname(sys.executable)
-        else:
-            # 如果是开发环境
-            base_path = os.path.dirname(os.path.dirname(__file__))
-
-        icon_dir = os.path.join(base_path, 'ico')
+        icon_dir = get_resources_dir('ico')
         self.lock_icon = QIcon(os.path.join(icon_dir, 'lock.svg'))
         self.unlock_icon = QIcon(os.path.join(icon_dir, 'unlock.svg'))
         

@@ -1,7 +1,5 @@
-from logging import Logger
 import os
-import fileutil
-import logging_util
+from src import fileutil, logging_util
 
 logger=logging_util.get_logger(__name__)
 
@@ -14,7 +12,7 @@ class TroopLoader:
         self.init_troop_loader()
 
     def init_troop_loader(self):
-        troops_dir = fileutil.get_resources_dir('resources', 'troops')
+        troops_dir = fileutil.get_resources_dir('troops')
         if not troops_dir:
             logger.error('无法找到troops目录')
             return

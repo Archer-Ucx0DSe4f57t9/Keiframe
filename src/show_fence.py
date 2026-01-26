@@ -1,10 +1,9 @@
-import image_util
-import config
 import importlib
 import threading
 import time
 import io
-from logging_util import get_logger
+from src import config, image_util
+from src.logging_util import get_logger
 logger = get_logger(__name__)
 
 def show_square():

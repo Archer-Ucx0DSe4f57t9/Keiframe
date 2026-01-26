@@ -7,7 +7,8 @@ from typing import List, Optional
 
 from PyQt5.QtCore import QObject, QUrl
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
-import config
+from src import config
+from src.fileutil import get_resources_dir
 
 logger = logging.getLogger(__name__)
 
@@ -35,22 +36,14 @@ class SoundManager(QObject):
           3) 当前工作目录的 Sounds
         """
         paths = []
-        # 1) 上级目录的 Sounds
+        # 1) 上级目录的 Sounds（相对于本模块文件）
         try:
-            base = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'resources', 'sounds'))
-            paths.append(base)
-        except Exception:
-            pass
-
-        # 2) 如果项目有 fileutil.get_resources_dir，尝试使用
-        try:
-            from fileutil import get_resources_dir
             paths.append(os.path.join(get_resources_dir(), 'sounds'))
         except Exception:
             pass
 
         # 3) 当前工作目录的 Sounds
-        paths.append(os.path.join(os.getcwd(), 'sounds'))
+        paths.append(get_resources_dir('sounds'))
 
         # 还可以按需在此处添加更多路径
         return paths

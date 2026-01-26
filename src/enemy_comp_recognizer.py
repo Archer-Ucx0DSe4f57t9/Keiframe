@@ -11,10 +11,10 @@ import easyocr
 import traceback
 
 # 假设这些函数/模块在项目中可用
-from fileutil import get_resources_dir
-from window_utils import get_sc2_window_geometry, is_game_active 
-import config 
-from logging_util import get_logger
+from src.fileutil import get_resources_dir
+from src.window_utils import get_sc2_window_geometry, is_game_active 
+from src import config 
+from src.logging_util import get_logger
 
 logger = get_logger(__name__)
 
@@ -31,14 +31,14 @@ def load_enemy_comps():
     
     # 假设 'resources' 位于项目根目录，且 get_resources_dir 可正确处理
     try:
-        resources_dir = get_resources_dir('resources', 'enemy_comps')
-        if not resources_dir or not os.path.exists(resources_dir):
-            logger.error(f"资源目录不存在: {resources_dir}")
+        enemy_comps_dir = get_resources_dir('enemy_comps')
+        if not enemy_comps_dir or not os.path.exists(enemy_comps_dir):
+            logger.error(f"资源目录不存在: {enemy_comps_dir}")
             return comp_configs
         
-        for filename in os.listdir(resources_dir):
+        for filename in os.listdir(enemy_comps_dir):
             if filename.lower().endswith('.csv'):
-                file_path = os.path.join(resources_dir, filename)
+                file_path = os.path.join(enemy_comps_dir, filename)
                 comp_name = os.path.splitext(filename)[0] # 文件名作为字典键
 
                 with open(file_path, 'r', encoding='utf-8') as f:
@@ -69,8 +69,7 @@ def load_enemy_comps():
     except Exception as e:
         logger.error(f"加载敌方配置失败: {e}\n{traceback.format_exc()}")
         return comp_configs
-      
-import traceback
+
 
 def preprocess_image_for_ocr(cv_image_roi, color_mode):
     """

@@ -6,9 +6,10 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QFont, QBrush, QColor
 from PyQt5.QtCore import Qt, QTimer
-import config
-from fileutil import get_resources_dir, list_files
-from mutator_manager import MutatorManager
+
+from src import config
+from src.fileutil import get_resources_dir, list_files
+from src.mutator_manager import MutatorManager
 
 
 
@@ -226,7 +227,7 @@ def setup_search_and_combo_box(window):
     }''')
 
     # 加载resources文件夹下的文件
-    resources_dir = get_resources_dir('resources', 'maps', config.current_language)
+    resources_dir = get_resources_dir('maps', config.current_language)
     all_files = list_files(resources_dir) if resources_dir else []
     window.files = []
     for file_name in all_files:

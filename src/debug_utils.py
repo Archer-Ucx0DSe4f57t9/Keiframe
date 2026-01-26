@@ -87,7 +87,7 @@ def get_mock_data() -> Dict:
     """获取模拟的游戏数据"""
     global _game_time_mock
     if _game_time_mock is None:
-        from config import debug_time_factor  # 延迟导入以避免循环依赖
+        from src.config import debug_time_factor  # 延迟导入以避免循环依赖
         init_mock(debug_time_factor)
     return _game_time_mock.get_game_data()
 

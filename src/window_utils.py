@@ -2,7 +2,7 @@ import win32gui
 import win32con
 import win32api
 
-from logging_util import get_logger
+from src.logging_util import get_logger
 
 logger = get_logger('window_utils')
 
@@ -18,7 +18,7 @@ class WindowHandleManager:
             hwnd = win32gui.FindWindow(None, title)
             if hwnd:
                 return hwnd
-        logger.warning(f"未找到游戏窗口: {e}")
+        print(f"未找到游戏窗口")
         return None
 
     def get_hwnd(self):

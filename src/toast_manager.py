@@ -4,13 +4,10 @@ from PyQt5.QtGui import QFont, QPixmap
 import os
 import traceback
 import asyncio
-import config
-from fileutil import get_resources_dir
-from game_monitor import get_troop_from_game
-from troop_util import TroopLoader
-from message_presenter import MessagePresenter
-from window_utils import get_sc2_window_geometry
-from logging_util import get_logger
+from src import config
+from src.troop_util import TroopLoader
+from src.message_presenter import MessagePresenter
+from src.window_utils import get_sc2_window_geometry
 
 class ToastManager:
     

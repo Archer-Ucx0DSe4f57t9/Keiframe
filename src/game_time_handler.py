@@ -1,13 +1,12 @@
 #game_time_handler
 import time
 import traceback
-import config 
-# 导入 TimerWindow 可能需要的其他模块（假设它们在项目中其他位置定义）
+from src import config, game_monitor# 导入 TimerWindow 可能需要的其他模块（假设它们在项目中其他位置定义）
 # 确保项目结构能够解析这些导入
-from map_handlers.map_event_manager import MapEventManager
-from map_handlers.malwarfare_event_manager import MapwarfareEventManager
-from map_handlers.malwarfare_map_handler import MalwarfareMapHandler
-import game_monitor
+from src.map_handlers.map_event_manager import MapEventManager
+from src.map_handlers.malwarfare_event_manager import MapwarfareEventManager
+from src.map_handlers.malwarfare_map_handler import MalwarfareMapHandler
+
 
 def update_game_time(window):
     """更新游戏时间显示和处理地图/突变事件 (原 TimerWindow.update_game_time)"""

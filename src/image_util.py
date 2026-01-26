@@ -12,13 +12,13 @@ from tkinter import ttk
 import ctypes
 from ctypes import windll
 from ctypes import c_int
-import config
 import traceback
 import numpy as np
 import cv2
 from skimage.metrics import structural_similarity as ssim
-from fileutil import get_resources_dir, list_files
-from logging_util import get_logger, setup_logger
+from src import config
+from src.fileutil import get_resources_dir, list_files
+from src.logging_util import get_logger, setup_logger
 logger = get_logger(__name__)
 
 class ImageCache:
@@ -38,7 +38,7 @@ class ImageCache:
             logger.error(f'加载图片时发生错误: {str(e)}')
             
     def scan_directory(self):
-        troops_dir = get_resources_dir('resources', 'screen_capcture', 'troops')
+        troops_dir = get_resources_dir('screen_capcture', 'troops')
         if not troops_dir:
             logger.error('无法找到troops目录')
             return

@@ -1,8 +1,7 @@
 #identifymap.py
 from typing import List, Dict, Any, Optional
 import sys, os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
-from logging_util import get_logger
+from src.logging_util import get_logger
 
 map_checks = {
     '升格之恋': {

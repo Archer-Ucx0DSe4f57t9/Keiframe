@@ -1,0 +1,41 @@
+netsh int ipv4 add excludedportrange protocol=tcp startport=6119 numberofports=1
+
+第一步：检查是否有程序正在运行
+
+在 PowerShell 中运行以下命令，查看谁占用了端口：
+PowerShell
+
+netstat -ano | findstr :6119
+
+    如果有输出（例如 TCP 0.0.0.0:6119 ... PID 1234）：
+
+        记下最后的数字（PID）。
+
+        打开任务管理器 -> 详细信息，找到这个 PID 对应的程序，结束它。
+
+        然后再次尝试运行你的 netsh 命令。
+
+    如果没有输出（什么都没显示），但依然报错：
+
+        这说明端口没有被具体的 .exe 占用，而是被 Windows 网络服务（WinNAT / Hyper-V） 提前保留了。这种情况在安装了 WSL2 或 Docker 的电脑上非常常见。请看第二步。
+
+第二步：解决系统保留冲突（最常见的情况）
+
+如果是系统服务（WinNAT）占用了端口，你需要先暂停该服务，保留完端口后，再重新开启它。
+
+请依次执行以下命令（需要管理员权限）：
+
+    停止 Windows NAT 服务（这会暂时释放它占用的动态端口池）：
+    PowerShell
+
+net stop winnat
+
+再次尝试保留端口（现在应该能成功了）：
+PowerShell
+
+netsh int ipv4 add excludedportrange protocol=tcp startport=6119 numberofports=1
+
+重新启动 Windows NAT 服务：
+PowerShell
+
+net start winnat

@@ -9,13 +9,13 @@ from PyQt5.QtCore import Qt, QTimer, QPoint, pyqtSignal
 import config
 from PyQt5 import QtCore
 
-import image_util
-from toast_manager import ToastManager
-from mutator_and_enemy_race_automatic_recognizer import Mutator_and_enemy_race_automatic_recognizer
-import ui_setup, game_monitor, config_hotkeys,game_time_handler,map_loader,app_window_manager,language_manager
-from memo_overlay import MemoOverlay
-from settings_window import SettingsWindow
-from countdown_manager import CountdownManager
+from src import  ui_setup, game_monitor, config_hotkeys, game_time_handler, map_loader, app_window_manager, language_manager, image_util
+from src.toast_manager import ToastManager
+from src.mutator_and_enemy_race_automatic_recognizer import Mutator_and_enemy_race_automatic_recognizer
+from src.memo_overlay import MemoOverlay
+from src.settings_window import SettingsWindow
+from src.countdown_manager import CountdownManager
+from src.fileutil import get_project_root
 
 #from global_key_listener import GlobalKeyListener
 
@@ -57,18 +57,10 @@ class TimerWindow(QMainWindow):
         self.mutator_and_enemy_race_recognizer = Mutator_and_enemy_race_automatic_recognizer(recognition_signal = self.mutator_and_enemy_race_recognition_signal)
         self.mutator_and_enemy_race_recognizer.reset_and_start() # 启动识别线程
 
-        # 初始化artifact_window
-        from misc.artifacts import ArtifactWindow
-        self.artifact_window = ArtifactWindow(self)
-
         # 设置窗口属性以支持DPI缩放
         self.setAttribute(Qt.WA_DontCreateNativeAncestors)
         self.setAttribute(Qt.WA_NativeWindow)
-        if getattr(sys, 'frozen', False):  # 是否为打包的 exe
-            base_dir = os.path.dirname(sys.executable)  # exe 所在目录
-        else:
-            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 源码所在目录
-
+        
         # 初始化日志记录器
         from logging_util import get_logger
         self.logger = get_logger(__name__)
@@ -477,24 +469,6 @@ class TimerWindow(QMainWindow):
 
     def on_language_changed(self, lang):
         return language_manager.on_language_changed(self,lang)
-
-    '''
-    def handle_artifact_shortcut(self):
-        # 如果窗口可见，则销毁图片
-        if self.artifact_window.isVisible():
-            self.artifact_window.destroy_images()
-            self.artifact_window.hide()
-        else:
-            # 获取当前选择的地图名称并显示对应的神器图片
-            try:
-                current_map = self.combo_box.currentText()
-                if current_map:
-                    self.artifact_window.show_artifact(current_map, config.ARTIFACTS_IMG_OPACITY,
-                                                       config.ARTIFACTS_IMG_GRAY)
-            except Exception as e:
-                self.logger.error(f'draw artifacts layer failed: {str(e)}')
-                self.logger.error(traceback.format_exc())
-    '''
     
     #倒计时功能相关
     def trigger_countdown_selection(self):
@@ -566,9 +540,11 @@ class TimerWindow(QMainWindow):
             
     def apply_user_settings(self):
         """读取json并覆盖config.py中的变量"""
-        if os.path.exists('settings.json'):
+        
+        json_path = os.path.join(get_project_root(), 'settings.json')
+        if os.path.exists(json_path):
             try:
-                with open('settings.json', 'r', encoding='utf-8') as f:
+                with open(json_path, 'r', encoding='utf-8') as f:
                     user_settings = json.load(f)
                     
                 # 动态更新 config 模块的属性

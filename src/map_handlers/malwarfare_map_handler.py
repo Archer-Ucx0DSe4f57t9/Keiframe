@@ -9,11 +9,9 @@ import sys
 import os
 
 # 自带模块
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-BASE_DIR = os.path.dirname(__file__)
-from window_utils import get_sc2_window_geometry, is_game_active
-from logging_util import get_logger
-import config
+from src.window_utils import get_sc2_window_geometry, is_game_active
+from src.logging_util import get_logger
+from src import config
 
 
 class MalwarfareMapHandler:
@@ -96,7 +94,7 @@ class MalwarfareMapHandler:
 
         # --- 3. 加载模板 ---
         self.BASE_RESOLUTION_WIDTH = 1920.0
-        template_dir = 'char_templates_1920w'
+        template_dir = 'char_templates_1920w7'
         self.templates = self._load_templates(template_dir)
         #人族和rep用
         self.templates_green = self._load_templates('char_templates_1920w')

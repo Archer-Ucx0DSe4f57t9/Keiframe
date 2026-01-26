@@ -6,11 +6,12 @@ import time
 import threading
 import mss
 import os
-import config
 import sys
 import os
-from logging_util import get_logger
-from window_utils import get_sc2_window_geometry, is_game_active
+from src import config
+from src.logging_util import get_logger
+from src.window_utils import get_sc2_window_geometry, is_game_active
+from src.fileutil import get_resources_dir
 
 class Mutator_and_enemy_race_automatic_recognizer:
     """
@@ -36,13 +37,12 @@ class Mutator_and_enemy_race_automatic_recognizer:
         self._running = False
         self._thread = None
         self._current_game_time = 0.0
-        self.base_dir = os.path.dirname(__file__)
+        
 
         # 加载模板
 
-        self.race_templates = self._load_templates(os.path.join(self.base_dir, '..', 'resources', 'icons', 'races'))
-        self.mutator_templates = self._load_templates(os.path.join(self.base_dir, '..', 'resources', 'icons', 'mutators'))
-
+        self.race_templates = self._load_templates(get_resources_dir('icons', 'races'))
+        self.mutator_templates = self._load_templates(get_resources_dir('icons', 'mutators'))
         # 初始化状态和结果存储
         self._reset_state()
 

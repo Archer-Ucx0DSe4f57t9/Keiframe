@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import QLabel, QHBoxLayout
 
 from fileutil import get_resources_dir
 import sys
-import config
+from src import config
 
 from sound_player import shared_sound_manager
 

@@ -4,11 +4,11 @@ import aiohttp
 import asyncio
 import traceback
 from PyQt5 import QtCore
-from map_handlers.IdentifyMap import identify_map
-import config
-from debug_utils import get_mock_data, reset_mock, get_mock_screen_data
-from logging_util import get_logger
-import show_fence
+from src.map_handlers.IdentifyMap import identify_map
+from src import config
+from src.debug_utils import get_mock_data, reset_mock, get_mock_screen_data
+from src.logging_util import get_logger
+from src import show_fence
 
 logger = get_logger(__name__)
 

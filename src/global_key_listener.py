@@ -3,7 +3,7 @@
 import threading
 from pynput import keyboard
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer, Qt
-from logging_util import get_logger
+from src.logging_util import get_logger
 
 class GlobalKeyListener(QObject):
     """

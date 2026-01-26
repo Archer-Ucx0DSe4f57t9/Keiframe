@@ -11,8 +11,9 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QKeyEvent, QColor, QKeySequence
 
-import config  # 导入你现有的 config.py 作为默认值
-from logging_util import get_logger
+from src import config  # 导入你现有的 config.py 作为默认值
+from src.logging_util import get_logger
+from src.fileutil import get_resources_dir, get_project_root
 
 # ==========================================
 # 1. 自定义控件
@@ -249,13 +250,8 @@ class CountdownOptionsTable(QTableWidget):
         return data
       
     def get_sound_files(self):
-        """扫描 resources/sounds 文件夹下的所有文件"""
-        if getattr(sys, 'frozen', False):
-            base_path = os.path.dirname(sys.executable)
-        else:
-            base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        
-        sound_dir = os.path.join(base_path, 'resources', 'sounds')
+        """获取 resources/sounds 目录下的所有声音文件名列表"""        
+        sound_dir = get_resources_dir('sounds')
         files = []
         
         if os.path.exists(sound_dir):
@@ -308,7 +304,7 @@ class SettingsWindow(QDialog):
         self.main_window = parent
         self.setWindowTitle("系统设置 / Settings")
         self.resize(900, 700)
-        self.settings_file = 'settings.json'
+        self.settings_file = os.path.join(get_project_root(), 'settings.json')
         self.logger = get_logger("setting window")
         
         self.current_config = self.load_config()
@@ -469,13 +465,7 @@ class SettingsWindow(QDialog):
             lang = self.current_config.get('current_language', 'zh')
 
         # 计算路径
-        if getattr(sys, 'frozen', False):
-            base_path = os.path.dirname(sys.executable)
-        else:
-            # 假设 settings_window.py 在 src/ 下
-            base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            
-        maps_dir = os.path.join(base_path, 'resources', 'maps', lang)
+        maps_dir = get_resources_dir(os.path.join('maps', lang))
         
         map_files = []
         if os.path.exists(maps_dir):

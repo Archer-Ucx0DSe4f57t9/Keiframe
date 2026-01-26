@@ -1,6 +1,6 @@
 import os
 import logging
-import config
+from src import config
 
 def setup_logger(base_dir=None):
     """初始化日志配置

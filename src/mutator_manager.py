@@ -8,12 +8,12 @@ from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QIcon, QPixmap, QColor, QPainter
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton, QGraphicsDropShadowEffect
 
-import config
-from fileutil import get_resources_dir
-from logging_util import get_logger
-from message_presenter import MessagePresenter
-from window_utils import get_sc2_window_geometry
-from game_monitor import state as game_state
+from src import config
+from src.fileutil import get_resources_dir
+from src.logging_util import get_logger
+from src.message_presenter import MessagePresenter
+from src.window_utils import get_sc2_window_geometry
+from src.game_monitor import state as game_state
 
 mutator_types = ['AggressiveDeployment', 'Propagators', 'VoidRifts', 'KillBots', 'BoomBots', 
                  'HeroesFromtheStorm', 'AggressiveDeploymentProtoss'] # 
@@ -166,7 +166,7 @@ class MutatorManager(QWidget):
     def load_mutator_config(self, mutator_name):
         """加载突变因子配置文件"""
         try:
-            config_path = os.path.join('resources', 'mutator', f'{mutator_name}.csv')
+            config_path = get_resources_dir('mutator', f'{mutator_name}.csv')
             if not os.path.exists(config_path):
                 self.logger.error(f'突变因子配置文件不存在: {config_path}')
                 return []
