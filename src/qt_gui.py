@@ -6,10 +6,9 @@ import threading, asyncio
 from PyQt5.QtWidgets import (QMainWindow, QApplication,QMessageBox)
 from control_window import ControlWindow
 from PyQt5.QtCore import Qt, QTimer, QPoint, pyqtSignal
-import config
 from PyQt5 import QtCore
 
-from src import  ui_setup, game_monitor, config_hotkeys, game_time_handler, map_loader, app_window_manager, language_manager, image_util
+from src import  config, ui_setup, game_monitor, config_hotkeys, game_time_handler, map_loader, app_window_manager, language_manager, image_util
 from src.toast_manager import ToastManager
 from src.mutator_and_enemy_race_automatic_recognizer import Mutator_and_enemy_race_automatic_recognizer
 from src.memo_overlay import MemoOverlay
