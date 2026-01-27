@@ -10,20 +10,11 @@ import sys
 # 获取当前脚本所在目录 (即 project/tests/)
 current_test_dir = os.path.dirname(os.path.abspath(__file__))
 
-# 获取项目根目录 (即 project/)
-project_root = os.path.abspath(os.path.join(current_test_dir, '..'))
-
-# 获取目标模块目录 (即 project/src/map_handlers)
-handlers_dir = os.path.join(project_root, 'src', 'map_handlers')
-
-
 # 尝试导入核心模块
 try:
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
     from src.map_handlers.sc2_ocr_processor import SC2OCRProcessor
 except ImportError as e:
     print(f"❌ 导入失败: {e}")
-    print(f"请确认 sc2_ocr_processor.py 是否位于: {handlers_dir}")
     print("按任意键退出...")
     input()
     sys.exit(1)
@@ -32,8 +23,8 @@ except ImportError as e:
 # 2. 默认配置修正
 # ==============================
 # 默认指向: tests/ocr sampling/00zh
-DEFAULT_DIR = os.path.join(current_test_dir, 'ocr sampling', '00zh')
-#DEFAULT_DIR = os.path.join(current_test_dir, 'ocr sampling', '01en')
+DEFAULT_DIR = os.path.join(current_test_dir, 'samples', '00zh')
+#DEFAULT_DIR = os.path.join(current_test_dir, 'samples', '01en')
 DEFAULT_LANG = 'zh'
 DEFAULT_COLOR = 'yellow'
 
@@ -41,27 +32,12 @@ def main():
     # 打印当前工作环境信息
     print(f"工作目录: {os.getcwd()}")
     print(f"脚本位置: {current_test_dir}")
-    print(f"模块路径: {handlers_dir}")
     print("-" * 50)
 
     # 1. 获取参数
     # 显示默认路径给用户看
-    print(f"默认测试目录: {DEFAULT_DIR}")
-    target_input = input(f"输入测试图片目录 (回车使用默认): ").strip()
-    
-    # 处理路径
-    if not target_input:
-        target_dir = DEFAULT_DIR
-    else:
-        # 如果用户输入了路径，检查是绝对路径还是相对路径
-        if os.path.isabs(target_input):
-            target_dir = target_input
-        else:
-            # 允许用户输入相对于 tests 目录的路径
-            target_dir = os.path.join(current_test_dir, target_input)
-
-    lang = input(f"输入语言 zh/en (默认 {DEFAULT_LANG}): ").strip()
-    if not lang: lang = DEFAULT_LANG
+    target_dir = DEFAULT_DIR
+    lang = DEFAULT_LANG
     
     print("\n请选择识别颜色:")
     print("1: yellow (System/Time/Paused)")

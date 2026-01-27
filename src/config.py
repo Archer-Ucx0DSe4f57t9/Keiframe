@@ -196,8 +196,6 @@ MALWARFARE_REPLAY_OFFSET = 49
 # 净网行动识别用
 #############################
 
-# === 基础路径配置 ===
-TEMPLATE_BASE_DIR = 'templates'
 
 # === 算法参数配置 (Master Config 2026) ===
 # 结构: OCR_CONFIG[lang][color_type]

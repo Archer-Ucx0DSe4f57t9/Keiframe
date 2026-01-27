@@ -5,6 +5,7 @@ import numpy as np
 import os,sys
 
 from src import config
+from src.fileutil import get_resources_dir
 
 class SC2OCRProcessor:
     def __init__(self, lang='zh'):
@@ -17,23 +18,28 @@ class SC2OCRProcessor:
         # ... (这部分加载代码保持不变，省略以节省空间，直接复用之前的即可) ...
         colors = ['yellow', 'green', 'blue', 'orange']
         print(f"=== 初始化 OCR ({self.lang}) ===")
+        template_all_dir = get_resources_dir('templates')
         
+
         for color in colors:
             self.templates[color] = {}
-            folder_name = config.get_template_folder(self.lang, color)
-            folder_path = os.path.join(config.TEMPLATE_BASE_DIR, folder_name)
+
+            template_base_dir = os.path.join(template_all_dir, f'{self.lang}_{color}')
+            if not os.path.exists(template_base_dir): 
+                print(f"❌ {color} 的模板目录不存在: {template_base_dir}")
+                continue
             
-            if not os.path.exists(folder_path): continue
-                
+            print(f"加载模板目录: {template_base_dir}")
             count = 0
-            for fname in os.listdir(folder_path):
+            for fname in os.listdir(template_base_dir):
                 if not fname.lower().endswith('.png'): continue
                 parts = fname.split('_')
                 key = parts[0] # key 是识别结果，如 '0', '5', 'paused', 'c0'
-                
-                img_path = os.path.join(folder_path, fname)
+
+                img_path = os.path.join(template_base_dir, fname)
+                print   (fname)
                 templ_img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
-                
+
                 if templ_img is not None:
                     if key not in self.templates[color]:
                         self.templates[color][key] = []
