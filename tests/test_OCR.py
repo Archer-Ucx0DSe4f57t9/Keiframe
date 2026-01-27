@@ -4,29 +4,23 @@ import cv2
 import os
 import sys
 
+#导入模块
+from src.map_handlers.sc2_ocr_processor import SC2OCRProcessor
+
 # ==============================
 # 1. 核心路径修正 (Path Patching)
 # ==============================
 # 获取当前脚本所在目录 (即 project/tests/)
 current_test_dir = os.path.dirname(os.path.abspath(__file__))
 
-# 尝试导入核心模块
-try:
-    from src.map_handlers.sc2_ocr_processor import SC2OCRProcessor
-except ImportError as e:
-    print(f"❌ 导入失败: {e}")
-    print("按任意键退出...")
-    input()
-    sys.exit(1)
-
 # ==============================
 # 2. 默认配置修正
 # ==============================
 # 默认指向: tests/ocr sampling/00zh
-DEFAULT_DIR = os.path.join(current_test_dir, 'samples', '00zh')
-#DEFAULT_DIR = os.path.join(current_test_dir, 'samples', '01en')
-DEFAULT_LANG = 'zh'
-DEFAULT_COLOR = 'yellow'
+#DEFAULT_DIR = os.path.join(current_test_dir, 'samples', '01zh')
+DEFAULT_DIR = os.path.join(current_test_dir, 'samples', '01en')
+DEFAULT_LANG = 'en'
+DEFAULT_COLOR = 'blue'
 
 def main():
     # 打印当前工作环境信息

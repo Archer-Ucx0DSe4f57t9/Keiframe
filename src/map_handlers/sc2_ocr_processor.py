@@ -6,18 +6,20 @@ import os,sys
 
 from src import config
 from src.fileutil import get_resources_dir
+from src.logging_util import get_logger
 
 class SC2OCRProcessor:
     def __init__(self, lang='zh'):
         self.lang = lang
         self.scale_factor = 4.0
         self.templates = {} 
+        self.logger = get_logger(__name__)
         self._load_all_templates()
 
     def _load_all_templates(self):
         # ... (这部分加载代码保持不变，省略以节省空间，直接复用之前的即可) ...
         colors = ['yellow', 'green', 'blue', 'orange']
-        print(f"=== 初始化 OCR ({self.lang}) ===")
+        self.logger.info(f"=== 初始化 OCR ({self.lang}) ===")
         template_all_dir = get_resources_dir('templates')
         
 
@@ -26,10 +28,10 @@ class SC2OCRProcessor:
 
             template_base_dir = os.path.join(template_all_dir, f'{self.lang}_{color}')
             if not os.path.exists(template_base_dir): 
-                print(f"❌ {color} 的模板目录不存在: {template_base_dir}")
+                self.logger.error(f"❌ {color} 的模板目录不存在: {template_base_dir}")
                 continue
             
-            print(f"加载模板目录: {template_base_dir}")
+            self.logger.info(f"加载模板目录: {template_base_dir}")
             count = 0
             for fname in os.listdir(template_base_dir):
                 if not fname.lower().endswith('.png'): continue
@@ -37,7 +39,6 @@ class SC2OCRProcessor:
                 key = parts[0] # key 是识别结果，如 '0', '5', 'paused', 'c0'
 
                 img_path = os.path.join(template_base_dir, fname)
-                print   (fname)
                 templ_img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
 
                 if templ_img is not None:
@@ -45,7 +46,7 @@ class SC2OCRProcessor:
                         self.templates[color][key] = []
                     self.templates[color][key].append(templ_img)
                     count += 1
-            print(f" -> 加载 {color}: {count} 个模板")
+            self.logger.info(f" -> 加载 {color}: {count} 个模板")
 
     def recognize(self, roi_img, color_type, confidence_thresh=0.7, debug_show=False):
         """
