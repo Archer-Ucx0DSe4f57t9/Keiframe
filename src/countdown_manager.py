@@ -244,11 +244,11 @@ class CountdownManager(QWidget):
         self.active_countdowns.clear()
         self.cancel_selection()
 
-    def update_game_time(self, current_seconds, game_screen):
+    def update_game_time(self, current_seconds, is_in_game):
         """
         每帧调用。管理所有活动的倒计时。
         :param current_seconds: 当前游戏时间
-        :param game_screen: 当前游戏界面状态 (传给 ToastManager 用)
+        :param is_in_game: 当前游戏界面状态 (传给 ToastManager 用)
         """
         # 遍历副本，因为可能会在循环中移除元素
         for entry in self.active_countdowns[:]:
@@ -284,7 +284,7 @@ class CountdownManager(QWidget):
                     event_id, 
                     remaining, 
                     message, 
-                    game_screen, 
+                    is_in_game, 
                     sound_filename=sound_to_play,
                     default_color=custom_color # <--- 传入自定义颜色
                 )

@@ -1,4 +1,4 @@
-# mutator_and_enemy_race_automatic_recognizer.py
+# mutator_and_enemy_race_recognizer.py
 
 import cv2
 import numpy as np
@@ -13,7 +13,7 @@ from src.logging_util import get_logger
 from src.window_utils import get_sc2_window_geometry, is_game_active
 from src.fileutil import get_resources_dir
 
-class Mutator_and_enemy_race_automatic_recognizer:
+class Mutator_and_enemy_race_recognizer:
     """
     通过屏幕捕捉和模板匹配，识别游戏中的种族和突变因子图标。
 
@@ -324,7 +324,7 @@ if __name__ == '__main__':
     print("请确保星际争霸II游戏窗口是打开的。")
     print("按 Ctrl+C 停止程序。")
 
-    recognizer = Mutator_and_enemy_race_automatic_recognizer()
+    recognizer = Mutator_and_enemy_race_recognizer()
     recognizer.start()
 
     try:

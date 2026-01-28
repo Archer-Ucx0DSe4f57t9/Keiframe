@@ -388,7 +388,7 @@ class MalwarfareMapHandler:
                     start_time = time.perf_counter()
                     sc2_rect = get_sc2_window_geometry()
                     
-                    if not sc2_rect or not is_game_active() or self.game_state.game_screen !="in_game":
+                    if not sc2_rect or not is_game_active() or self.game_state.is_in_game == False:
                         # 当游戏窗口关闭时，重置状态以便下次启动时重新探测
                         self._current_ui_offset_state = -1
                         self._detected_count_color = None

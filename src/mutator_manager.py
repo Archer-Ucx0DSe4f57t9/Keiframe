@@ -13,7 +13,7 @@ from src.fileutil import get_resources_dir
 from src.logging_util import get_logger
 from src.message_presenter import MessagePresenter
 from src.window_utils import get_sc2_window_geometry
-from src.game_monitor import state as game_state
+from src.game_state_service import state as game_state
 
 mutator_types = ['AggressiveDeployment', 'Propagators', 'VoidRifts', 'KillBots', 'BoomBots', 
                  'HeroesFromtheStorm', 'AggressiveDeploymentProtoss'] # 
@@ -195,13 +195,13 @@ class MutatorManager(QWidget):
             self.logger.error(traceback.format_exc())
             return []
 
-    def check_alerts(self, current_seconds, game_screen):
+    def check_alerts(self, current_seconds, is_in_game):
         """
         检查所有激活的突变因子，并持续更新倒计时提醒。
         此函数将由 qt_tui 中的 update_game_time 周期性调用。
         """
         sc2_rect = get_sc2_window_geometry()
-        if not sc2_rect or game_screen != 'in_game':
+        if not sc2_rect or is_in_game == False:
             # 如果找不到SC2窗口，则隐藏所有提醒
             for label in self.mutator_alert_labels.values():
                 label.hide()

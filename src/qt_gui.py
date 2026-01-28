@@ -8,15 +8,14 @@ from control_window import ControlWindow
 from PyQt5.QtCore import Qt, QTimer, QPoint, pyqtSignal
 from PyQt5 import QtCore
 
-from src import  config, ui_setup, game_monitor, config_hotkeys, game_time_handler, map_loader, app_window_manager, language_manager, image_util
+from src import  config, ui_setup, game_state_service, config_hotkeys, game_time_handler, map_loader, app_window_manager, language_manager, image_util
 from src.toast_manager import ToastManager
-from src.mutator_and_enemy_race_automatic_recognizer import Mutator_and_enemy_race_automatic_recognizer
+from src.mutator_and_enemy_race_recognizer import Mutator_and_enemy_race_recognizer
 from src.memo_overlay import MemoOverlay
 from src.settings_window import SettingsWindow
 from src.countdown_manager import CountdownManager
 from src.fileutil import get_project_root
 
-#from global_key_listener import GlobalKeyListener
 
 class TimerWindow(QMainWindow):
     # 创建信号用于地图更新
@@ -39,7 +38,7 @@ class TimerWindow(QMainWindow):
 
     def _run_async_game_scheduler(self, progress_signal):
         """在新线程中启动 asyncio 事件循环"""
-        asyncio.run(game_monitor.check_for_new_game_scheduler(progress_signal))
+        asyncio.run(game_state_service.check_for_new_game_scheduler(progress_signal))
 
 
     def __init__(self):
@@ -53,7 +52,7 @@ class TimerWindow(QMainWindow):
         self.apply_user_settings()
 
         # 初始化突变因子和种族识别器
-        self.mutator_and_enemy_race_recognizer = Mutator_and_enemy_race_automatic_recognizer(recognition_signal = self.mutator_and_enemy_race_recognition_signal)
+        self.mutator_and_enemy_race_recognizer = Mutator_and_enemy_race_recognizer(recognition_signal = self.mutator_and_enemy_race_recognition_signal)
         self.mutator_and_enemy_race_recognizer.reset_and_start() # 启动识别线程
 
         # 设置窗口属性以支持DPI缩放
@@ -69,7 +68,7 @@ class TimerWindow(QMainWindow):
         # 初始化状态
         self.current_time = ""
         self.drag_position = QPoint(0, 0)
-        self.game_state = game_monitor.state
+        self.game_state = game_state_service.state
 
         # 添加一个标志来追踪地图选择的来源
         self.manual_map_selection = False
@@ -399,8 +398,8 @@ class TimerWindow(QMainWindow):
                  self.mutator_and_enemy_race_recognizer.reset_and_start() # 调用识别器的重置和启动方法
 
             # 清除全局状态中的种族和突变因子
-            game_monitor.state.enemy_race = None
-            game_monitor.state.active_mutators = None
+            game_state_service.state.enemy_race = None
+            game_state_service.state.active_mutators = None
             
             # 清空自定义倒计时
             if hasattr(self, 'countdown_manager') and self.countdown_manager:
@@ -446,12 +445,12 @@ class TimerWindow(QMainWindow):
         :param mode: 'temp' or 'toggle'
         """
         try:
-            # 假设 game_monitor 已在 TimerWindow 的模块中导入
-            current_map = game_monitor.state.current_selected_map
-            self.logger.info(f"通过 game_monitor 获取地图: {current_map}")
+            # 假设 game_state_service 已在 TimerWindow 的模块中导入
+            current_map = game_state_service.state.current_selected_map
+            self.logger.info(f"通过 game_state_service 获取地图: {current_map}")
         except Exception:
             current_map = "Unknown_Map"
-            self.logger.warning("无法从 game_monitor 获取当前地图名称，使用默认值。")
+            self.logger.warning("无法从 game_state_service 获取当前地图名称，使用默认值。")
                 
         self.logger.info(f"触发 Memo 显示: 地图={current_map}, 模式={mode}")
         
@@ -500,20 +499,20 @@ class TimerWindow(QMainWindow):
 
         if race:
             self.logger.info(f"UI接收到确认种族: {race}")
-            game_monitor.state.enemy_race = race
+            game_state_service.state.enemy_race = race
 
             current_map = self.combo_box.currentText()
             if current_map:
                 map_loader.handle_map_selection(self, current_map)
             # 如果种族更新，强制同步突变因子按钮状态    
-            if hasattr(self, 'mutator_manager') and self.mutator_manager and game_monitor.state.active_mutators is not None:
+            if hasattr(self, 'mutator_manager') and self.mutator_manager and game_state_service.state.active_mutators is not None:
                 self.logger.info(f"种族已更新{race}，强制重新同步突变因子变式。")
-                self.mutator_manager.sync_mutator_toggles(game_monitor.state.active_mutators)
+                self.mutator_manager.sync_mutator_toggles(game_state_service.state.active_mutators)
 
         if mutators is not None:
             # 只有当 mutators 不为 None（即识别完成，可能是空列表）时才更新
             self.logger.info(f"UI接收到确认突变因子: {mutators}")
-            game_monitor.state.active_mutators = mutators
+            game_state_service.state.active_mutators = mutators
             # 调用 MutatorManager 来同步按钮状态
             if hasattr(self, 'mutator_manager') and self.mutator_manager:
                 self.mutator_manager.sync_mutator_toggles(mutators)

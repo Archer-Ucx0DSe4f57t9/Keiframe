@@ -7,7 +7,7 @@ import logging
 import shutil
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
-from src.mutator_and_enemy_race_automatic_recognizer import Mutator_and_enemy_race_automatic_recognizer
+from src.mutator_and_enemy_race_recognizer import Mutator_and_enemy_race_recognizer
 current_dir = os.path.dirname(os.path.abspath(__file__))
 # your_project/tests/test_recognizer_debug.py
 
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     logger.info(f"调试图片将保存在: {debug_output_dir}")
 
     # --- 3. 初始化识别器 ---
-    recognizer = Mutator_and_enemy_race_automatic_recognizer()
+    recognizer = Mutator_and_enemy_race_recognizer()
     
     # (可选) 如果需要，可以在这里临时降低阈值进行测试
     # recognizer.CONFIDENCE_THRESHOLD = 0.7 

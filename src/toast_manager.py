@@ -21,7 +21,7 @@ class ToastManager:
         for alert in self.map_alerts.values():
             alert.hide_alert()
 
-    def show_map_countdown_alert(self, event_id, time_diff, message, game_screen, sound_filename: str = None, default_color=None):
+    def show_map_countdown_alert(self, event_id, time_diff, message, is_in_game, sound_filename: str = None, default_color=None):
         self.logger.debug(f"尝试播报信息{message}")
         
         new_event = False
@@ -32,7 +32,7 @@ class ToastManager:
         time_diff: 剩余的秒数，用于确定颜色
         """
         # 检查游戏状态，非游戏中状态不显示提示
-        if game_screen != 'in_game':
+        if is_in_game == False:
             self.hide_toast()
             return
 

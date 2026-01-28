@@ -3,11 +3,11 @@ import traceback
 from PyQt5.QtWidgets import QTableWidgetItem, QPushButton
 from PyQt5.QtGui import QBrush, QColor
 from PyQt5.QtCore import Qt
-from src.fileutil import get_resources_dir, list_files
+from src.fileutil import get_resources_dir
 from src.map_handlers.map_event_manager import MapEventManager
 from src.map_handlers.malwarfare_event_manager import MapwarfareEventManager
-from src.map_handlers.malwarfare_map_handler import MalwarfareMapHandler # 确保导入正确
-from src import config, game_monitor
+from src.map_handlers.malwarfare_map_handler import MalwarfareMapHandler
+from src import config, game_state_service
 
 def handle_version_selection(window):
     """处理地图版本按钮选择事件 (原 TimerWindow.on_version_selected)"""
@@ -43,7 +43,7 @@ def handle_map_selection(window, map_name):
         window.manual_map_selection = True
         window.logger.info('用户手动选择了地图')
         
-    game_monitor.state.current_selected_map = map_name
+    game_state_service.state.current_selected_map = map_name
     
     # 在地嗪图识别到神族时，自动切换到神族模式
     if map_name == '机会渺茫-人虫' and window.game_state.enemy_race == 'Protoss':

@@ -27,12 +27,12 @@ class MapwarfareEventManager:
             return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
         raise ValueError("Invalid time format")
 
-    def update_events(self, current_count, current_countdown_seconds, game_screen):
+    def update_events(self, current_count, current_countdown_seconds, is_in_game):
         """
         根据当前阶段(count)和倒计时更新表格颜色和Toast提示
         :param current_count: 当前的计数值
         :param current_countdown_seconds: 当前的倒计时（秒）
-        :param game_screen: 游戏屏幕对象，用于定位Toast
+        :param is_in_game: 游戏屏幕对象，用于定位Toast
         """
         # 避免在同一秒内或相同count下重复执行
         if self.last_count == current_count and int(current_countdown_seconds) == self.last_seconds:
@@ -123,7 +123,7 @@ class MapwarfareEventManager:
                         if 0 < time_diff <= config.MAP_ALERT_SECONDS:
                             toast_message = f'余{int(time_diff):0>2}秒  ' + f"  {time_item.text()}\t{event_item.text()}" + (
                                 f"\t{army_item.text()}" if army_item and army_item.text() else "")
-                            self.toast_manager.show_map_countdown_alert(event_id, time_diff, toast_message, game_screen)
+                            self.toast_manager.show_map_countdown_alert(event_id, time_diff, toast_message, is_in_game)
                         else:
                             # 确保过时或远未到来的提示被移除
                             if self.toast_manager.has_alert(event_id):

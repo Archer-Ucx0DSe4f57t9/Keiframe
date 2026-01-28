@@ -1,12 +1,6 @@
 #game_time_handler
 import time
 import traceback
-from src import config, game_monitor# 导入 TimerWindow 可能需要的其他模块（假设它们在项目中其他位置定义）
-# 确保项目结构能够解析这些导入
-from src.map_handlers.map_event_manager import MapEventManager
-from src.map_handlers.malwarfare_event_manager import MapwarfareEventManager
-from src.map_handlers.malwarfare_map_handler import MalwarfareMapHandler
-
 
 def update_game_time(window):
     """更新游戏时间显示和处理地图/突变事件 (原 TimerWindow.update_game_time)"""
@@ -48,7 +42,7 @@ def update_game_time(window):
                 # === 突变信息相关 ===
                 if hasattr(window, 'mutator_manager'):
                     window.logger.debug(f'正在检查突变: {formatted_time} (格式化后), 原始数据: {game_time}')
-                    window.mutator_manager.check_alerts(current_seconds, window.game_state.game_screen)
+                    window.mutator_manager.check_alerts(current_seconds, window.game_state.is_in_game)
 
                 # ===地图信息相关===
                 if hasattr(window, 'map_event_manager'):
@@ -90,7 +84,7 @@ def update_game_time(window):
                                         window.map_event_manager.update_events(
                                             current_count,
                                             countdown_seconds,
-                                            window.game_state.game_screen
+                                            window.game_state.is_in_game
                                         )
                                     else:
                                         window.logger.warning(f"从OCR接收到无效的时间格式: {time_str}")
@@ -103,20 +97,20 @@ def update_game_time(window):
                         if window.countdown_label.isVisible():
                             window.countdown_label.hide()
                             window.countdown_label.setText("") 
-                        window.map_event_manager.update_events(current_seconds, window.game_state.game_screen)
+                        window.map_event_manager.update_events(current_seconds, window.game_state.is_in_game)
 
-            
+
                 #===突变因子识别器相关===
                 if hasattr(window, 'mutator_and_enemy_race_recognizer'):
                     window.logger.debug(f'尝试推送到因子识别器时间{current_seconds}')
                     window.mutator_and_enemy_race_recognizer .update_game_time(current_seconds)
-                    
+
                 #===倒计时模块相关===
                 if hasattr(window, 'countdown_manager'):
-                    # window.game_state.game_screen 是当前的游戏状态 ('in_game', 'loading' 等)
+                    # window.game_state.is_in_game 是当前的游戏状态 ('in_game', 'loading' 等)
                     window.countdown_manager.update_game_time(
                         current_seconds, 
-                        window.game_state.game_screen
+                        window.game_state.is_in_game
                     )
 
             except Exception as e:

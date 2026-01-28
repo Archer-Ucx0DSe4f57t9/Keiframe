@@ -45,7 +45,7 @@ def main():
     if not color_type: color_type = DEFAULT_COLOR
     target_dir = os.path.join(target_dir, color_type)
 
-    
+
     # 2. 初始化
     print(f"\n正在初始化 OCR [{lang}]...")
     try:

@@ -3,7 +3,7 @@ import traceback
 from PyQt5.QtGui import QBrush, QColor
 from PyQt5.QtCore import Qt
 import sys, os
-from src import config , game_monitor
+from src import config , game_state_service
 import time  # 添加 time 模块用于调试
 
 
@@ -20,7 +20,7 @@ class MapEventManager:
         self.logger = logger
         self.last_seconds = -1  # 用于避免重复高亮和提示
 
-    def update_events(self, current_seconds, game_screen) -> object:
+    def update_events(self, current_seconds, is_in_game) -> object:
         """
         根据当前游戏时间更新表格颜色和Toast提示
         :param current_seconds: 当前游戏时间（秒）
@@ -63,7 +63,7 @@ class MapEventManager:
                         continue
             
             is_heroes_from_the_storm_active = False
-            if game_monitor.state.active_mutators and 'HeroesFromtheStorm' in game_monitor.state.active_mutators:
+            if game_state_service.state.active_mutators and 'HeroesFromtheStorm' in game_state_service.state.active_mutators:
                 is_heroes_from_the_storm_active = True
             
             # 第二次遍历：设置颜色和触发提示
@@ -132,7 +132,7 @@ class MapEventManager:
                             sound_filename = sound_item.text().strip() if sound_item else ""
                             # 调用 ToastManager 的新方法
                             self.logger.debug(f'正在调用toast_manager播报地图事件')
-                            self.toast_manager.show_map_countdown_alert(event_id, time_diff, toast_message, game_screen,sound_filename)
+                            self.toast_manager.show_map_countdown_alert(event_id, time_diff, toast_message,is_in_game, sound_filename)
                         else:
                             if self.toast_manager.has_alert(event_id):
                                 self.toast_manager.remove_alert(event_id)

@@ -24,24 +24,16 @@ class GlobalState:
         self.current_selected_map = None
         self.current_game_id = None
         self.troop = None
-        self.game_screen = None
+        self.is_in_game = None
         self.active_mutators = None
         self.enemy_race = None
+
 
 # 创建一个唯一的全局状态实例
 state = GlobalState()
 
-'''
-# 全局变量
-APP_CLOSING = False
-most_recent_playerdata = None
-player_winrate_data = []
-PLAYER_NAMES = []
-current_game_id = None  # 添加新的全局变量用于标识当前游戏
-'''
-
 port_game_status  = "http://localhost:6119/game/"
-port_game_screen_status = "http://localhost:6119/ui/"
+port_game_screen_for_check_in_game = "http://localhost:6119/ui/"
 troop = None
 
 
@@ -58,14 +50,14 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
         if config.debug_mode:
             # 根据调试模式选择数据来源
             game_data = get_mock_data()
-            map_data = get_mock_screen_data()
+            game_screen_for_check_in_game_data = get_mock_screen_data()
         else:
             async with session.get(f'{port_game_status}', timeout=2) as resp:
                 resp.raise_for_status()  # 处理非200状态码
                 game_data = await resp.json()
-            async with session.get(f'{port_game_screen_status}', timeout=2) as resp:
+            async with session.get(f'{port_game_screen_for_check_in_game}', timeout=2) as resp:
                 resp.raise_for_status()  # 处理非200状态码
-                map_data = await resp.json()
+                game_screen_for_check_in_game_data = await resp.json()
 
     except aiohttp.ClientError:
         logger.debug('SC2请求失败。游戏未运行。')
@@ -158,13 +150,13 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
             show_fence.detect_troop(troop_detection_callback)
 
     # 更新地图相关
-    active_screens = map_data.get('activeScreens', [])
+    active_screens = game_screen_for_check_in_game_data.get('activeScreens', [])
     # 获取activeScreens数组
     # 判断界面状态：数组不为空表示在匹配界面，为空表示在游戏中
     if active_screens:
-        state.game_screen = 'matchmaking'
+        state.is_in_game = False
     else:
-        state.game_screen = 'in_game'
+        state.is_in_game = True
 
 
 async def check_for_new_game_scheduler(progress_callback: QtCore.pyqtSignal) -> None:
