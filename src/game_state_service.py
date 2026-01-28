@@ -177,6 +177,7 @@ def _capture_game_screen(sct):
     同步函数：执行截屏并更新state。
     由scheduler调用。
     """
+    logger.info("尝试截图")
     try:
         # 基础检查：游戏是否激活且在进行中
         if not is_game_active(): # 如果你需要只在游戏窗口激活时截图，保留此行；否则可去掉
@@ -210,7 +211,7 @@ def _capture_game_screen(sct):
             state.latest_screenshot = game_screen_bgr
             state.scale_factor = current_scale
             state.screenshot_timestamp = time.perf_counter()
-            
+        logger.info("截图成功更新全局状态")
     except Exception as e:
         logger.error(f"截图失败: {e}")
 

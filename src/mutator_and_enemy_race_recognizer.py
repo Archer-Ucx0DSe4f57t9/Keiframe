@@ -4,14 +4,14 @@ import cv2
 import numpy as np
 import time
 import threading
-import mss
 import os
 import sys
 import os
 from src import config
 from src.logging_util import get_logger
-from src.window_utils import get_sc2_window_geometry, is_game_active
 from src.fileutil import get_resources_dir
+from src.window_utils import is_game_active
+from src.game_state_service import state
 
 class Mutator_and_enemy_race_recognizer:
     """
@@ -82,7 +82,7 @@ class Mutator_and_enemy_race_recognizer:
 
     def _reset_state(self):
         """重置所有识别状态和结果，用于开始新一轮的识别。"""
-        self.logger.info("正在重置 GameInfoRecognizer 状态...")
+        self.logger.info("正在重置 Mutator_and_enemy_race_recognizer 状态...")
 
         # 最终识别结果
         self.recognized_race = None
@@ -114,17 +114,17 @@ class Mutator_and_enemy_race_recognizer:
             self._running = True
             self._thread = threading.Thread(target=self._run_loop, daemon=True)
             self._thread.start()
-            self.logger.info("GameInfoRecognizer 后台识别线程已启动。")
+            self.logger.info("Mutator_and_enemy_race_recognizer 后台识别线程已启动。")
         else:
-            self.logger.warning("GameInfoRecognizer 已经在运行中。")
+            self.logger.warning("Mutator_and_enemy_race_recognizer 已经在运行中。")
 
     def shutdown(self):
         """停止后台识别线程。"""
-        self.logger.info("正在停止 GameInfoRecognizer...")
+        self.logger.info("正在停止 Mutator_and_enemy_race_recognizer...")
         self._running = False
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=2)
-        self.logger.info("GameInfoRecognizer 已停止。")
+        self.logger.info("Mutator_and_enemy_race_recognizer 已停止。")
 
     def reset_and_start(self):
         """重置状态并重启识别流程。这是开始新游戏时应调用的方法。"""
@@ -166,8 +166,8 @@ class Mutator_and_enemy_race_recognizer:
 
         # 如果找到了任何潜在匹配
         if best_match_name:
-            # [状态切换] 立即进入0.5秒/次的“确认模式”
-            self._race_scan_interval = 0.5
+            # [状态切换] 立即进入1秒/次的“确认模式”
+            self._race_scan_interval = 1.0
 
             # 如果最佳匹配发生变化（异常情况），清空所有计数，但保持1秒模式
             if self._last_best_race_match != best_match_name:
@@ -233,7 +233,7 @@ class Mutator_and_enemy_race_recognizer:
 
         # [状态切换] 只要发现任何一个潜在突变因子，就进入1秒/次的“确认模式”
         if a_potential_match_found:
-            self._mutator_scan_interval = 0.5
+            self._mutator_scan_interval = 1.0
 
         if len(self.recognized_mutators) > 0:
             self.mutator_detection_complete = True
@@ -241,79 +241,78 @@ class Mutator_and_enemy_race_recognizer:
 
     def _run_loop(self):
         """后台线程的主循环，使用独立计时器分别调度种族和突变因子的识别任务。"""
-        with mss.mss() as sct:
-            while self._running:
-                # 检查所有任务是否都已完成
-                if self.race_detection_complete and self.mutator_detection_complete:
-                    self.logger.info("所有识别任务已完成，进入等待状态。")
-                    self._running = False # 设置标志位以表明我们想停止
-                    continue
+        
+        last_game_screen_time_stamp = 0.0
+        while self._running:
+            # 检查所有任务是否都已完成
+            if self.race_detection_complete and self.mutator_detection_complete:
+                self.logger.info("所有识别任务已完成，进入等待状态。")
+                self._running = False # 设置标志位以表明我们想停止
+                continue
 
-                # 条件：已超过 30 秒 AND 突变因子检测未完成
-                if self._current_game_time >= 30 and not self.mutator_detection_complete:
-                    self.logger.warning("游戏时间已超过 30 秒，且突变因子未确认，将结果确认为空。")
-                    self.recognized_mutators = [] # 确认结果为空列表
-                    self.mutator_detection_complete = True
-                    self.recognition_signal.emit({'race': None, 'mutators': self.recognized_mutators})
+            # 条件：已超过 60 秒 AND 突变因子检测未完成
+            if self._current_game_time >= 60 and not self.mutator_detection_complete:
+                self.logger.warning("游戏时间已超过 60 秒，且突变因子未确认，将结果确认为空。")
+                self.recognized_mutators = [] # 确认结果为空列表
+                self.mutator_detection_complete = True
+                self.recognition_signal.emit({'race': None, 'mutators': self.recognized_mutators})
+                continue
+
+            current_time = time.perf_counter()
+            
+            # 检查哪个任务需要扫描
+            is_race_scan_due = not self.race_detection_complete and \
+                                current_time - self._last_race_scan_time >= self._race_scan_interval
+            is_mutator_scan_due = not self.mutator_detection_complete and \
+                                    current_time - self._last_mutator_scan_time >= self._mutator_scan_interval
+
+            # 如果有任何一个任务需要扫描，才执行截图和预处理
+            self.logger.info(f"检测到种族或突变因子扫描任务到期，准备识别...当前种族{is_race_scan_due}，突变因子{is_mutator_scan_due},窗口状态{state.is_in_game}")
+            if is_race_scan_due or is_mutator_scan_due:
+                if not is_game_active():
+                    time.sleep(0.5)
                     continue
-                '''
-                //弃用原来逻辑
-                if self.race_detection_complete and not self.mutator_detection_complete and self._race_confirmed_time:
-                  elapsed = time.perf_counter() - self._race_confirmed_time
-                  if elapsed > self.MUTATOR_TIMEOUT_AFTER_RACE:
-                      self.logger.warning(f"种族已确认超过 {self.MUTATOR_TIMEOUT_AFTER_RACE} 秒，未发现突变因子。将突变因子确认为空。")
-                      self.recognized_mutators = [] # 确认结果为空列表
-                      self.mutator_detection_complete = True
-                      continue # 进入下一个循环，将会触发上面的“所有任务完成”逻辑
-               
-                '''
-                current_time = time.perf_counter()
                 
-                # 检查哪个任务需要扫描
-                is_race_scan_due = not self.race_detection_complete and \
-                                   current_time - self._last_race_scan_time >= self._race_scan_interval
-                is_mutator_scan_due = not self.mutator_detection_complete and \
-                                      current_time - self._last_mutator_scan_time >= self._mutator_scan_interval
+                with state.screenshot_lock:
+                    game_screen = state.latest_screenshot
+                    game_screen_time_stamp = state.screenshot_timestamp
+                    scale_factor = state.scale_factor
+                self.logger.info("截图已获取，准备进行识别处理。")
 
-                # 如果有任何一个任务需要扫描，才执行截图和预处理
-                if is_race_scan_due or is_mutator_scan_due:
-                    sc2_rect = get_sc2_window_geometry()
-                    if not sc2_rect or not is_game_active():
-                        time.sleep(1)
-                        continue
+                # 没新截图就不处理
+                if game_screen is None or game_screen_time_stamp == last_game_screen_time_stamp:
+                    time.sleep(0.05)
+                    continue
 
-                    x, y, w, h = sc2_rect
-                    if w == 0 or h == 0:
-                        time.sleep(1)
-                        continue
+                x1, y1, x2, y2 = config.MUTATOR_AND_ENEMY_RACE_RECOGNIZER_ROI
+                if y2 > game_screen.shape[0] or x2 > game_screen.shape[1]:
+                    time.sleep(1)
+                    continue
 
-                    scale_factor = float(w) / self.BASE_RESOLUTION_WIDTH
-                    monitor = {"top": y, "left": x, "width": w, "height": h}
-                    sct_img = sct.grab(monitor)
-                    game_screen_bgr = cv2.cvtColor(np.array(sct_img), cv2.COLOR_BGRA2BGR)
+                roi_image = game_screen[y1:y2, x1:x2]
+                last_game_screen_time_stamp = game_screen_time_stamp
+                screenshot_gray = cv2.cvtColor(roi_image, cv2.COLOR_BGR2GRAY)
 
-                    x1, y1, x2, y2 = config.MUTATOR_AND_ENEMY_RACE_RECOGNIZER_ROI
-                    if y2 > game_screen_bgr.shape[0] or x2 > game_screen_bgr.shape[1]:
-                        time.sleep(1)
-                        continue
+                # 执行到期的任务
+                if is_race_scan_due:
+                    self.logger.info(f"执行种族扫描 (间隔: {self._race_scan_interval}s)")
+                    self._scan_for_races(screenshot_gray, scale_factor)
+                    self._last_race_scan_time = current_time
 
-                    roi_image = game_screen_bgr[y1:y2, x1:x2]
-                    screenshot_gray = cv2.cvtColor(roi_image, cv2.COLOR_BGR2GRAY)
+                if is_mutator_scan_due:
+                    self.logger.info(f"执行突变因子扫描 (间隔: {self._mutator_scan_interval}s)")
+                    self._scan_for_mutators(screenshot_gray, scale_factor)
+                    self._last_mutator_scan_time = current_time
 
-                    # 执行到期的任务
-                    if is_race_scan_due:
-                        self.logger.debug(f"执行种族扫描 (间隔: {self._race_scan_interval}s)")
-                        self._scan_for_races(screenshot_gray, scale_factor)
-                        self._last_race_scan_time = current_time
-
-                    if is_mutator_scan_due:
-                        self.logger.debug(f"执行突变因子扫描 (间隔: {self._mutator_scan_interval}s)")
-                        self._scan_for_mutators(screenshot_gray, scale_factor)
-                        self._last_mutator_scan_time = current_time
-
-                # 主循环的短暂休眠，以防止CPU占用过高
-                time.sleep(0.1)
-
+            # 主循环的短暂休眠，以防止CPU占用过高
+            time.sleep(0.1)
+                
+    def _get_latest_screenshot(self):
+        """获取最新的游戏截图和缩放比例。"""
+        with state.screenshot_lock:
+            screenshot = state.latest_screenshot.copy() if state.latest_screenshot is not None else None
+            scale_factor = state.scale_factor
+        return screenshot, scale_factor
 # --- 使用示例 ---
 if __name__ == '__main__':
     import logging
