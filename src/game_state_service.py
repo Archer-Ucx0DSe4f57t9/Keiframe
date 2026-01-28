@@ -3,11 +3,16 @@ import json
 import aiohttp
 import asyncio
 import traceback
+import threading
+import mss
+import cv2
+import numpy as np
 from PyQt5 import QtCore
 from src.map_handlers.IdentifyMap import identify_map
 from src import config
 from src.debug_utils import get_mock_data, reset_mock, get_mock_screen_data
 from src.logging_util import get_logger
+from src.window_utils import get_sc2_window_geometry, is_game_active
 from src import show_fence
 
 logger = get_logger(__name__)
@@ -17,16 +22,27 @@ class GlobalState:
     """封装所有全局状态的类，确保单例模式"""
 
     def __init__(self):
-        self.app_closing = False
-        self.most_recent_playerdata = None
-        self.player_winrate_data = []
-        self.player_names = []
+        
+        #基础状态信息
+        self.game_time = None
         self.current_selected_map = None
         self.current_game_id = None
-        self.troop = None
         self.is_in_game = None
+        
+        # 游戏相关信息
+        self.troop = None
         self.active_mutators = None
         self.enemy_race = None
+        
+        # 截图相关信息
+        self.latest_screenshot = None  # 存储BGR格式的numpy数组
+        self.screenshot_timestamp = 0
+        self.scale_factor = 1.0        # 基于1920宽度的缩放比例
+        self.screenshot_lock = threading.Lock() # 用于保护截图数据的读写安全
+        
+        #暂时没用
+        self.player_names = []
+        self.app_closing = False
 
 
 # 创建一个唯一的全局状态实例
@@ -35,6 +51,7 @@ state = GlobalState()
 port_game_status  = "http://localhost:6119/game/"
 port_game_screen_for_check_in_game = "http://localhost:6119/ui/"
 troop = None
+BASE_RESOLUTION_WIDTH = 1920.0
 
 
 def get_troop_from_game():
@@ -74,16 +91,12 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
 
     # 更新游戏数据相关
     if game_data:
-
         players = game_data.get('players', list())
         # 更新当前游戏时间
         if 'displayTime' in game_data:
             current_time = game_data['displayTime']
             # 更新全局变量中的时间
-            if state.most_recent_playerdata is None:
-                state.most_recent_playerdata = {'time': current_time}
-            else:
-                state.most_recent_playerdata['time'] = current_time
+            state.game_time = current_time
             logger.debug(f'更新游戏时间: {current_time}')
 
         # 生成当前游戏的唯一标识（使用玩家列表的哈希值）
@@ -102,12 +115,12 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
             # 发送信号，通知主线程重置识别器和地图
             progress_callback.emit(['reset_game_info'])
             # 更新全局变量
-            state.most_recent_playerdata = {
-                'time': game_data['displayTime'],
-                'map': game_data.get('map')
-            }
-            logger.info(f'更新全局变量: {state.most_recent_playerdata}')
+            state.game_time = current_time
+            logger.info(f'新游戏更新游戏时间: {state.game_time}')
 
+            
+            '''
+            #暂时不知道有什么用
             player_names = list()
             player_position = 1
             for player in players:
@@ -115,6 +128,7 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
                     player_names.append(player['name'])
                     player_position = 2 if player['id'] == 1 else 1
                     break
+            '''
 
             formatted_time = time.strftime("%M:%S", time.gmtime(game_data['displayTime']))
             logger.info(f'游戏时间更新: {formatted_time}, 原始数据: {game_data["displayTime"]}')
@@ -129,7 +143,7 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
                     # 发送信号更新下拉列表
                     progress_callback.emit(['update_map', map_found])
                     # 更新全局变量中的地图信息
-                    state.most_recent_playerdata['map'] = map_found
+                    state.current_selected_map = map_found
                 else:
                     logger.error('地图识别失败,- 原因: 无法从API响应中获取地图名称')
             except Exception:
@@ -157,6 +171,71 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
         state.is_in_game = False
     else:
         state.is_in_game = True
+        
+def _capture_game_screen(sct):
+    """
+    同步函数：执行截屏并更新state。
+    由scheduler调用。
+    """
+    try:
+        # 基础检查：游戏是否激活且在进行中
+        if not is_game_active(): # 如果你需要只在游戏窗口激活时截图，保留此行；否则可去掉
+            return
+
+        # 获取窗口几何信息
+        sc2_rect = get_sc2_window_geometry()
+        if not sc2_rect:
+            return
+            
+        x, y, w, h = sc2_rect
+        if w == 0 or h == 0:
+            return
+
+        monitor = {"top": y, "left": x, "width": w, "height": h}
+        
+        # 1. 截图 (mss.grab 返回 MSS.Image)
+        sct_img = sct.grab(monitor)
+        
+        # 2. 转换为 numpy 数组 (dtype=uint8 确保兼容性)
+        img_array = np.array(sct_img, dtype=np.uint8)
+        
+        # 3. 颜色空间转换 BGRA -> BGR
+        game_screen_bgr = cv2.cvtColor(img_array, cv2.COLOR_BGRA2BGR)
+        
+        # 4. 计算缩放比例
+        current_scale = float(w) / BASE_RESOLUTION_WIDTH
+
+        # 5. 更新全局状态 (加锁)
+        with state.screenshot_lock:
+            state.latest_screenshot = game_screen_bgr
+            state.scale_factor = current_scale
+            state.screenshot_timestamp = time.perf_counter()
+            
+    except Exception as e:
+        logger.error(f"截图失败: {e}")
+
+
+async def screenshot_scheduler() -> None:
+    """
+    后台截图循环：
+    - 每 0.5 秒截一次
+    - 结果写入 GlobalState
+    """
+    logger.info("screenshot_scheduler 启动")
+
+    with mss.mss() as sct:
+        while not state.app_closing:
+            start = time.perf_counter()
+
+            # 只在“确实在游戏中”时截图
+            if state.is_in_game:
+                _capture_game_screen(sct)
+
+            elapsed = time.perf_counter() - start
+            sleep_time = max(0.0, 0.5 - elapsed)
+            await asyncio.sleep(sleep_time)
+
+    logger.info("screenshot_scheduler 退出")
 
 
 async def check_for_new_game_scheduler(progress_callback: QtCore.pyqtSignal) -> None:
@@ -171,6 +250,8 @@ async def check_for_new_game_scheduler(progress_callback: QtCore.pyqtSignal) -> 
         await asyncio.sleep(4)  # 游戏初始化等待
         logger.info('游戏初始化等待完成')
 
+        asyncio.create_task(screenshot_scheduler())
+        
         while not state.app_closing:
             # 每 0.33秒创建一个非阻塞任务更新游戏状态
             asyncio.create_task(process_game_data(session, progress_callback))

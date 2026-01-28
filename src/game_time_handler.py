@@ -9,8 +9,8 @@ def update_game_time(window):
 
     try:
         # 从全局变量获取游戏时间
-        if window.game_state.most_recent_playerdata and isinstance(window.game_state.most_recent_playerdata, dict):
-            game_time = window.game_state.most_recent_playerdata.get('time', 0)
+        if window.game_state.game_time:
+            game_time = window.game_state.game_time
             window.logger.debug(f'从全局变量获取的原始时间数据: {game_time}')
 
             # 格式化时间显示
@@ -25,12 +25,6 @@ def update_game_time(window):
 
             window.current_time = formatted_time
             window.time_label.setText(formatted_time)
-
-
-          # 更新地图信息（如果有）
-            map_name = window.game_state.most_recent_playerdata.get('map')
-            if map_name:
-                window.logger.debug(f'地图信息更新: {map_name}')
 
             window.logger.debug(f'游戏时间更新: {formatted_time} (格式化后), 原始数据: {game_time}')
 

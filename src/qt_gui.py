@@ -16,7 +16,6 @@ from src.settings_window import SettingsWindow
 from src.countdown_manager import CountdownManager
 from src.fileutil import get_project_root
 
-
 class TimerWindow(QMainWindow):
     # 创建信号用于地图更新
     progress_signal = QtCore.pyqtSignal(list)
@@ -275,8 +274,8 @@ class TimerWindow(QMainWindow):
 
     def process_countdown_hotkey_logic(self):
         game_time = 0
-        if self.game_state.most_recent_playerdata:
-             game_time = float(self.game_state.most_recent_playerdata.get('time', 0))
+        if self.game_state.game_time:
+             game_time = float(self.game_state.game_time)
         self.countdown_manager.handle_hotkey_trigger(game_time)
 
     
@@ -470,26 +469,20 @@ class TimerWindow(QMainWindow):
     
     #倒计时功能相关
     def trigger_countdown_selection(self):
-        # 尝试获取当前游戏秒数
         game_time = 0
-        if self.game_state.most_recent_playerdata:
-             game_time = float(self.game_state.most_recent_playerdata.get('time', 0))
-        
+        if self.game_state.game_time:
+             game_time = float(self.game_state.game_time)
         self.countdown_manager.start_interaction(game_time)
 
     def handle_countdown_hotkey(self):
         self.countdown_hotkey_signal.emit()
 
     def process_countdown_hotkey_logic(self):
-        # 获取最新的游戏时间（在主线程读取也是更安全的）
         game_time = 0
-        if self.game_state.most_recent_playerdata:
-             game_time = float(self.game_state.most_recent_playerdata.get('time', 0))
-        
-        # 调用管理器的逻辑（包含UI操作）
+        if self.game_state.game_time:
+             game_time = float(self.game_state.game_time)
         self.countdown_manager.handle_hotkey_trigger(game_time)
 
-    
     
     # 处理识别器传回突变因子和种族的数据
     def handle_mutator_and_enemy_race_recognition_update(self, results):
