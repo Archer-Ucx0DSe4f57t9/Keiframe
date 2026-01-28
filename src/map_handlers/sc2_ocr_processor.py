@@ -50,7 +50,7 @@ class SC2OCRProcessor:
 
     def recognize(self, roi_img, color_type, confidence_thresh=0.7, debug_show=False):
         """
-        [升级版] 能够识别多位数 (例如 "2:48") 或 单词 ("paused", "c0")
+        能够识别多位数 (例如 "2:48") 或 单词 ("paused", "c0")
         逻辑：扫描所有可能的匹配 -> 去重 -> 按X坐标排序 -> 拼接结果
         """
         if roi_img is None or roi_img.size == 0: return None

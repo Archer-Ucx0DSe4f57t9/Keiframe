@@ -17,7 +17,7 @@ current_test_dir = os.path.dirname(os.path.abspath(__file__))
 # 2. 默认配置修正
 # ==============================
 # 默认指向: tests/ocr sampling/00zh
-#DEFAULT_DIR = os.path.join(current_test_dir, 'samples', '01zh')
+#DEFAULT_DIR = os.path.join(current_test_dir, 'samples', '00zh')
 DEFAULT_DIR = os.path.join(current_test_dir, 'samples', '01en')
 DEFAULT_LANG = 'en'
 DEFAULT_COLOR = 'blue'
@@ -44,6 +44,8 @@ def main():
     color_type = color_map.get(choice, choice)
     if not color_type: color_type = DEFAULT_COLOR
     target_dir = os.path.join(target_dir, color_type)
+
+    
     # 2. 初始化
     print(f"\n正在初始化 OCR [{lang}]...")
     try:

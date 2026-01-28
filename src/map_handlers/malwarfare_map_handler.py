@@ -94,7 +94,7 @@ class MalwarfareMapHandler:
 
         # --- 3. 加载模板 ---
         self.BASE_RESOLUTION_WIDTH = 1920.0
-        template_dir = 'char_templates_1920w7'
+        template_dir = 'char_templates_1920w'
         self.templates = self._load_templates(template_dir)
         #人族和rep用
         self.templates_green = self._load_templates('char_templates_1920w')

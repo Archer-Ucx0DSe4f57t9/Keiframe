@@ -149,21 +149,9 @@ GAME_ICO_RECONGIZE_INTERVAL = 1  # 秒
 GAME_ICO_RECONGIZE_CONFIDENCE = 0.9  # 0-1 越高识别率越高，但是也会导致误识别
 GAME_ICO_RECONGIZE_TIMEOUT = 300  # 秒
 
-
-
 TROOP_ICON_SIZE = 50
 TROOP_HYBRID_ICON_COLOR = 'rgb(0, 255, 128)'
 TROOP_HYBRCONT_FONT_SIZE = 20
-
-ARTIFACTS_IMG_SCALE_RATIO = 0.7
-ARTIFACTS_IMG_GRAY = False
-ARTIFACTS_IMG_OPACITY = 0.5
-ARTIFACTS_POS_死亡摇篮 = [600 / 1174, 483 / 876, 40, 40]  # [x占图像的比例, y占图像的比例, width px, height px]
-ARTIFACTS_POS_湮灭快车 = [830 / 1987, 1050 / 1353, 40, 40]
-ARTIFACTS_POS_净网行动 = [398 / 1496, 688 / 996, 40, 40]
-ARTIFACTS_POS_营救矿工 = [1080 / 1755, 391 / 844, 40, 40]
-ARTIFACTS_POS_亡者之夜 = [468 / 1242, 495 / 938, 40, 40]
-ARTIFACTS_POS_熔火危机 = [730 / 1783, 1200 / 1334, 40, 40]
 '''
 
 #突变因子和敌方种族识别区域（默认1920）
@@ -172,7 +160,9 @@ MUTATOR_AND_ENEMY_RACE_RECOGNIZER_ROI = (1800, 50, 1920, 800)
 #敌方ai识别区域识别区域（默认1920）
 ENEMY_COMP_RECOGNIZER_ROI = (1450, 373 ,1920 ,800)
 
-#净网行动限定
+#############################
+# 净网行动识别用
+#############################
 #以下是1920*1080窗口英文模式下的参数。
 MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD = (298, 85)
 MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD = (334, 103)
@@ -191,10 +181,6 @@ MALWARFARE_TEMPLATE_DIR = 'char_templates_1920w' # 建议与基准分辨率匹�
 MALWARFARE_HERO_OFFSET = 97
 MALWARFARE_ZWEIHAKA_OFFSET = 181
 MALWARFARE_REPLAY_OFFSET = 49
-
-#############################
-# 净网行动识别用
-#############################
 
 
 # === 算法参数配置 (Master Config 2026) ===
