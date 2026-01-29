@@ -4,14 +4,14 @@ import numpy as np
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor
-import mss
-import sys
 import os
 
 # 自带模块
-from src.window_utils import get_sc2_window_geometry, is_game_active
 from src.logging_util import get_logger
+from src.map_handlers.malwarfate_ocr_processor import MalwarfareOcrProcessor
 from src import config
+from src.game_state_service import state
+
 
 
 class MalwarfareMapHandler:
@@ -24,10 +24,14 @@ class MalwarfareMapHandler:
         """
         self.logger = get_logger(__name__)
         self.debug = debug
+        
+        self.game_state = game_state
+        self.lang = config.current_game_language
+        self.ocr = MalwarfareOcrProcessor(lang=self.lang)
+        
         self._consecutive_failures = 0 #连续获取数据失败一定次数后重定位
         self._shutdown_condition_counter = 0 #在n=4(最后一个锁)时，如果时间小于20秒持续一定时间，结束运行（最后一波在倒计时还剩30秒时发出，10秒已经很足够）
         self._time_recognition_failures = 0 #时间识别的连续失败计数器
-        self.game_state = game_state
         
         # 获取当前文件所在目录，用于构建绝对路径
         base_dir = os.path.dirname(__file__)
@@ -71,18 +75,9 @@ class MalwarfareMapHandler:
         self.UI_STATE_OFFSETS = [0, config.MALWARFARE_HERO_OFFSET, config.MALWARFARE_ZWEIHAKA_OFFSET] 
         
         # 存储“基准”ROI (状态0: 0偏移时的坐标)
-        self._base_count_roi = (
-            config.MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD[0], config.MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD[1],
-            config.MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD[0], config.MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD[1]
-        )
-        self._base_paused_roi = (
-            config.MALWARFARE_PAUSED_TOP_LFET_COORD[0], config.MALWARFARE_PAUSED_TOP_LFET_COORD[1],
-            config.MALWARFARE_PAUSED_BOTTOM_RIGHT_COORD[0], config.MALWARFARE_PAUSED_BOTTOM_RIGHT_COORD[1]
-        )
-        self._base_time_roi = (
-            config.MALWARFARE_TIME_TOP_LFET_COORD[0], config.MALWARFARE_TIME_TOP_LFET_COORD[1],
-            config.MALWARFARE_TIME_BOTTOM_RIGHT_COORD[0], config.MALWARFARE_TIME_BOTTOM_RIGHT_COORD[1]
-        )
+        self._base_count_roi = config.get_malwarfare_roi(self.lang, 'purified_count')
+        self._base_paused_roi = config.get_malwarfare_roi(self.lang, 'paused')
+        self._base_time_roi = config.get_malwarfare_roi(self.lang, 'time')
         
         # UI状态变量, -1 代表未知，需要探测
         self._current_ui_offset_state = -1 
@@ -368,61 +363,49 @@ class MalwarfareMapHandler:
 
     def _run_loop(self):
             """后台线程的主循环，负责定时截图和调度识别任务。"""
-            with mss.mss() as sct:
-                while self._running:
-                    start_time = time.perf_counter()
-                    sc2_rect = get_sc2_window_geometry()
-                    
-                    if not sc2_rect or not is_game_active() or self.game_state.is_in_game == False:
-                        # 当游戏窗口关闭时，重置状态以便下次启动时重新探测
-                        self._current_ui_offset_state = -1
-                        self._detected_count_color = None
-                        time.sleep(1)
-                        continue
-                    
-                    x, y, w, h = sc2_rect
-                    if w == 0 or h == 0:
-                        time.sleep(1)
-                        continue
-                    
-                    current_width = float(w)
-                    scale_factor = current_width / self.BASE_RESOLUTION_WIDTH
-                    
-                    monitor = {"top": y, "left": x, "width": w, "height": h}
-                    
-                     # 1. 原始 mss.grab() 返回的是一个 MSS.Image 对象
-                    sct_img = sct.grab(monitor)
-                    
-                    # 2. 将其转换为numpy数组时，明确指定数据类型为 uint8。
-                    #    这会“净化”数据，使其与 cv2.imread() 读取的数组格式完全一致，解决颜色校准失败的问题。
-                    img_array = np.array(sct_img, dtype=np.uint8)
-                    
-                    # 3. 现在再进行颜色空间转换
-                    game_screen_bgr = cv2.cvtColor(img_array, cv2.COLOR_BGRA2BGR)
-                    
-                    # 如果UI状态未知，则先进行探测 
-                    if self._current_ui_offset_state == -1:
-                        if not self._detect_and_set_ui_state(game_screen_bgr):
-                            # 如果探测失败，则等待下一轮，不进行OCR
-                            time.sleep(0.5)
-                            continue
-                    
-                    # 正常调度OCR任务，此时 self._count_roi 等已经是正确的值了
-                    current_time = time.perf_counter()
-                    
-                    if current_time - self._last_count_update >= 1.0:
-                        self._executor.submit(self._ocr_and_process_count, game_screen_bgr, scale_factor)
-                        self._last_count_update = current_time
-                    if current_time - self._last_status_update >= 0.33:
-                        self._executor.submit(self._ocr_and_process_time_and_paused, game_screen_bgr, scale_factor)
-                        self._last_status_update = current_time
+            
+            last_game_screen_time_stamp = 0.0
+            while self._running:
+                start_time = time.perf_counter()
+                
+                with state.screenshot_lock:
+                    game_screen = state.latest_screenshot
+                    game_screen_time_stamp = state.screenshot_timestamp
+                    scale_factor = state.scale_factor
+                self.logger.info("截图已获取，准备进行识别处理。")
 
-                    self._update_latest_result()
+                # 没新截图就不处理
+                if game_screen is None or game_screen_time_stamp == last_game_screen_time_stamp:
+                    time.sleep(0.05)
+                    continue
+                
+                self.logger.info("发现新截图，开始处理。")
+                
+                # 如果UI状态未知，则先进行探测 
+                if self._current_ui_offset_state == -1:
+                    self.logger.info("正在探测ui状态...")
+                    if not self._detect_and_set_ui_state(game_screen):
+                        # 如果探测失败，则等待下一轮，不进行OCR
+                        time.sleep(0.5)
+                        continue
+                
+                last_game_screen_time_stamp = game_screen_time_stamp
+                # 正常调度OCR任务，此时 self._count_roi 等已经是正确的值了
+                current_time = time.perf_counter()
+                
+                if current_time - self._last_count_update >= 1.0:
+                    self._executor.submit(self._ocr_and_process_count, game_screen, scale_factor)
+                    self._last_count_update = current_time
+                if current_time - self._last_status_update >= 0.33:
+                    self._executor.submit(self._ocr_and_process_time_and_paused, game_screen, scale_factor)
+                    self._last_status_update = current_time
 
-                    elapsed_time = time.perf_counter() - start_time
-                    sleep_time = max(0, 0.1 - elapsed_time)
-                    if sleep_time > 0:
-                        time.sleep(sleep_time)
+                self._update_latest_result()
+
+                elapsed_time = time.perf_counter() - start_time
+                sleep_time = max(0, 0.3 - elapsed_time)
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
 
     def _post_process_n_value(self, n_value):
         """对识别出的n值进行后处理，修正已知的特定识别错误。"""
@@ -735,7 +718,7 @@ class MalwarfareMapHandler:
         
         #输出结果        
         parsed = {
-                    "lang": "en",
+                    "lang": self.lang,
                     "n": latest_count,
                     "time": final_time_str,
                     "is_paused": latest_paused

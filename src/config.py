@@ -5,8 +5,8 @@ import json
 import sys
 import cv2
 
-# current region
-current_region = 'kr'  # 当前地区 / Current region
+# current language settings
+current_game_language = 'en'  # 当前游戏语言 / Current game language
 current_language = 'zh'  # 当前语言 / Current language
 
 # 快捷键
@@ -164,27 +164,53 @@ ENEMY_COMP_RECOGNIZER_ROI = (1450, 373 ,1920 ,800)
 # 净网行动识别用
 #############################
 #以下是1920*1080窗口英文模式下的参数。
-MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD = (298, 85)
-MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD = (334, 103)
+#基本识别区域，仅以1920*1080下，文字部分为基准
+MALWARFARE_ROI = {
+    'en': {
+        'purified_count': ((298, 85), (334, 103)), #已净化节点数：（左上坐标，右下坐标）
+        'time':           ((431, 85), (475, 103)), #时间：（左上坐标，右下坐标）
+        'paused':         ((343, 85), (420, 103)), #暂停：（左上坐标，右下坐标）
+    },
+    'zh': {
+        'purified_count': ((184, 80), (207, 95)),  #已净化节点数：（左上坐标，右下坐标）
+        'time':           ((244, 81), (273, 94)),  #时间：（左上坐标，右下坐标）
+        'paused':         ((216, 79), (245, 95)),  #暂停：（左上坐标，右下坐标）
+    }
+}
 
-MALWARFARE_TIME_TOP_LFET_COORD = (431, 85)
-MALWARFARE_TIME_BOTTOM_RIGHT_COORD = (475, 103)
+# roi 扩展像素数 (根据语言不同微调)
+MALWARFARE_ROI_PADDING = { 
+    'en': {
+        'x': 6,
+        'y': 4,
+    },
+    'zh': {
+        'x': 12,
+        'y': 8,
+    }
+}
 
-MALWARFARE_PAUSED_TOP_LFET_COORD = (343, 85)
-MALWARFARE_PAUSED_BOTTOM_RIGHT_COORD = (420, 103)
-BASE_RESOLUTION_WIDTH = 1920.0 # 基准分辨率宽度(窗口模式下的1920)
+# 获取净网行动识别区域函数
+def get_malwarfare_roi(lang, key, with_padding=True):
+    (x1, y1), (x2, y2) = MALWARFARE_ROI[lang][key]
 
-# 模板文件夹的相对路径
-MALWARFARE_TEMPLATE_DIR = 'char_templates_1920w' # 建议与基准分辨率匹配
+    if not with_padding:
+        return x1, y1, x2, y2
+
+    pad = MALWARFARE_ROI_PADDING[lang]
+    return (
+        x1 - pad['x'],
+        y1 - pad['y'],
+        x2 + pad['x'],
+        y2 + pad['y'],
+    )
 
 # roi 下英雄y轴方向下偏移量
 MALWARFARE_HERO_OFFSET = 97
 MALWARFARE_ZWEIHAKA_OFFSET = 181
 MALWARFARE_REPLAY_OFFSET = 49
 
-
-# === 算法参数配置 (Master Config 2026) ===
-# 结构: OCR_CONFIG[lang][color_type]
+# OCR用参数
 OCR_CONFIG = {
     'zh': {
         # 黄色中文 (HSV方案 - 宽范围)

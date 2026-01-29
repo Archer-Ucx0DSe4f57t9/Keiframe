@@ -17,9 +17,9 @@ current_test_dir = os.path.dirname(os.path.abspath(__file__))
 # 2. 默认配置修正
 # ==============================
 # 默认指向: tests/ocr sampling/00zh
-#DEFAULT_DIR = os.path.join(current_test_dir, 'samples', '00zh')
-DEFAULT_DIR = os.path.join(current_test_dir, 'samples', '01en')
-DEFAULT_LANG = 'en'
+DEFAULT_DIR = os.path.join(current_test_dir, 'samples', '00zh')
+#DEFAULT_DIR = os.path.join(current_test_dir, 'samples', '01en')
+DEFAULT_LANG = 'zh'
 DEFAULT_COLOR = 'blue'
 
 def main():

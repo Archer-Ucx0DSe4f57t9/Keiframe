@@ -1,4 +1,4 @@
-# sc2_ocr.py
+#malwarfate_ocr_processor.py
 # -*- coding: utf-8 -*-
 import cv2
 import numpy as np
@@ -8,7 +8,7 @@ from src import config
 from src.fileutil import get_resources_dir
 from src.logging_util import get_logger
 
-class SC2OCRProcessor:
+class MalwarfareOcrProcessor:
     def __init__(self, lang='zh'):
         self.lang = lang
         self.scale_factor = 4.0
