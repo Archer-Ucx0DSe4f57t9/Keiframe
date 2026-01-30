@@ -129,7 +129,7 @@ class TimerWindow(QMainWindow):
         
         #退出按钮功能
         if hasattr(self, 'exit_btn'): 
-            self.exit_btn.clicked.connect(QApplication.instance().quit)
+            self.exit_btn.clicked.connect(self.safe_exit)
         
         # 初始化全局快捷键
         config_hotkeys.init_global_hotkeys(self)
@@ -576,6 +576,39 @@ class TimerWindow(QMainWindow):
             setattr(config, key, value)
         self.logger.info("配置已更新，部分功能已重载")
 
+    def showEvent(self, event):
+        """窗口显示事件，确保窗口始终保持在最上层"""
+        super().showEvent(event)
+        app_window_manager.showEvent_handler(self, event)
+        
+    def safe_exit(self):
+        """关闭所有后台处理器和监听器"""
+        try:
+            #1.关闭净网识别
+            if hasattr(self, 'malwarfare_handler') and self.malwarfare_handler is not None:
+                self.logger.info("应用关闭，正在关闭 MalwarfareMapHandler。")
+                self.malwarfare_handler.shutdown()
+                self.malwarfare_handler = None
+
+            #2.关闭突变因子识别
+            if hasattr(self, 'mutator_and_enemy_race_recognizer') and self.mutator_and_enemy_race_recognizer:
+                self.mutator_and_enemy_race_recognizer.shutdown()
+                self.logger.info("突变因子和种族识别器已关闭。")
+
+            #3.设置全局标志位，通知所有 asyncio 循环停止
+            game_state_service.state.app_closing = True
+
+            # 4.清理全局快捷
+            config_hotkeys.unhook_global_hotkeys(self)
+            
+            #self.logger.info("清理完成，程序退出。")
+            QApplication.instance().quit()
+            
+        except Exception as e:
+            self.logger.error(f'清理失败，无法正常退出: {str(e)}')
+            self.logger.error(traceback.format_exc())
+
+
     def closeEvent(self, event):
         """窗口关闭事件处理"""
         try:
@@ -584,7 +617,7 @@ class TimerWindow(QMainWindow):
                 self.malwarfare_handler.shutdown()
                 self.malwarfare_handler = None
 
-            if hasattr(self, 'mutator_and_enemy_race_recognizer') and self.recognizer:
+            if hasattr(self, 'mutator_and_enemy_race_recognizer') and self.mutator_and_enemy_race_recognizer:
                 self.mutator_and_enemy_race_recognizer.shutdown()
                 self.logger.info("突变因子和种族识别器已关闭。")
                 
@@ -601,8 +634,3 @@ class TimerWindow(QMainWindow):
 
         # 调用父类的closeEvent
         super().closeEvent(event)
-
-    def showEvent(self, event):
-        """窗口显示事件，确保窗口始终保持在最上层"""
-        super().showEvent(event)
-        app_window_manager.showEvent_handler(self, event)

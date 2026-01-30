@@ -6,7 +6,7 @@ import sys
 import cv2
 
 # current language settings
-current_game_language = 'en'  # 当前游戏语言 / Current game language
+current_game_language = 'zh'  # 当前游戏语言 / Current game language
 current_language = 'zh'  # 当前语言 / Current language
 
 # 快捷键
@@ -125,7 +125,7 @@ debug_mode = False  # 设置为True启用调试模式 / Set to True to enable de
 debug_time_factor = 5.0  # 调试模式下的时间流速因子 / Time flow factor in debug mode
 
 # 日志级别配置
-LOG_LEVEL = 'WARNING'  # 日志级别，可选值：DEBUG, INFO, WARNING, ERROR, CRITICAL / Log level, available values: DEBUG, INFO, WARNING, ERROR, CRITICAL
+LOG_LEVEL = 'DEBUG'  # 日志级别，可选值：DEBUG, INFO, WARNING, ERROR, CRITICAL / Log level, available values: DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 
 #############################

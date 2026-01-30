@@ -5,7 +5,7 @@ import os
 import sys
 
 #导入模块
-from src.map_handlers.sc2_ocr_processor import SC2OCRProcessor
+from src.map_handlers.malwarfate_ocr_processor import MalwarfareOcrProcessor
 
 # ==============================
 # 1. 核心路径修正 (Path Patching)
@@ -53,7 +53,7 @@ def main():
         # 请确保 config.py 里的 TEMPLATE_BASE_DIR 路径是正确的
         # 如果 config.py 在 src/map_handlers，且模板在 tests/../templates
         # 可能需要去 config.py 里调整一下 TEMPLATE_BASE_DIR 为绝对路径或者基于项目根目录的路径
-        processor = SC2OCRProcessor(lang=lang)
+        processor = MalwarfareOcrProcessor(lang=lang)
     except Exception as e:
         print(f"初始化失败: {e}")
         import traceback

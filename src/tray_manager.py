@@ -43,7 +43,7 @@ class TrayManager:
         settings_action = QAction(self.parent.get_text("settings"), self.parent)
         
         show_action.triggered.connect(self.parent.show)
-        quit_action.triggered.connect(QApplication.instance().quit)
+        quit_action.triggered.connect(self.parent.safe_exit)
         settings_action.triggered.connect(self.parent.open_settings)
         
         '''
