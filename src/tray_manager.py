@@ -40,10 +40,13 @@ class TrayManager:
         tray_menu = QMenu()
         show_action = QAction(self.parent.get_text("show_action"), self.parent)
         quit_action = QAction(self.parent.get_text("quit_action"), self.parent)
+        settings_action = QAction(self.parent.get_text("settings"), self.parent)
         
         show_action.triggered.connect(self.parent.show)
         quit_action.triggered.connect(QApplication.instance().quit)
+        settings_action.triggered.connect(self.parent.open_settings)
         
+        '''
         # 添加语言设置菜单
         language_menu = QMenu(self.parent.get_text("language_menu"), self.parent)
         maps_dir = get_resources_dir('maps')
@@ -55,9 +58,11 @@ class TrayManager:
                     language_action.setText(f"{lang_dir}✓")
                 language_action.triggered.connect(lambda checked, lang=lang_dir: self.parent.on_language_changed(lang))
                 language_menu.addAction(language_action)
+        tray_menu.addMenu(language_menu)
+        '''
         
         tray_menu.addAction(show_action)
-        tray_menu.addMenu(language_menu)
+        tray_menu.addAction(settings_action)
         tray_menu.addAction(quit_action)
         
         # 设置托盘菜单的位置
