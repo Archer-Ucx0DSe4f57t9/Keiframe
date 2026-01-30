@@ -49,7 +49,7 @@ class MutatorManager(QWidget):
                       'AggressiveDeploymentProtoss.png','HeroesFromtheStorm.png']
         for icon_name in icon_paths:
             btn = QPushButton()
-            icon_path = os.path.join(get_resources_dir(), 'ico', 'mutator', icon_name)
+            icon_path = os.path.join(get_resources_dir(), 'icons','mutators', icon_name)
 
             original_pixmap = QPixmap(icon_path)
             if original_pixmap.isNull():

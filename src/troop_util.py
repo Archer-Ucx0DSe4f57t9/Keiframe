@@ -12,7 +12,7 @@ class TroopLoader:
         self.init_troop_loader()
 
     def init_troop_loader(self):
-        troops_dir = fileutil.get_resources_dir('troops')
+        troops_dir = fileutil.get_resources_dir('')
         if not troops_dir:
             logger.error('无法找到troops目录')
             return

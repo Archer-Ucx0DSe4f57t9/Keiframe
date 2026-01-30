@@ -28,23 +28,23 @@ class ControlWindow(QMainWindow):
         self.icon_label = QLabel(self)
         self.icon_label.setGeometry(5, 12, 20, 20)
 
-        icon_dir = get_resources_dir('ico')
+        icon_dir = get_resources_dir('icons')
         self.lock_icon = QIcon(os.path.join(icon_dir, 'lock.svg'))
         self.unlock_icon = QIcon(os.path.join(icon_dir, 'unlock.svg'))
-        
+
         # 设置初始图标
         self.update_icon()
-        
+
         # 设置标签样式
         self.icon_label.setStyleSheet("""
             QLabel {
                 background-color: transparent;
             }
         """)
-        
+
         # 设置窗口大小
         self.setFixedSize(30, 30)
-        
+
     def mousePressEvent(self, event):
         # 处理鼠标点击事件
         if event.button() == Qt.LeftButton:

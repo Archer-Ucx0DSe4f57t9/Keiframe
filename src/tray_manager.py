@@ -26,7 +26,7 @@ class TrayManager:
 
         self.tray_icon = QSystemTrayIcon(self.parent)
 
-        icon_path = os.path.join(get_resources_dir('ico'), 'fav.ico')
+        icon_path = get_resources_dir('icons','sc2_mini.ico')
         self.logger.info(f'加载托盘图标: {icon_path}')
         
         if not os.path.exists(icon_path):

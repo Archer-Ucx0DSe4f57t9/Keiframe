@@ -17,7 +17,7 @@ class Mutator_and_enemy_race_recognizer:
     """
     通过屏幕捕捉和模板匹配，识别游戏中的种族和突变因子图标。
 
-    它会监控一个固定的屏幕区域，并将其与 'icons/races' 和 'icons/mutators'
+    它会监控一个固定的屏幕区域，并将其与 'templates/races' 和 'templates/mutators'
     文件夹中的模板图片进行比对。当一个图标连续匹配10次后，会被确认为最终结果。
     """
 
@@ -41,8 +41,8 @@ class Mutator_and_enemy_race_recognizer:
 
         # 加载模板
 
-        self.race_templates = self._load_templates(get_resources_dir('icons', 'races'))
-        self.mutator_templates = self._load_templates(get_resources_dir('icons', 'mutators'))
+        self.race_templates = self._load_templates(get_resources_dir('templates', 'races'))
+        self.mutator_templates = self._load_templates(get_resources_dir('templates', 'mutators'))
         # 初始化状态和结果存储
         self._reset_state()
 
