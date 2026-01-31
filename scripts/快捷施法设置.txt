@@ -1,7 +1,0 @@
-[Settings]
-
-[Hotkeys]
-TargetChoose=LeftMouseButton,E,B,C,Q,T,R,W,V,Q
-
-[Commands]
-

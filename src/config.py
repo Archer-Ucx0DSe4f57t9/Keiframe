@@ -6,7 +6,7 @@ import sys
 import cv2
 
 # current language settings
-current_game_language = 'zh'  # 当前游戏语言 / Current game language
+current_game_language = 'en'  # 当前游戏语言 / Current game language
 current_language = 'zh'  # 当前语言 / Current language
 
 # 快捷键
