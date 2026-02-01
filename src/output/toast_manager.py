@@ -39,7 +39,7 @@ class ToastManager:
         # 根据事件ID获取或创建 MessagePresenter 实例
         if event_id not in self.map_alerts:
             # 如果是新事件，创建一个新的 MessagePresenter
-            self.map_alerts[event_id] = MessagePresenter(icon_name=None)
+            self.map_alerts[event_id] = MessagePresenter(icon_path=None)
             new_event = True
 
         alert_label = self.map_alerts[event_id]

@@ -45,9 +45,9 @@ class MutatorManager(QWidget):
         layout.setSpacing(1)
         layout.setContentsMargins(0, 5, 0, 0)
 
-        icon_paths = ['AggressiveDeployment.png', 'Propagators.png', 'VoidRifts.png', 'KillBots.png', 'BoomBots.png',
+        icon_names = ['AggressiveDeployment.png', 'Propagators.png', 'VoidRifts.png', 'KillBots.png', 'BoomBots.png',
                       'AggressiveDeploymentProtoss.png','HeroesFromtheStorm.png']
-        for icon_name in icon_paths:
+        for icon_name in icon_names:
             btn = QPushButton()
             icon_path = os.path.join(get_resources_dir(), 'icons','mutators', icon_name)
 
@@ -115,7 +115,8 @@ class MutatorManager(QWidget):
         """初始化突变因子提醒标签"""
 
         for mutator_type in mutator_types:
-            label = MessagePresenter(self.parent(), icon_name=f'{mutator_type}.png')
+            icon_path = os.path.join(get_resources_dir(), 'icons','mutators', f'{mutator_type}.png')
+            label = MessagePresenter(self.parent(), icon_path = icon_path)
             self.mutator_alert_labels[mutator_type] = label
 
             '''
@@ -258,8 +259,8 @@ class MutatorManager(QWidget):
         font_size = int(getattr(config, 'MUTATOR_ALERT_FONT_SIZE', 19))
 
         if not isinstance(alert_label, MessagePresenter):
-            icon_name = f"{mutator_type}.png"
-            alert_label = MessagePresenter(self.parent(), icon_name=icon_name, font_size=font_size)
+            icon_path = os.path.join(get_resources_dir(), 'icons','mutators', f'{mutator_type}.png')
+            alert_label = MessagePresenter(self.parent(), icon_path=icon_path, font_size=font_size)
             self.mutator_alert_labels[mutator_type] = alert_label
 
         # 1. 设置标签的几何信息

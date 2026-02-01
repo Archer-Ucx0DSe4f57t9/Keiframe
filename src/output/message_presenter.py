@@ -194,13 +194,13 @@ class OutlinedLabel(QLabel):
 
 # 负责将输入的文本消息转换成屏幕消息，如果有提示语音也播放。
 class MessagePresenter(QLabel):
-    def __init__(self, parent=None, icon_name=None):
+    def __init__(self, parent=None, icon_path=None):
         super().__init__(parent)
         self.hide()
 
         self._last_message = None
         self._last_color = None
-        self.icon_name = icon_name
+        self.icon_path = icon_path
         self._last_render_time = 0.0
         self._throttle_seconds = 0.08  # 节流（可调整到 0.08~0.2s）
 
@@ -210,7 +210,7 @@ class MessagePresenter(QLabel):
 
         # icon
         self.icon_label = None
-        if icon_name:
+        if icon_path:
             self.icon_label = QLabel()
             layout.addWidget(self.icon_label)
 
@@ -254,8 +254,8 @@ class MessagePresenter(QLabel):
             self._last_message = message
             self._last_color = color
 
-        if self.icon_label and self.icon_name:
-            icon_path = os.path.join(get_resources_dir(), 'ico', 'mutator', self.icon_name)
+        if self.icon_label and self.icon_path:
+            icon_path = os.path.join(get_resources_dir(), 'icons', 'mutators', self.icon_path)
             if os.path.exists(icon_path):
                 px = QPixmap(icon_path).scaled(font_size, font_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 self.icon_label.setPixmap(px)
