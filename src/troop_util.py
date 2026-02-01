@@ -1,5 +1,6 @@
 import os
-from src import fileutil, logging_util
+from src.utils import fileutil
+from src.utils import logging_util
 
 logger=logging_util.get_logger(__name__)
 

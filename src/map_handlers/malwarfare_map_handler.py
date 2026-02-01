@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 import os
 
 # 自带模块
-from src.logging_util import get_logger
+from src.utils.logging_util import get_logger
 from src.map_handlers.malwarfate_ocr_processor import MalwarfareOcrProcessor
 from src import config
 from src.game_state_service import state
@@ -470,7 +470,7 @@ class MalwarfareMapHandler:
             "time": final_time_str,
             "is_paused": latest_paused
         }
-        self.logger.warning(f"OCR 解析结果: {parsed}")
+        self.logger.debug(f"OCR 解析结果: {parsed}")
 
         # 更新状态
         if parsed:

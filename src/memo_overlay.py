@@ -6,9 +6,10 @@ from PyQt5.QtGui import QPixmap, QColor
 import win32gui
 import win32con
 
-from src import config, window_utils
-from src.fileutil import get_resources_dir
-from src.logging_util import get_logger
+from src import config
+from src.utils.fileutil import get_resources_dir
+from src.utils.logging_util import get_logger
+from src.utils import window_utils
 
 logger = get_logger('memo_overlay')
 

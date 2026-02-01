@@ -8,7 +8,7 @@ from typing import List, Optional
 from PyQt5.QtCore import QObject, QUrl
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from src import config
-from src.fileutil import get_resources_dir
+from src.utils.fileutil import get_resources_dir
 
 logger = logging.getLogger(__name__)
 

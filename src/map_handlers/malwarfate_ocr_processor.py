@@ -5,8 +5,8 @@ import numpy as np
 import os,sys
 
 from src import config
-from src.fileutil import get_resources_dir
-from src.logging_util import get_logger
+from src.utils.fileutil import get_resources_dir
+from src.utils.logging_util import get_logger
 
 class MalwarfareOcrProcessor:
     def __init__(self, lang='zh'):

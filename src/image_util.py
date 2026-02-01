@@ -17,8 +17,8 @@ import numpy as np
 import cv2
 from skimage.metrics import structural_similarity as ssim
 from src import config
-from src.fileutil import get_resources_dir, list_files
-from src.logging_util import get_logger, setup_logger
+from src.utils.fileutil import get_resources_dir, list_files
+from src.utils.logging_util import get_logger, setup_logger
 logger = get_logger(__name__)
 
 class ImageCache:

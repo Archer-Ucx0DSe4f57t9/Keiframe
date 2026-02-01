@@ -2,7 +2,7 @@ import win32gui
 import win32con
 import win32api
 
-from src.logging_util import get_logger
+from src.utils.logging_util import get_logger
 
 logger = get_logger('window_utils')
 

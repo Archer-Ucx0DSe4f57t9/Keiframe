@@ -1,10 +1,10 @@
 #identifymap.py
 from typing import List, Dict, Any, Optional
 import sys, os
-from src.logging_util import get_logger
+from src.utils.logging_util import get_logger
 
 map_checks = {
-    '升格之恋': {
+    '升格之链': {
         'check': {
             6: {"Ji'nara", 'Ji’nara', 'Джи-нара', '吉娜拉', '지나라'},
             8: {

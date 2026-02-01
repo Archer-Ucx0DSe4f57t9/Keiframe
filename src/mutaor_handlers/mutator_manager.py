@@ -9,10 +9,10 @@ from PyQt5.QtGui import QIcon, QPixmap, QColor, QPainter
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton, QGraphicsDropShadowEffect
 
 from src import config
-from src.fileutil import get_resources_dir
-from src.logging_util import get_logger
-from src.message_presenter import MessagePresenter
-from src.window_utils import get_sc2_window_geometry
+from src.utils.fileutil import get_resources_dir
+from src.utils.logging_util import get_logger
+from src.output.message_presenter import MessagePresenter
+from src.utils.window_utils import get_sc2_window_geometry
 from src.game_state_service import state as game_state
 
 mutator_types = ['AggressiveDeployment', 'Propagators', 'VoidRifts', 'KillBots', 'BoomBots', 

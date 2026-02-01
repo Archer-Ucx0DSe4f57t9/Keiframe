@@ -12,8 +12,8 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QKeyEvent, QColor, QKeySequence
 
 from src import config  # 导入你现有的 config.py 作为默认值
-from src.logging_util import get_logger
-from src.fileutil import get_resources_dir, get_project_root
+from src.utils.logging_util import get_logger
+from src.utils.fileutil import get_resources_dir, get_project_root
 
 # ==========================================
 # 1. 自定义控件

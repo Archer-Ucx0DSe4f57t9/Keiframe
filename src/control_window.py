@@ -4,7 +4,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtCore import pyqtSignal
 import os
 import sys
-from src.fileutil import get_resources_dir
+from src.utils.fileutil import get_resources_dir
 
 class ControlWindow(QMainWindow):
     # 创建状态改变信号

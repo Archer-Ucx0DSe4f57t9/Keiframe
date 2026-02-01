@@ -11,10 +11,10 @@ import easyocr
 import traceback
 
 # 假设这些函数/模块在项目中可用
-from src.fileutil import get_resources_dir
-from src.window_utils import is_game_active 
+from src.utils.fileutil import get_resources_dir
+from src.utils.window_utils import is_game_active 
 from src import config 
-from src.logging_util import get_logger
+from src.utils.logging_util import get_logger
 
 logger = get_logger(__name__)
 

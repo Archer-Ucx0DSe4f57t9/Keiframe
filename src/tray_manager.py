@@ -6,8 +6,8 @@ from PyQt5.QtCore import QPoint
 from PyQt5.QtWidgets import QApplication
 
 from src import config
-from src.fileutil import get_resources_dir
-from src.logging_util import get_logger
+from src.utils.fileutil import get_resources_dir
+from src.utils.logging_util import get_logger
 
 class TrayManager:
     def __init__(self, parent=None):

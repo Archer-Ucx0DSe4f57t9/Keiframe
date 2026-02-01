@@ -8,13 +8,14 @@ from control_window import ControlWindow
 from PyQt5.QtCore import Qt, QTimer, QPoint, pyqtSignal
 from PyQt5 import QtCore
 
-from src import  config, ui_setup, game_state_service, config_hotkeys, game_time_handler, map_loader, app_window_manager, language_manager, image_util
-from src.toast_manager import ToastManager
-from src.mutator_and_enemy_race_recognizer import Mutator_and_enemy_race_recognizer
+from src import  config, ui_setup, game_state_service, config_hotkeys, game_time_handler, app_window_manager, language_manager, image_util
+from src.map_handlers import map_loader
+from src.output.toast_manager import ToastManager
+from src.mutaor_handlers.mutator_and_enemy_race_recognizer import Mutator_and_enemy_race_recognizer
 from src.memo_overlay import MemoOverlay
 from src.settings_window import SettingsWindow
 from src.countdown_manager import CountdownManager
-from src.fileutil import get_project_root
+from src.utils.fileutil import get_project_root
 
 class TimerWindow(QMainWindow):
     # 创建信号用于地图更新
@@ -59,7 +60,7 @@ class TimerWindow(QMainWindow):
         self.setAttribute(Qt.WA_NativeWindow)
         
         # 初始化日志记录器
-        from logging_util import get_logger
+        from src.utils.logging_util import get_logger
         self.logger = get_logger(__name__)
         self.logger.info('SC2 Timer 启动')
 

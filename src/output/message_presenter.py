@@ -3,11 +3,11 @@ from PyQt5.QtCore import Qt, QRect
 from PyQt5.QtGui import QFont, QPixmap, QPainter, QPen, QColor, QFontMetrics
 from PyQt5.QtWidgets import QLabel, QHBoxLayout
 
-from fileutil import get_resources_dir
+from src.utils.fileutil import get_resources_dir
 import sys
 from src import config
 
-from sound_player import shared_sound_manager
+from src.output.sound_player import shared_sound_manager
 
 # 将屏幕提示优化，减少帧数影响
 class OutlinedLabel(QLabel):

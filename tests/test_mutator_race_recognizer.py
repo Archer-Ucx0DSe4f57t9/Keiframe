@@ -7,7 +7,7 @@ import logging
 import shutil
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
-from src.mutator_and_enemy_race_recognizer import Mutator_and_enemy_race_recognizer
+from src.mutaor_handlers.mutator_and_enemy_race_recognizer import Mutator_and_enemy_race_recognizer
 current_dir = os.path.dirname(os.path.abspath(__file__))
 # your_project/tests/test_recognizer_debug.py
 

@@ -1,6 +1,6 @@
 import sys, os
 import json
-from src.logging_util import get_logger
+from src.utils.logging_util import get_logger
 
 
 logger = get_logger(__name__)
@@ -13,7 +13,7 @@ class MapProcessor:
     def load_map_templates(self):
         """加载地图模板数据"""
         try:
-            from fileutil import get_resources_dir
+            from src.utils.fileutil import get_resources_dir
             resources_dir = get_resources_dir('maps', 'zh')
             if not resources_dir:
                 return

@@ -1,6 +1,6 @@
 import os
 import sys
-from src.logging_util import get_logger, setup_logger
+from src.utils.logging_util import get_logger, setup_logger
 logger = get_logger(__name__)
 
 def get_project_root():

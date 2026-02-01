@@ -8,9 +8,9 @@ import os
 import sys
 import os
 from src import config
-from src.logging_util import get_logger
-from src.fileutil import get_resources_dir
-from src.window_utils import is_game_active
+from src.utils.logging_util import get_logger
+from src.utils.fileutil import get_resources_dir
+from src.utils.window_utils import is_game_active
 from src.game_state_service import state
 
 class Mutator_and_enemy_race_recognizer:

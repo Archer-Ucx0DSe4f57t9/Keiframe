@@ -4,7 +4,7 @@ import re
 import traceback
 import json
 import config
-from src.fileutil import get_resources_dir, list_files, get_project_root
+from src.utils.fileutil import get_resources_dir, list_files, get_project_root
 
 def get_text(window, key):
     """获取多语言文本 (原 TimerWindow.get_text)"""

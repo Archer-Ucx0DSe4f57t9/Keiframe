@@ -8,8 +8,8 @@ from PyQt5.QtGui import QFont, QBrush, QColor
 from PyQt5.QtCore import Qt, QTimer
 
 from src import config
-from src.fileutil import get_resources_dir, list_files
-from src.mutator_manager import MutatorManager
+from src.utils.fileutil import get_resources_dir, list_files
+from src.mutaor_handlers.mutator_manager import MutatorManager
 
 
 

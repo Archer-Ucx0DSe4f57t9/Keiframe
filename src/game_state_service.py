@@ -10,9 +10,9 @@ import numpy as np
 from PyQt5 import QtCore
 from src.map_handlers.IdentifyMap import identify_map
 from src import config
-from src.debug_utils import get_mock_data, reset_mock, get_mock_screen_data
-from src.logging_util import get_logger
-from src.window_utils import get_sc2_window_geometry, is_game_active
+from src.utils.debug_utils import get_mock_data, reset_mock, get_mock_screen_data
+from src.utils.logging_util import get_logger
+from src.utils.window_utils import get_sc2_window_geometry, is_game_active
 from src import show_fence
 
 logger = get_logger(__name__)
