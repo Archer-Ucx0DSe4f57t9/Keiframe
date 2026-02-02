@@ -228,21 +228,7 @@ def setup_search_and_combo_box(window):
 
     window.map_list = get_all_map_names(window.maps_db)
     window.combo_box.addItems(sorted(window.map_list, key=pinyin_key))
-    
-    '''原来的文本加载逻辑
-    # 加载resources文件夹下的文件
-    resources_dir = get_resources_dir('maps', config.current_language)
-    all_files = list_files(resources_dir) if resources_dir else []
-    window.files = []
-    for file_name in all_files:
-    # 确保只处理 .csv 文件
-        if file_name.lower().endswith('.csv'):
-            # 移除 .csv 扩展名
-            clean_name = file_name[:-4] 
-            window.files.append(clean_name)
 
-    window.combo_box.addItems(sorted(window.files))
-    原来的文本加载逻辑'''
     ####################
     # 用户输入搜索
     # 清空搜索框的定时器
@@ -254,7 +240,7 @@ def setup_search_and_combo_box(window):
 def setup_mutator_ui(window):
     """创建突变管理器和指挥官替换按钮"""
     # ... (突变和按钮创建和样式代码) ... (保持与原文件一致)
-    window.mutator_manager = MutatorManager(window.main_container)
+    window.mutator_manager = MutatorManager(window.main_container,window.mutators_db)
     window.mutator_manager.setStyleSheet("""
         QWidget {
             background-color: rgba(43, 43, 43, 96);

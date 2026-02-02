@@ -1,6 +1,8 @@
 #daos.py
 #dbs 相关的数据访问对象 (DAO) 定义
-from pypinyin import lazy_pinyin, Style
+#负责与数据库进行交互，执行查询和数据操作
+
+# 根据地图名称加载地图配置
 def load_map_by_name(conn, map_name):
   #键值：	"map_name","time_label"，	"time_value","count_value",	"event_text",	"army_text"，"sound_filename"，"hero_text"
   if map_name =='净网行动':
@@ -40,7 +42,8 @@ def get_all_map_names(conn):
     rows = cur.fetchall()
     return [row[0] for row in rows]
 
-def load_mutators_for_time(conn, mutator_name):
+# 根据突变名称加载突变配置
+def load_mutator_by_name(conn, mutator_name):
   #键值：	"mutator_name",	"time_label", "time_value",	"content_text","sound_filename"
     sql = """
     SELECT *
@@ -50,7 +53,24 @@ def load_mutators_for_time(conn, mutator_name):
     """
     cur = conn.execute(sql, (mutator_name,))
     return cur.fetchall()
-  
+
+# 获取所有突变列表
+def get_all_mutator_names(conn):
+    sql = """
+    SELECT * FROM mutator_meta ORDER BY sort_order ASC;
+    """
+    cur = conn.execute(sql)
+    rows = cur.fetchall()
+    return  [row[0] for row in rows]
+
+def get_all_notify_mutator_names(conn):
+    sql = """
+    SELECT mutator_name FROM mutator_meta WHERE need_notify = 1 ORDER BY sort_order ASC;
+    """
+    cur = conn.execute(sql)
+    rows = cur.fetchall()
+    return  [row[0] for row in rows]
+#测试代码
 if __name__ == "__main__":
     from src.db.db_manager import DBManager
 
@@ -65,8 +85,10 @@ if __name__ == "__main__":
         print(map_row['map_name'], map_row['count_value'],map_row['time_label'],map_row['time_value'], map_row['event_text'], map_row['army_text'] ,map_row['sound_filename'],map_row['hero_text'])
     # 测试加载突变
     mutator_name = "AggressiveDeploymentProtoss"
-    mutators = load_mutators_for_time(mutators_conn, mutator_name)
+    mutators = load_mutator_by_name(mutators_conn, mutator_name)
     for mutator_row in mutators:
         print(mutator_row['mutator_name'], mutator_row['time_value'], mutator_row['content_text'])
         
     print(get_all_map_names(maps_conn))
+    print(get_all_mutator_names(mutators_conn))
+    print(get_all_notify_mutator_names(mutators_conn))

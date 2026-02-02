@@ -14,18 +14,24 @@ from src.utils.logging_util import get_logger
 from src.output.message_presenter import MessagePresenter
 from src.utils.window_utils import get_sc2_window_geometry
 from src.game_state_service import state as game_state
+from src.db.daos import load_mutator_by_name,get_all_mutator_names,get_all_notify_mutator_names
 
-mutator_types = ['AggressiveDeployment', 'Propagators', 'VoidRifts', 'KillBots', 'BoomBots', 
-                 'HeroesFromtheStorm', 'AggressiveDeploymentProtoss'] # 
-#名称到简略中文名称映射，用于提示显示
-mutator_types_to_CHS = {'AggressiveDeployment': '部署', 'Propagators': '小软', 'VoidRifts': '裂隙', 'KillBots': '杀戮',
+
+#名称到简略中文名称映射，用于提示显示,将来迁移到语言模块
+mutator_names_to_CHS = {'AggressiveDeployment': '部署', 'Propagators': '小软', 'VoidRifts': '裂隙', 'KillBots': '杀戮',
                         'BoomBots': '炸弹', 'HeroesFromtheStorm': '风暴', 'AggressiveDeploymentProtoss': '部署神族'}
 
+
+
 class MutatorManager(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, mutators_db=None):
         super().__init__(parent)
         self.logger = get_logger(__name__)
 
+        self.mutators_db = mutators_db
+        self.mutator_names = get_all_mutator_names(self.mutators_db)
+        self.notify_mutator_names = get_all_notify_mutator_names(self.mutators_db)
+        # 突变因子提醒标签和定时器
         self.mutator_alert_labels = {}
         self.mutator_alert_timers = {}
         self.mutator_buttons = []
@@ -45,11 +51,10 @@ class MutatorManager(QWidget):
         layout.setSpacing(1)
         layout.setContentsMargins(0, 5, 0, 0)
 
-        icon_names = ['AggressiveDeployment.png', 'Propagators.png', 'VoidRifts.png', 'KillBots.png', 'BoomBots.png',
-                      'AggressiveDeploymentProtoss.png','HeroesFromtheStorm.png']
-        for icon_name in icon_names:
+        mutator_list = self.mutator_names
+        for mutator_name in mutator_list:
             btn = QPushButton()
-            icon_path = os.path.join(get_resources_dir(), 'icons','mutators', icon_name)
+            icon_path = os.path.join(get_resources_dir(), 'icons','mutators', f'{mutator_name}.png')
 
             original_pixmap = QPixmap(icon_path)
             if original_pixmap.isNull():
@@ -64,7 +69,7 @@ class MutatorManager(QWidget):
             btn.setIconSize(QSize(26, 26))
             btn.setFixedSize(32, 32)
             btn.setCheckable(True)
-            btn.setToolTip(mutator_types_to_CHS.get(icon_name.split('.')[0]))
+            btn.setToolTip(mutator_names_to_CHS.get(mutator_name.split('.')[0]))
 
             btn.setStyleSheet('''
                 QPushButton { border: none; padding: 0px; 
@@ -78,8 +83,7 @@ class MutatorManager(QWidget):
             btn.original_icon = QIcon(transparent_pixmap)
             btn.gray_icon = QIcon(gray_transparent_pixmap)
 
-            mutator_type = icon_name.split('.')[0]
-            btn.setProperty("mutator_type", mutator_type)
+            btn.setProperty("mutator_name", mutator_name)
             btn.toggled.connect(lambda checked, b=btn: self.on_mutator_toggled(b, checked))
 
             layout.addWidget(btn)
@@ -114,31 +118,24 @@ class MutatorManager(QWidget):
     def init_mutator_alerts(self):
         """初始化突变因子提醒标签"""
 
-        for mutator_type in mutator_types:
-            icon_path = os.path.join(get_resources_dir(), 'icons','mutators', f'{mutator_type}.png')
-            label = MessagePresenter(self.parent(), icon_path = icon_path)
-            self.mutator_alert_labels[mutator_type] = label
+        for mutator_name in self.notify_mutator_names:
+            if len(load_mutator_by_name(self.mutators_db,mutator_name)) > 1:
+                #只有1条一般只为不涉及时间点的提示，不需要提醒标签
+                icon_path = os.path.join(get_resources_dir(), 'icons','mutators', f'{mutator_name}.png')
+                label = MessagePresenter(self.parent(), icon_path = icon_path)
+                self.mutator_alert_labels[mutator_name] = label
 
-            '''
-            label = QLabel(self.parent())
-            label.setWindowFlags(
-                Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
-            )
-            label.setAttribute(Qt.WA_TranslucentBackground)
-            label.hide()
-            self.mutator_alert_labels[mutator_type] = label
-            '''
 
     def on_mutator_toggled(self, button, checked):
-        mutator_type = button.property("mutator_type")
+        mutator_name = button.property("mutator_name")
 
         if game_state.active_mutators is None:
             game_state.active_mutators = []
 
         if checked:
 
-            if mutator_type not in game_state.active_mutators:
-                game_state.active_mutators.append(mutator_type)
+            if mutator_name not in game_state.active_mutators:
+                game_state.active_mutators.append(mutator_name)
 
             button.setIcon(button.original_icon)
             shadow = QGraphicsDropShadowEffect()
@@ -147,49 +144,32 @@ class MutatorManager(QWidget):
             shadow.setYOffset(3)
             shadow.setColor(QColor(0, 0, 0, 160))
             button.setGraphicsEffect(shadow)
-
-            time_points = self.load_mutator_config(mutator_type)
-            self.active_mutator_time_points[mutator_type] = time_points
-            self.logger.warning(f"手动加载 {mutator_type} 配置。时间点数量: {len(time_points)}")
+            
+            if(self.is_muatator_required_to_notify(mutator_name)==True):
+                time_points = self.load_mutator_config(mutator_name)
+                self.active_mutator_time_points[mutator_name] = time_points
+                self.logger.warning(f"手动加载 {mutator_name} 配置。时间点数量: {len(time_points)}")
         else:
             button.setIcon(button.gray_icon)
             button.setGraphicsEffect(None)
 
-            if mutator_type in game_state.active_mutators:
-                game_state.active_mutators.remove(mutator_type)
+            if mutator_name in game_state.active_mutators:
+                game_state.active_mutators.remove(mutator_name)
 
-            if mutator_type in self.active_mutator_time_points:
-                del self.active_mutator_time_points[mutator_type]
-            if mutator_type in self.currently_alerting:
-                del self.currently_alerting[mutator_type]
-            self.hide_mutator_alert(mutator_type)
+            if mutator_name in self.active_mutator_time_points:
+                del self.active_mutator_time_points[mutator_name]
+            if mutator_name in self.currently_alerting:
+                del self.currently_alerting[mutator_name]
+            self.hide_mutator_alert(mutator_name)
 
     def load_mutator_config(self, mutator_name):
         """加载突变因子配置文件"""
         try:
-            config_path = get_resources_dir('mutator', f'{mutator_name}.csv')
-            if not os.path.exists(config_path):
-                self.logger.error(f'突变因子配置文件不存在: {config_path}')
-                return []
-
-            with open(config_path, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-
             time_points_info = []
-            for line in lines:
-                if line.strip():
-                    parts = line.strip().split(',')
-                    if len(parts) >= 3:
-                        time_str = parts[0].strip()
-                        content_text = parts[1].strip() 
-                        sound_filename = parts[2].strip() # <--- 新增：读取第 3 列的内容
-                        
-                        time_parts = time_str.split(':')
-                        if len(time_parts) == 2:
-                            seconds = int(time_parts[0]) * 60 + int(time_parts[1])
-                            time_points_info.append((seconds, content_text, sound_filename))  #存储时间点、因子信息和音频文件名的元组
-
-            return sorted(time_points_info,key=lambda x: x[0])  # 返回按时间排序的列表
+            mutator_data = load_mutator_by_name(self.mutators_db,mutator_name)
+            for a_mutator in mutator_data:
+                time_points_info.append((a_mutator['time_value'],a_mutator['content_text'],a_mutator['sound_filename']))
+            return time_points_info #dao已经排序
 
         except Exception as e:
             self.logger.error(f'加载突变因子配置失败: {str(e)}')
@@ -208,7 +188,7 @@ class MutatorManager(QWidget):
                 label.hide()
             return
 
-        for mutator_type, time_points_info in self.active_mutator_time_points.items():
+        for mutator_name, time_points_info in self.active_mutator_time_points.items():
             next_deployment_info = None
             for deployment_seconds, content_text,sound_filename in time_points_info:
                 if deployment_seconds > current_seconds:
@@ -216,8 +196,8 @@ class MutatorManager(QWidget):
                     break
             
             if not next_deployment_info:
-                self.hide_mutator_alert(mutator_type)
-                continue # 跳到下一个 mutator_type
+                self.hide_mutator_alert(mutator_name)
+                continue # 跳到下一个 mutator_name
 
             next_deployment_time = next_deployment_info[0]
             content_to_show = next_deployment_info[1]
@@ -226,52 +206,52 @@ class MutatorManager(QWidget):
             if (next_deployment_time - current_seconds) <= config.MUTATOR_ALERT_SECONDS:
                 time_remaining = next_deployment_time - current_seconds
 
-                if (mutator_type == "AggressiveDeploymentProtoss" or mutator_type == "AggressiveDeployment"):
+                if (mutator_name == "AggressiveDeploymentProtoss" or mutator_name == "AggressiveDeployment"):
                     #部署因子涉及到强度信息
-                     message = f"{int(time_remaining)}秒后：{mutator_types_to_CHS.get(mutator_type)} 强度：{content_to_show}"
+                     message = f"{int(time_remaining)}秒后：{mutator_names_to_CHS.get(mutator_name)} 强度：{content_to_show}"
                 else:
                     #其他因子只涉及到数量，风暴不由mutatormanager播报
-                    message = f"{int(time_remaining)}秒后：{mutator_types_to_CHS.get(mutator_type)}*{content_to_show} "
+                    message = f"{int(time_remaining)}秒后：{mutator_names_to_CHS.get(mutator_name)}*{content_to_show} "
 
 
-                self.show_mutator_alert(message, mutator_type, time_remaining,warning_sound_filename)
+                self.show_mutator_alert(message, mutator_name, time_remaining,warning_sound_filename)
             else:
-                self.hide_mutator_alert(mutator_type)
+                self.hide_mutator_alert(mutator_name)
 
-    def show_mutator_alert(self, message, mutator_type='deployment', time_remaining=None, warning_sound_filename=None):
+    def show_mutator_alert(self, message, mutator_name='deployment', time_remaining=None, warning_sound_filename=None):
         """
         显示/更新突变因子提醒，并根据剩余时间动态改变颜色。
         """
         sc2_rect = get_sc2_window_geometry()
 
         if not sc2_rect:
-            self.hide_mutator_alert(mutator_type)
+            self.hide_mutator_alert(mutator_name)
             return
 
         sc2_x, sc2_y, sc2_width, sc2_height = sc2_rect
-        alert_label = self.mutator_alert_labels.get(mutator_type)
+        alert_label = self.mutator_alert_labels.get(mutator_name)
 
         if not alert_label:
-            self.logger.warning(f"警告：未找到 mutator_type: {mutator_type} 对应的提醒标签。")
+            self.logger.warning(f"警告：未找到 mutator_name: {mutator_name} 对应的提醒标签。")
             return
 
         line_height = int(getattr(config, 'MUTATOR_ALERT_LINE_HEIGHT', 32))
         font_size = int(getattr(config, 'MUTATOR_ALERT_FONT_SIZE', 19))
 
         if not isinstance(alert_label, MessagePresenter):
-            icon_path = os.path.join(get_resources_dir(), 'icons','mutators', f'{mutator_type}.png')
+            icon_path = os.path.join(get_resources_dir(), 'icons','mutators', f'{mutator_name}.png')
             alert_label = MessagePresenter(self.parent(), icon_path=icon_path, font_size=font_size)
-            self.mutator_alert_labels[mutator_type] = alert_label
+            self.mutator_alert_labels[mutator_name] = alert_label
 
         # 1. 设置标签的几何信息
         start_offset_y = int(getattr(config, 'MUTATOR_ALERT_OFFSET_Y', 324))
         alert_area_y = sc2_y + start_offset_y
 
         try:
-            mutator_index = mutator_types.index(mutator_type)
+            mutator_index = self.notify_mutator_names.index(mutator_name)
             alert_label_y = alert_area_y + (mutator_index * line_height)
         except ValueError:
-            self.logger.warning(f"未知的 mutator 类型: {mutator_type}")
+            self.logger.warning(f"未知的 mutator 类型: {mutator_name}")
             return
 
         horizontal_indent = int(getattr(config, 'MUTATOR_ALERT_OFFSET_X', 19))
@@ -306,10 +286,10 @@ class MutatorManager(QWidget):
             sound_filename=sound_filename
         )
 
-    def hide_mutator_alert(self, mutator_type):
+    def hide_mutator_alert(self, mutator_name):
         """隐藏突变因子提醒"""
-        if mutator_type in self.mutator_alert_labels:
-            self.mutator_alert_labels[mutator_type].hide()
+        if mutator_name in self.mutator_alert_labels:
+            self.mutator_alert_labels[mutator_name].hide()
 
     def get_current_screen(self):
         return self.parent().get_current_screen()
@@ -324,6 +304,10 @@ class MutatorManager(QWidget):
                 # 非激活状态 (灰色)
                 btn.setIcon(btn.gray_icon)
 
+    def is_muatator_required_to_notify(self, mutator_name):
+        """检查某个突变因子是否需要提醒"""
+        return mutator_name in self.notify_mutator_names
+    
     def sync_mutator_toggles(self, confirmed_mutators):
         """
         根据识别器确认的突变因子列表，同步按钮的选中状态。
@@ -342,8 +326,8 @@ class MutatorManager(QWidget):
 
         try:
             for btn in self.mutator_buttons:
-                mutator_type = btn.property("mutator_type")
-                should_be_checked = mutator_type in confirmed_mutators
+                mutator_name = btn.property("mutator_name")
+                should_be_checked = mutator_name in confirmed_mutators
 
                 # 1. 确保按钮的选中状态正确
                 btn.setChecked(should_be_checked)
@@ -351,10 +335,10 @@ class MutatorManager(QWidget):
                 # 2. 【关键修复】手动同步 UI 和加载配置，因为信号被阻塞
                 if should_be_checked:
                     #确定加载配置名称
-                    config_name_to_load = mutator_type
-                    if mutator_type == 'AggressiveDeployment' and game_state.enemy_race == 'Protoss':
+                    config_name_to_load = mutator_name
+                    if mutator_name == 'AggressiveDeployment' and game_state.enemy_race == 'Protoss':
                         config_name_to_load = 'AggressiveDeploymentProtoss'
-                        self.logger.info(f"应用变式: {mutator_type} + {game_state.enemy_race } -> 加载 {config_name_to_load}")
+                        self.logger.info(f"应用变式: {mutator_name} + {game_state.enemy_race } -> 加载 {config_name_to_load}")
                     
                     # 同步 UI 状态（图标和阴影）
                     btn.setIcon(btn.original_icon)
@@ -376,17 +360,17 @@ class MutatorManager(QWidget):
                         self.logger.error(f"警告：配置 '{config_name_to_load}' 加载后时间点列表为空。")
                     
                     # 更新活动配置
-                    self.active_mutator_time_points[mutator_type] = time_points #字典形式，键为原始mutator_type，在识别到protoss时可以更新值
-                    self.logger.debug(f"通过同步加载 {mutator_type} 配置。")
+                    self.active_mutator_time_points[mutator_name] = time_points #字典形式，键为原始mutator_name，在识别到protoss时可以更新值
+                    self.logger.debug(f"通过同步加载 {mutator_name} 配置。")
                 else:
                     # 同步 UI 状态 (灰色图标和清除阴影)
                     btn.setIcon(btn.gray_icon)
                     btn.setGraphicsEffect(None)
 
                     # 清除配置
-                    if mutator_type in self.active_mutator_time_points:
-                        del self.active_mutator_time_points[mutator_type]
-                    self.hide_mutator_alert(mutator_type)
+                    if mutator_name in self.active_mutator_time_points:
+                        del self.active_mutator_time_points[mutator_name]
+                    self.hide_mutator_alert(mutator_name)
         except Exception as e:
                 # 【捕获所有异常，并打印完整的堆栈信息】
                 self.logger.error(f"FATAL ERROR during mutator sync: {str(e)}")

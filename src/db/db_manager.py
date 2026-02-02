@@ -8,8 +8,6 @@ class DBManager:
     def __init__(self):
         self.maps_db_path = get_resources_dir("db", "maps.db")
         self.mutators_db_path = get_resources_dir("db", "mutators.db")
-        print(f"Maps DB Path: {self.maps_db_path}")
-        print(f"Mutators DB Path: {self.mutators_db_path}")
         self._maps_conn = None
         self._mutators_conn = None
 

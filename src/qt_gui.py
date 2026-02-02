@@ -57,6 +57,8 @@ class TimerWindow(QMainWindow):
         #启动时加载用户自定义配置 (这步最好放在程序入口最开始)
         self.apply_user_settings()
 
+        #self.mutator_manager在ui_setup中创建
+        
         # 初始化突变因子和种族识别器
         self.mutator_and_enemy_race_recognizer = Mutator_and_enemy_race_recognizer(recognition_signal = self.mutator_and_enemy_race_recognition_signal)
         self.mutator_and_enemy_race_recognizer.reset_and_start() # 启动识别线程
