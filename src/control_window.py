@@ -1,3 +1,5 @@
+#control_window.py
+# 控制窗口的定义，包含锁定/解锁图标和状态信号
 from PyQt5.QtWidgets import QMainWindow, QLabel
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt

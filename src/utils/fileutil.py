@@ -13,9 +13,8 @@ def get_project_root():
         # PyInstaller 打包后的 exe
         return os.path.dirname(sys.executable)
     else:
-        # 源码运行，假设 main.py 在项目根目录下一级
-        main_path = os.path.abspath(sys.modules['__main__'].__file__)
-        return os.path.dirname(os.path.dirname(main_path))
+        current_file_path = os.path.abspath(__file__)
+        return os.path.dirname(os.path.dirname(os.path.dirname(current_file_path)))
 
 
 def get_resources_dir(*subdirs):

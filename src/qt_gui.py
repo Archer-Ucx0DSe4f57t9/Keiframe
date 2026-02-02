@@ -16,6 +16,7 @@ from src.memo_overlay import MemoOverlay
 from src.settings_window import SettingsWindow
 from src.countdown_manager import CountdownManager
 from src.utils.fileutil import get_project_root
+from src.db.db_manager import DBManager
 
 class TimerWindow(QMainWindow):
     # 创建信号用于地图更新
@@ -31,8 +32,6 @@ class TimerWindow(QMainWindow):
     lock_signal = pyqtSignal()            # 新增：锁定信号
     screenshot_signal = pyqtSignal()      # 新增：截图信号
     
-    
-    
     def get_screen_resolution(self):
         return app_window_manager.get_screen_resolution()
 
@@ -43,6 +42,13 @@ class TimerWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        
+        # 初始化数据库管理器
+        self.db_manager = DBManager()
+        # 获取数据库连接
+        self.maps_db = self.db_manager.get_maps_conn()
+        self.mutators_db = self.db_manager.get_mutators_conn()
+        #self.enemies_db = self.db_manager.get_enemies_conn()#暂不可用
         
         #在最开始安全地初始化 control_window 为 None
         # 万一在真正创建前触发了 moveEvent，它可以通过 hasattr() 或 try/except 优雅地失败。

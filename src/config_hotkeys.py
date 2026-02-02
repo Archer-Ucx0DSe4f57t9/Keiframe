@@ -1,3 +1,5 @@
+#config_hotkeys.py
+#配置全局快捷键的初始化和处理逻辑
 import keyboard
 import traceback
 from PyQt5.QtCore import Qt

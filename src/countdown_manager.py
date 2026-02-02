@@ -1,4 +1,5 @@
 # countdown_manager.py
+# 倒计时管理器，处理用户交互和倒计时逻辑
 import time
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal

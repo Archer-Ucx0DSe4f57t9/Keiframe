@@ -1,4 +1,5 @@
 #game_time_handler
+# 处理游戏时间更新的逻辑
 import time
 import traceback
 

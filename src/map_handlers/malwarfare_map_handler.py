@@ -219,17 +219,18 @@ class MalwarfareMapHandler:
             last_game_screen_time_stamp = game_screen_time_stamp
             current_time = time.perf_counter()
             
+            # 依据时间间隔决定执行哪些OCR任务
             if current_time - self._last_count_update >= 1.0:
                 self._executor.submit(self._ocr_and_process_count, game_screen)
                 self._last_count_update = current_time
-            if current_time - self._last_status_update >= 0.33:
+            if current_time - self._last_status_update >= 0.13:
                 self._executor.submit(self._ocr_and_process_time_and_paused, game_screen)
                 self._last_status_update = current_time
 
             self._update_latest_result()
 
             elapsed_time = time.perf_counter() - start_time
-            sleep_time = max(0, 0.3 - elapsed_time)
+            sleep_time = max(0, 0.1 - elapsed_time)
             if sleep_time > 0:
                 time.sleep(sleep_time)
 

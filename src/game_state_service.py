@@ -1,3 +1,5 @@
+#game_state_service.py
+# 封装全局游戏状态的服务，只记录状态（游戏时间，id,画面截图等），不进行任何处理逻辑
 import time
 import json
 import aiohttp
@@ -219,7 +221,7 @@ def _capture_game_screen(sct):
 async def screenshot_scheduler() -> None:
     """
     后台截图循环：
-    - 每 0.5 秒截一次
+    - 每 0.1 秒截一次
     - 结果写入 GlobalState
     """
     logger.info("screenshot_scheduler 启动")
@@ -233,7 +235,7 @@ async def screenshot_scheduler() -> None:
                 _capture_game_screen(sct)
 
             elapsed = time.perf_counter() - start
-            sleep_time = max(0.0, 0.5 - elapsed)
+            sleep_time = max(0.0, 0.1 - elapsed)
             await asyncio.sleep(sleep_time)
 
     logger.info("screenshot_scheduler 退出")
