@@ -45,22 +45,7 @@ class TrayManager:
         show_action.triggered.connect(self.parent.show)
         quit_action.triggered.connect(self.parent.safe_exit)
         settings_action.triggered.connect(self.parent.open_settings)
-        
-        '''
-        # 添加语言设置菜单
-        language_menu = QMenu(self.parent.get_text("language_menu"), self.parent)
-        maps_dir = get_resources_dir('maps')
-        for lang_dir in os.listdir(maps_dir):
-            if os.path.isdir(os.path.join(maps_dir, lang_dir)) and lang_dir not in ['.', '..']:
-                language_action = QAction(lang_dir, self.parent)
-                # 为当前选中的语言添加标记
-                if lang_dir == config.current_language:
-                    language_action.setText(f"{lang_dir}✓")
-                language_action.triggered.connect(lambda checked, lang=lang_dir: self.parent.on_language_changed(lang))
-                language_menu.addAction(language_action)
-        tray_menu.addMenu(language_menu)
-        '''
-        
+
         tray_menu.addAction(show_action)
         tray_menu.addAction(settings_action)
         tray_menu.addAction(quit_action)

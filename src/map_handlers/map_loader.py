@@ -7,6 +7,7 @@ from src.utils.fileutil import get_resources_dir
 from src.map_handlers.map_event_manager import MapEventManager
 from src.map_handlers.malwarfare_event_manager import MapwarfareEventManager
 from src.map_handlers.malwarfare_map_handler import MalwarfareMapHandler
+from src.db.daos import load_map_by_name
 from src import config, game_state_service
 
 def handle_version_selection(window):
@@ -147,43 +148,29 @@ def handle_map_selection(window, map_name):
         
     # 加载地图文件内容并填充表格 (原有的文件加载和表格填充逻辑)
     try:
-        map_file_name_with_ext = map_name + ".csv" # 构造带扩展名的文件名
-        map_file_path = get_resources_dir('maps', config.current_language, map_file_name_with_ext)
-        window.logger.info(f'尝试加载地图文件: {map_file_path}')
-
-        if os.path.exists(map_file_path):
-            with open(map_file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            window.logger.info(f'成功读取地图文件内容: {map_name}')
-
+        
+        map_data = load_map_by_name(window.maps_db, map_name)
+        if map_data:
+            window.logger.info(f'成功从数据库读取地图数据: {map_name}，记录数: {len(map_data)}')
             # 清空表格现有内容
             window.table_area.setRowCount(0)
             window.logger.info('已清空表格现有内容')
             
-            # 按行分割内容，过滤掉空行和只包含空白字符的行
-            lines = [line.strip() for line in content.split('\n') if line and not line.isspace()]
-            window.logger.info('解析到的有效行数: {}'.format(len(lines)))
-            window.logger.info('解析后的行内容:\n{}'.format('\n'.join(lines)))
-            
             # 设置表格行数
-            window.table_area.setRowCount(len(lines))
-            window.logger.info(f'设置表格行数为: {len(lines)}')
+            window.table_area.setRowCount(len(map_data))
+            window.logger.info(f'设置表格行数为: {len(map_data)}')
             
             # 填充表格内容
-            for row, line in enumerate(lines):
-                
-                # 按tab分隔符拆分时间和事件
-                parts = line.split(',')
-                
+            for row, map_row in enumerate(map_data):
                 if window.is_map_Malwarfare:
                     # 净网行动处理逻辑 (4列)
-                    if len(parts) >= 4:
-                        count_text = parts[0].strip()
-                        time_text = parts[1].strip()
-                        event_text = parts[2].strip()
-                        army_text = parts[3].strip()
-                        sound_text = parts[4].strip() if len(parts) >= 5 else "" # Sound 现在是第 5 列
-                        hero_text = "" # 净网行动英雄列留空
+                    
+                    count_text = str(map_row['count_value'])
+                    time_text = str(map_row['time_label'])
+                    event_text = map_row['event_text']
+                    army_text = map_row['army_text']
+                    sound_text = map_row['sound_filename']  # Sound 现在是第 5 列
+                    hero_text = map_row['hero_text'] # 净网行动英雄列留空
 
                     # 0. Count
                     count_item = QTableWidgetItem(count_text)
@@ -208,24 +195,21 @@ def handle_map_selection(window, map_name):
                     sound_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
                     sound_item.setForeground(QBrush(QColor(255, 255, 255)))
                     window.table_area.setItem(row, 3, sound_item)
-
-                    # 4. Hero (隐藏列，留空)
+                    
+                    # 4. Hero (隐藏列，风暴英雄)
                     hero_item = QTableWidgetItem(hero_text)
                     hero_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
                     hero_item.setForeground(QBrush(QColor(255, 255, 255)))
                     window.table_area.setItem(row, 4, hero_item)
-                    
-                    window.logger.info(f'已添加净网表格内容 - 行{row+1}: Count={count_text}, Time={time_text}, Event={event_text}, Sound={sound_text}')
                 else:
-                     # 标准地图处理逻辑 (2或3列)
-                    if len(parts) >= 2:
-                      # 确保所有 5 个单元格的内容都有定义 (如果 parts 长度不足，则使用空字符串)
-                        time_text = parts[0].strip()
-                        event_text = parts[1].strip()
-                        army_text = parts[2].strip() if len(parts) >= 3 else ""
-                        sound_text = parts[3].strip() if len(parts) >= 4 else "" # Sound
-                        hero_text = parts[4].strip() if len(parts) >= 5 else "" # Hero
-
+                        # 标准地图处理逻辑 (2或3列)
+                        
+                        time_text = str(map_row['time_label'])
+                        event_text = map_row['event_text']
+                        army_text = map_row['army_text']
+                        sound_text = map_row['sound_filename']
+                        hero_text = map_row['hero_text']
+                        
                         # 1. 时间单元格 (列 0)
                         time_item = QTableWidgetItem(time_text)
                         time_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
@@ -237,7 +221,7 @@ def handle_map_selection(window, map_name):
                         event_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
                         event_item.setForeground(QBrush(QColor(255, 255, 255)))
                         window.table_area.setItem(row, 1, event_item)
-
+    
                         # 3. 兵种/备注单元格 (列 2)
                         army_item = QTableWidgetItem(army_text)
                         army_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
@@ -255,33 +239,5 @@ def handle_map_selection(window, map_name):
                         hero_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
                         hero_item.setForeground(QBrush(QColor(255, 255, 255)))
                         window.table_area.setItem(row, 4, hero_item)
-
-                        window.logger.info(
-                                f'已添加表格内容 - 行{row + 1}: T={time_text}, E={event_text}, A={army_text}, S={sound_text}, H={hero_text}')
-
-                    else:
-                      # 对于不符合格式的行，将整行内容显示在事件列
-                        event_item = QTableWidgetItem(line)
-                        event_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                        event_item.setForeground(QBrush(QColor(255, 255, 255)))
-
-                        window.table_area.setItem(row, 0, event_item)
-                        # 合并单元格
-                        window.table_area.setSpan(row, 0, 1, window.table_area.columnCount())
-
-                        window.logger.info(f'已添加不规范行内容到合并单元格 - 行{row + 1}: {line}')
-            #验证表格内容
-            row_count = window.table_area.rowCount()
-            window.logger.info(f'最终表格行数: {row_count}')
-            for row in range(row_count):
-                time_item = window.table_area.item(row, 0)
-                event_item = window.table_area.item(row, 1)
-                time_text = time_item.text() if time_item else 'None'
-                event_text = event_item.text() if event_item else 'None'
-                window.logger.info(f'验证第{row + 1}行内容: 时间={time_text}, 事件={event_text}')
-        else:
-            window.logger.error(f'地图文件不存在: {map_name}')
-            return
-
     except Exception as e:
-        window.logger.error(f'加载地图文件时出错: {str(e)}\n{traceback.format_exc()}')
+        window.logger.error(f'加载地图数据时出错: {str(e)}\n{traceback.format_exc()}')

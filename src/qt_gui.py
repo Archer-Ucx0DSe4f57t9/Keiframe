@@ -100,8 +100,8 @@ class TimerWindow(QMainWindow):
         self.init_tray()
 
         # 搜索框的信号连接
-        if hasattr(self, 'files'): # 确保 setup_search_and_combo_box 已创建 files
-            self.setup_search_box_connections(self.files)
+        if hasattr(self, 'map_list'): # 确保 setup_search_and_combo_box 已创建 map_list
+            self.setup_search_box_connections(self.map_list)
 
         self.ctrl_pressed = False
         self.is_temp_unlocked = False 
@@ -165,8 +165,8 @@ class TimerWindow(QMainWindow):
         QTimer.singleShot(50, self.show_control_window)
 
         # 强制加载第一个地图
-        if hasattr(self, 'files') and self.files:
-            map_loader.handle_map_selection(self, self.files[0])
+        if hasattr(self, 'map_list') and self.map_list:
+            map_loader.handle_map_selection(self, self.map_list[0])
 
         # 显示窗口并强制置顶
         self.show()
@@ -289,7 +289,7 @@ class TimerWindow(QMainWindow):
     def init_ui(self):
         ui_setup.init_ui(self)
 
-    def setup_search_box_connections(self, files):
+    def setup_search_box_connections(self, map_list):
         ####################
         # 用户输入搜索
         # 清空搜索框的定时器->现在在ui_setup实现
@@ -303,10 +303,10 @@ class TimerWindow(QMainWindow):
             self.combo_box.blockSignals(True)  # 🚫 禁止选项变化触发 currentTextChanged
             self.combo_box.clear()
 
-            filtered = [f for f in files if keyword in f.lower()]
+            filtered = [f for f in map_list if keyword in f.lower()]
 
             mapped_result = config.MAP_SEARCH_KEYWORDS.get(keyword)
-            if mapped_result and mapped_result not in filtered and mapped_result in files:
+            if mapped_result and mapped_result not in filtered and mapped_result in map_list:
                 filtered.insert(0, mapped_result)
 
             self.combo_box.addItems(filtered)

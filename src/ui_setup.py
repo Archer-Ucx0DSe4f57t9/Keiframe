@@ -10,8 +10,8 @@ from PyQt5.QtCore import Qt, QTimer
 from src import config
 from src.utils.fileutil import get_resources_dir, list_files
 from src.mutaor_handlers.mutator_manager import MutatorManager
-
-
+from src.db.daos import get_all_map_names
+from pypinyin import lazy_pinyin, Style
 
 # 辅助函数 1: 设置窗口样式
 def setup_window_style(window):
@@ -226,6 +226,10 @@ def setup_search_and_combo_box(window):
             border-radius: 4px;
     }''')
 
+    window.map_list = get_all_map_names(window.maps_db)
+    window.combo_box.addItems(sorted(window.map_list, key=pinyin_key))
+    
+    '''原来的文本加载逻辑
     # 加载resources文件夹下的文件
     resources_dir = get_resources_dir('maps', config.current_language)
     all_files = list_files(resources_dir) if resources_dir else []
@@ -238,7 +242,7 @@ def setup_search_and_combo_box(window):
             window.files.append(clean_name)
 
     window.combo_box.addItems(sorted(window.files))
-
+    原来的文本加载逻辑'''
     ####################
     # 用户输入搜索
     # 清空搜索框的定时器
@@ -344,6 +348,13 @@ def setup_bottom_buttons(window):
     window.memo_btn.move(5, 4)
     
 
+def pinyin_key(text: str):
+    """
+    返回拼音首字母串，用于排序
+    """
+    return ''.join(
+        lazy_pinyin(text, style=Style.FIRST_LETTER)
+    )
 
 # 主 UI 初始化函数
 def init_ui(window):
