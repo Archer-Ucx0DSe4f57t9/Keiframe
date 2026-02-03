@@ -8,6 +8,12 @@ if os.path.exists(os.path.join(src_dir, "config.py")):
     sys.path.insert(0, src_dir)
     print(f"使用外部配置文件: {os.path.join(src_dir, 'config.py')}")
 
+
+# 防止系统 / 用户环境污染 Qt 行为
+os.environ.pop("QT_DEVICE_PIXEL_RATIO", None)
+
+# 官方推荐 DPI 机制
+os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QGuiApplication

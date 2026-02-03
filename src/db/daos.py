@@ -2,13 +2,15 @@
 #dbs 相关的数据访问对象 (DAO) 定义
 #负责与数据库进行交互，执行查询和数据操作
 
+
+
 # 根据地图名称加载地图配置
 def load_map_by_name(conn, map_name):
   #键值：	"map_name","time_label"，	"time_value","count_value",	"event_text",	"army_text"，"sound_filename"，"hero_text"
-  if map_name =='净网行动':
+    if map_name =='净网行动':
     # 特殊排序逻辑：优先按 已净化节点count_value 升序，其次按 倒计时 time_value 降序,
     # 最后再按 波次T>压制塔 event_text 特定规则排序
-     sql = """
+        sql = """
         SELECT *
         FROM map_configs
         WHERE map_name = ?
@@ -21,16 +23,33 @@ def load_map_by_name(conn, map_name):
             END DESC,
             event_text ASC
         """
-  else:
+    else:
     # 一般排序逻辑：按 time_value 升序
-    sql = """
-    SELECT *
-    FROM map_configs
-    WHERE map_name = ?
-    ORDER BY time_value ASC
-    """
-  cur = conn.execute(sql, (map_name,))
-  return cur.fetchall()
+        sql = """
+        SELECT *
+        FROM map_configs
+        WHERE map_name = ?
+        ORDER BY time_value ASC
+        """
+    cur = conn.execute(sql, (map_name,))
+    rows = cur.fetchall()
+
+    result = []
+    # 组织结果为字典列表，便于日后数据库修改
+    for r in rows:
+        result.append({
+            "map_name": r["map_name"],
+            "time": {
+                "label": r["time_label"],
+                "value": r["time_value"],
+            },
+            "count": r["count_value"],
+            "event": r["event_text"],
+            "army": r["army_text"],
+            "sound": r["sound_filename"],
+            "hero": r["hero_text"],
+        })
+    return result
 
 # 获取所有不同的地图名称
 def get_all_map_names(conn):
@@ -52,7 +71,20 @@ def load_mutator_by_name(conn, mutator_name):
     ORDER BY time_value ASC
     """
     cur = conn.execute(sql, (mutator_name,))
-    return cur.fetchall()
+    rows = cur.fetchall()
+    result = []
+    # 组织结果为字典列表，便于日后数据库修改
+    for r in rows:
+        result.append({
+            "mutator_name": r["mutator_name"],
+            "time": {
+                "label": r["time_label"],
+                "value": r["time_value"],
+            },
+            "content": r["content_text"],
+            "sound": r["sound_filename"],
+        })
+    return result
 
 # 获取所有突变列表
 def get_all_mutator_names(conn):

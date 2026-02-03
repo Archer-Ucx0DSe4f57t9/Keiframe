@@ -165,12 +165,12 @@ def handle_map_selection(window, map_name):
                 if window.is_map_Malwarfare:
                     # 净网行动处理逻辑 (4列)
                     
-                    count_text = str(map_row['count_value'])
-                    time_text = str(map_row['time_label'])
-                    event_text = map_row['event_text']
-                    army_text = map_row['army_text']
-                    sound_text = map_row['sound_filename']  # Sound 现在是第 5 列
-                    hero_text = map_row['hero_text'] # 净网行动英雄列留空
+                    count_text = str(map_row['count'])
+                    time_text = str(map_row['time']['label'])
+                    event_text = map_row['event']
+                    army_text = map_row['army']
+                    sound_text = map_row['sound']  # Sound 现在是第 5 列
+                    hero_text = map_row['hero'] 
 
                     # 0. Count
                     count_item = QTableWidgetItem(count_text)
@@ -204,11 +204,11 @@ def handle_map_selection(window, map_name):
                 else:
                         # 标准地图处理逻辑 (2或3列)
                         
-                        time_text = str(map_row['time_label'])
-                        event_text = map_row['event_text']
-                        army_text = map_row['army_text']
-                        sound_text = map_row['sound_filename']
-                        hero_text = map_row['hero_text']
+                        time_text = str(map_row['time']['label'])
+                        event_text = map_row['event']
+                        army_text = map_row['army']
+                        sound_text = map_row['sound']  # Sound 现在是第 5 列
+                        hero_text = map_row['hero'] 
                         
                         # 1. 时间单元格 (列 0)
                         time_item = QTableWidgetItem(time_text)

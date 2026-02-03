@@ -119,11 +119,9 @@ class MutatorManager(QWidget):
         """初始化突变因子提醒标签"""
 
         for mutator_name in self.notify_mutator_names:
-            if len(load_mutator_by_name(self.mutators_db,mutator_name)) > 1:
-                #只有1条一般只为不涉及时间点的提示，不需要提醒标签
-                icon_path = os.path.join(get_resources_dir(), 'icons','mutators', f'{mutator_name}.png')
-                label = MessagePresenter(self.parent(), icon_path = icon_path)
-                self.mutator_alert_labels[mutator_name] = label
+            icon_path = os.path.join(get_resources_dir(), 'icons','mutators', f'{mutator_name}.png')
+            label = MessagePresenter(self.parent(), icon_path = icon_path)
+            self.mutator_alert_labels[mutator_name] = label
 
 
     def on_mutator_toggled(self, button, checked):
@@ -168,7 +166,7 @@ class MutatorManager(QWidget):
             time_points_info = []
             mutator_data = load_mutator_by_name(self.mutators_db,mutator_name)
             for a_mutator in mutator_data:
-                time_points_info.append((a_mutator['time_value'],a_mutator['content_text'],a_mutator['sound_filename']))
+                time_points_info.append((a_mutator['time']['value'], a_mutator['content'],a_mutator['sound']))
             return time_points_info #dao已经排序
 
         except Exception as e:
