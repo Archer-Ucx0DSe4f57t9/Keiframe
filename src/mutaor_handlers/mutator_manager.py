@@ -11,16 +11,11 @@ from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton, QGraphicsDropShad
 from src import config
 from src.utils.fileutil import get_resources_dir
 from src.utils.logging_util import get_logger
+from src.utils.temp_translate_utils import mutator_names_to_CHS
 from src.output.message_presenter import MessagePresenter
 from src.utils.window_utils import get_sc2_window_geometry
 from src.game_state_service import state as game_state
-from src.db.daos import load_mutator_by_name,get_all_mutator_names,get_all_notify_mutator_names
-
-
-#名称到简略中文名称映射，用于提示显示,将来迁移到语言模块
-mutator_names_to_CHS = {'AggressiveDeployment': '部署', 'Propagators': '小软', 'VoidRifts': '裂隙', 'KillBots': '杀戮',
-                        'BoomBots': '炸弹', 'HeroesFromtheStorm': '风暴', 'AggressiveDeploymentProtoss': '部署神族'}
-
+from src.db.mutator_daos import load_mutator_by_name,get_all_mutator_names,get_all_notify_mutator_names
 
 
 class MutatorManager(QWidget):

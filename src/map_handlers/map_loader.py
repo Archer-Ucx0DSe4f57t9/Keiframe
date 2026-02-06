@@ -7,7 +7,7 @@ from src.utils.fileutil import get_resources_dir
 from src.map_handlers.map_event_manager import MapEventManager
 from src.map_handlers.malwarfare_event_manager import MapwarfareEventManager
 from src.map_handlers.malwarfare_map_handler import MalwarfareMapHandler
-from src.db.daos import load_map_by_name
+from src.db.map_daos import load_map_by_name
 from src import config, game_state_service
 
 def handle_version_selection(window):

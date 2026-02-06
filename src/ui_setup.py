@@ -10,7 +10,7 @@ from PyQt5.QtCore import Qt, QTimer
 from src import config
 from src.utils.fileutil import get_resources_dir, list_files
 from src.mutaor_handlers.mutator_manager import MutatorManager
-from src.db.daos import get_all_map_names
+from src.db.map_daos import get_all_map_names
 from pypinyin import lazy_pinyin, Style
 
 # 辅助函数 1: 设置窗口样式
@@ -226,7 +226,7 @@ def setup_search_and_combo_box(window):
             border-radius: 4px;
     }''')
 
-    window.map_list = get_all_map_names(window.maps_db)
+    window.map_list = sorted(get_all_map_names(window.maps_db),key=pinyin_key)
     window.combo_box.addItems(sorted(window.map_list, key=pinyin_key))
 
     ####################

@@ -17,6 +17,7 @@ from src.settings_window import SettingsWindow
 from src.countdown_manager import CountdownManager
 from src.utils.fileutil import get_project_root
 from src.db.db_manager import DBManager
+from src.db.map_daos import search_maps_by_keyword
 
 class TimerWindow(QMainWindow):
     # 创建信号用于地图更新
@@ -307,9 +308,11 @@ class TimerWindow(QMainWindow):
 
             filtered = [f for f in map_list if keyword in f.lower()]
 
-            mapped_result = config.MAP_SEARCH_KEYWORDS.get(keyword)
-            if mapped_result and mapped_result not in filtered and mapped_result in map_list:
-                filtered.insert(0, mapped_result)
+            mapped_results = search_maps_by_keyword(self.maps_db, keyword)
+            
+            for map_name in reversed(mapped_results):
+                if map_name in map_list and map_name not in filtered:
+                    filtered.insert(0, map_name)
 
             self.combo_box.addItems(filtered)
 

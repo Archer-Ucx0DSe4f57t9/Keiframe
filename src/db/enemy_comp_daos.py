@@ -1,0 +1,73 @@
+# src/db/map_daos.py
+
+def load_map_by_name(conn, map_name):
+    """根据地图名称加载地图配置"""
+    if map_name == '净网行动':
+        # 特殊排序逻辑：优先按已净化节点，其次按时间倒序
+        sql = """
+        SELECT * FROM map_configs WHERE map_name = ?
+        ORDER BY count_value ASC, time_value DESC,
+        CASE WHEN event_text GLOB 'T[0-9]*' THEN 1 ELSE 0 END DESC,
+        event_text ASC
+        """
+    else:
+        # 一般排序逻辑：按 time_value 升序
+        sql = "SELECT * FROM map_configs WHERE map_name = ? ORDER BY time_value ASC"
+    
+    cur = conn.execute(sql, (map_name,))
+    return [dict(r) for r in cur.fetchall()]
+
+def get_all_map_names(conn):
+    """获取所有地图名称"""
+    cur = conn.execute("SELECT map_name FROM maps")
+    return [row[0] for row in cur.fetchall()]
+
+# === 关键词管理 (替代原 config.py 逻辑) ===
+
+def get_all_keywords(conn):
+    """获取所有搜索关键词映射"""
+    sql = "SELECT keyword, map_name FROM map_keywords ORDER BY priority DESC"
+    cur = conn.execute(sql)
+    # 返回字典格式，方便业务层直接使用
+    return {row[0]: row[1] for row in cur.fetchall()}
+
+def update_keywords_batch(conn, keyword_dict):
+    """批量更新关键词（清空并重建）"""
+    conn.execute("DELETE FROM map_keywords")
+    sql = "INSERT INTO map_keywords (keyword, map_name) VALUES (?, ?)"
+    conn.executemany(sql, keyword_dict.items())
+    conn.commit()
+
+# === Excel 导入支持 ===
+
+def convert_time_to_seconds(time_str):
+    """将 'mm:ss' 格式的时间转换为秒数整数"""
+    try:
+        if ':' in time_str:
+            m, s = map(int, time_str.split(':'))
+            return m * 60 + s
+        return int(time_str)
+    except:
+        return 0
+
+def bulk_import_map_configs(conn, data_list):
+    """
+    批量导入地图配置。
+    data_list 中的 time_label 如果是 '1:20' 格式，将自动计算 time_value。
+    """
+    sql = """
+    INSERT OR REPLACE INTO map_configs 
+    (map_name, time_label, time_value, count_value, event_text, army_text, sound_filename, hero_text)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """
+    processed_data = []
+    for item in data_list:
+        # 自动换算：$$TotalSeconds = Minutes \times 60 + Seconds$$
+        t_val = convert_time_to_seconds(str(item['time_label']))
+        processed_data.append((
+            item['map_name'], item['time_label'], t_val, item.get('count_value'),
+            item.get('event_text'), item.get('army_text'), item.get('sound_filename'), item.get('hero_text')
+        ))
+    
+    conn.executemany(sql, processed_data)
+    conn.commit()
