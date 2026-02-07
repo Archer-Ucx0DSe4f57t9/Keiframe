@@ -56,15 +56,9 @@ if __name__ == "__main__":
 
     # 测试加载地图
     map_name = "克哈裂痕"
-    maps = load_map_by_name(maps_conn, map_name)
-    for map_row in maps:
-        print(map_row['map_name'], map_row['count_value'],map_row['time_label'],map_row['time_value'], map_row['event_text'], map_row['army_text'] ,map_row['sound_filename'],map_row['hero_text'])
-    # 测试加载突变
     mutator_name = "AggressiveDeploymentProtoss"
     mutators = load_mutator_by_name(mutators_conn, mutator_name)
     for mutator_row in mutators:
         print(mutator_row['mutator_name'], mutator_row['time_value'], mutator_row['content_text'])
-        
-    print(get_all_map_names(maps_conn))
     print(get_all_mutator_names(mutators_conn))
     print(get_all_notify_mutator_names(mutators_conn))

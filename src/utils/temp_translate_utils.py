@@ -1,16 +1,16 @@
 # 映射表定义
 MAP_HEADER_MAP = {
-    'map_name': '地图名称 (请勿修改)',
-    'time_label': '提醒时间点 (格式 分:秒)',
-    'count_value': '计数值 (如已净化节点数)',
-    'event_text': '事件提醒内容',
-    'army_text': '兵种/阵营信息',
-    'sound_filename': '语音文件名 (需在resources/sounds中)',
-    'hero_text': '英雄台词/备注'
-}
+        'map_name': '地图名称',
+        'time_label': '提醒时间点 (格式 分:秒)',
+        'count_value': '已净化节点数（净网专用）',
+        'event_text': '事件提醒内容',
+        'army_text': '兵种/阵营信息',
+        'sound_filename': '语音文件名',
+        'hero_text': '风暴英雄'
+    }
 
 MUTATOR_HEADER_MAP = {
-    'mutator_name': '突变因子名称 (请勿修改)',
+    'mutator_name': '突变因子名称',
     'time_label': '提醒时间点 (格式 分:秒)',
     'content_text': '因子效果/提醒内容',
     'sound_filename': '语音文件名'
