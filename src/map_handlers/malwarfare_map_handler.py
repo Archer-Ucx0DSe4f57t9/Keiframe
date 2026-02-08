@@ -136,7 +136,9 @@ class MalwarfareMapHandler:
                     self.logger.warning(f"跳过越界的ROI检测: base={base_index}, replay={replay_offset != 0}, ROI={probe_roi_coords}")
                     continue
                 roi_img = img_bgr[y0:y1, x0:x1]
-
+                
+                #cv2.imwrite(f"debug_roi_state_{y0}_{y1}.png", roi_img) # Debug: 输出当前探测的ROI图像，检查是否正确截取
+                
                 if roi_img.size == 0:
                     self.logger.warning(f"跳过空的ROI检测: base={base_index}, replay={replay_offset != 0}, ROI={probe_roi_coords}")
                     continue
@@ -170,9 +172,10 @@ class MalwarfareMapHandler:
                     )
                     return True # 探测成功，结束函数
             
-            
+
             
         self.logger.warning("UI状态探测失败，所有预设位置均未找到有效信息。")
+
         return False
 
     def start(self):
@@ -204,6 +207,7 @@ class MalwarfareMapHandler:
             
             with state.screenshot_lock:
                 game_screen = state.latest_screenshot
+                self.logger.warning(f"当前处理图片尺寸: {game_screen.shape if game_screen is not None else 'None'}")
                 game_screen_time_stamp = state.screenshot_timestamp
             
             if game_screen is None or game_screen_time_stamp == last_game_screen_time_stamp:

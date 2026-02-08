@@ -21,8 +21,6 @@ class Mutator_and_enemy_race_recognizer:
     文件夹中的模板图片进行比对。当一个图标连续匹配10次后，会被确认为最终结果。
     """
 
-    #基础分辨率
-    BASE_RESOLUTION_WIDTH = 1920.0
     # 模板匹配的置信度阈值
     CONFIDENCE_THRESHOLD = 0.8
     # 确认结果所需的连续匹配次数

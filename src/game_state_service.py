@@ -205,9 +205,18 @@ def _capture_game_screen(sct):
         # 3. 颜色空间转换 BGRA -> BGR
         game_screen_bgr = cv2.cvtColor(img_array, cv2.COLOR_BGRA2BGR)
         
-        # 4. 计算缩放比例
-        current_scale = float(w) / BASE_RESOLUTION_WIDTH
+        # 4. 重缩放图片大小（临时手段）
+        target_w = 1920
+        target_h = int(h * (1920.0 / w)) # 保持纵横比
 
+        if w != target_w:
+            game_screen_bgr = cv2.resize(game_screen_bgr, (target_w, target_h), interpolation=cv2.INTER_AREA)
+
+        current_scale = 1.0
+        
+        # 4. 计算缩放比例（基于宽度）
+        # current_scale = float(w) / BASE_RESOLUTION_WIDTH
+        
         # 5. 更新全局状态 (加锁)
         with state.screenshot_lock:
             state.latest_screenshot = game_screen_bgr
