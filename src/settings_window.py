@@ -1,3 +1,4 @@
+#settings_window.py
 import json
 import os, sys
 import copy
@@ -7,13 +8,16 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
                              QLabel, QLineEdit, QSpinBox, QDoubleSpinBox, 
                              QCheckBox, QPushButton, QColorDialog, QMessageBox, 
                              QFormLayout, QScrollArea, QDialog, QComboBox, QGroupBox,
-                             QTableWidget, QTableWidgetItem, QHeaderView)
+                             QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QKeyEvent, QColor, QKeySequence
 
 from src import config  # 导入你现有的 config.py 作为默认值
 from src.utils.logging_util import get_logger
 from src.utils.fileutil import get_resources_dir, get_project_root
+from src.utils.excel_utils import ExcelUtil
+from src.utils.data_validator import DataValidator
+from src.db import map_daos, mutator_daos
 
 # ==========================================
 # 1. 自定义控件
@@ -26,7 +30,7 @@ class HotkeyInput(QLineEdit):
         self.setPlaceholderText("点击此处按下快捷键...")
         self.setReadOnly(True)
         self.current_keys = []
-
+        
     def keyPressEvent(self, event: QKeyEvent):
         key = event.key()
         modifiers = event.modifiers()
@@ -819,6 +823,34 @@ class SettingsWindow(QDialog):
             new_values[key] = val
         return new_values
 
+    def on_import_excel(self, config_type):
+        """Excel 导入按钮点击事件"""
+        path, _ = QFileDialog.getOpenFileName(self, "选择 Excel 文件", "", "Excel Files (*.xlsx)")
+        if not path: return
+        
+        # 1. 从 Excel 读取
+        raw_data, err = ExcelUtil.import_configs(path, config_type)
+        if err: 
+            QMessageBox.critical(self, "错误", f"读取失败: {err}")
+            return
+
+        # 2. 调用验证器 (传入 conn)
+        validator = DataValidator(self.db_manager.get_maps_conn())
+        valid_data, errors = validator.validate(config_type, raw_data)
+
+        if errors:
+            # 显示详细的合法性检查报告
+            self.show_error_report(errors)
+            return
+
+        # 3. 写入数据库
+        if config_type == 'map':
+            map_daos.bulk_import_map_configs(self.db_manager.get_maps_conn(), valid_data)
+        elif config_type == 'mutator':
+            mutator_daos.bulk_import_mutator_configs(self.db_manager.get_maps_conn(), valid_data)
+        
+        QMessageBox.information(self, "成功", f"成功导入 {len(valid_data)} 条合法配置！")
+    
     def on_save(self):
       new_config = self.get_ui_values()
       changes = []

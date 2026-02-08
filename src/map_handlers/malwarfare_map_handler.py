@@ -23,7 +23,7 @@ class MalwarfareMapHandler:
         初始化处理器。
         """
         self.logger = get_logger(__name__)
-        self.logger.warning("初始化 MalwarfareMapHandler...")
+        self.logger.info("初始化 MalwarfareMapHandler...")
         self.debug = debug
         
         self.game_state = game_state
@@ -174,7 +174,7 @@ class MalwarfareMapHandler:
             
 
             
-        self.logger.warning("UI状态探测失败，所有预设位置均未找到有效信息。")
+        self.logger.info("UI状态探测失败，所有预设位置均未找到有效信息。")
 
         return False
 
@@ -207,7 +207,7 @@ class MalwarfareMapHandler:
             
             with state.screenshot_lock:
                 game_screen = state.latest_screenshot
-                self.logger.warning(f"当前处理图片尺寸: {game_screen.shape if game_screen is not None else 'None'}")
+                #self.logger.info(f"当前处理图片尺寸: {game_screen.shape if game_screen is not None else 'None'}")
                 game_screen_time_stamp = state.screenshot_timestamp
             
             if game_screen is None or game_screen_time_stamp == last_game_screen_time_stamp:
@@ -420,7 +420,7 @@ class MalwarfareMapHandler:
             if self._current_ui_offset_state != -1:
                 self._consecutive_failures += 1
                 if self._consecutive_failures > 30:
-                    self.logger.warning("已连续识别失败超过阈值，重置UI状态...")
+                    self.logger.info("已连续识别失败超过阈值，重置UI状态...")
                     self.reset()
             return
 

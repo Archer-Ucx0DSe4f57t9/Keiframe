@@ -325,7 +325,7 @@ class MutatorManager(QWidget):
                 # 1. 确保按钮的选中状态正确
                 btn.setChecked(should_be_checked)
 
-                # 2. 【关键修复】手动同步 UI 和加载配置，因为信号被阻塞
+                # 2. 手动同步 UI 和加载配置，因为信号被阻塞
                 if should_be_checked:
                     #确定加载配置名称
                     config_name_to_load = mutator_name

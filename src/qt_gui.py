@@ -560,10 +560,10 @@ class TimerWindow(QMainWindow):
 
     def open_settings(self):
         """打开设置窗口"""
-        if self.settings_window is None:
-            # 传递 self 作为父级，确保窗口在应用程序内正确管理
-            self.settings_window = SettingsWindow(self) 
-            self.settings_window.settings_saved.connect(self.handle_settings_update)
+        #每次点击按钮都创建一个全新的 SettingsWindow 实例
+        self.settings_window = SettingsWindow(self)
+        # 连接设置保存信号到处理函数
+        self.settings_window.settings_saved.connect(self.handle_settings_update)
         
         # 1. 打开模态窗口前，卸载全局快捷键
         # 这能防止打字时的按键冲突导致的闪退，也能防止误触游戏快捷键
@@ -572,7 +572,7 @@ class TimerWindow(QMainWindow):
         # 2. 运行设置窗口 (阻塞直到关闭)
         self.settings_window.exec_() 
         
-        # 3. 【关键修复】关闭窗口后，重新注册全局快捷键
+        # 3. 关闭窗口后，重新注册全局快捷键
         config_hotkeys.init_global_hotkeys(self)
         
         # 4. 重新应用可能修改了的配置
