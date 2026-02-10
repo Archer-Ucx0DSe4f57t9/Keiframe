@@ -15,7 +15,7 @@ class OutlinedLabel(QLabel):
         super().__init__(parent)
         self._outline_color = QColor(outline_color)
         self._outline_width = 1
-        self._font = QFont('Arial', 16)
+        self._font = QFont(config.FONT_PRIMARY, 16)
         self._cached_pixmap = None
         self._cached_props = (None, None, None)  # (text, font.pointSize(), outline_width)
 

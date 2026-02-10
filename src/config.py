@@ -9,13 +9,12 @@ import cv2
 UI_FONT_SIZE = 12  # UI字体大小 / UI font size
 
 # === 字体相关配置 ===
+# 主 UI字体
+FONT_PRIMARY = None
+FONT_PRIMARY_STYLE = None
+# 消息显示字体
 FONT_MESSAGE = None
 FONT_MESSAGE_STYLE = None
-# 主 UI字体
-FONT_PRIMARY_LATIN = None
-FONT_PRIMARY_LATIN_STYLE = None
-FONT_PRIMARY_CJK   = None
-FONT_PRIMARY_CJK_STYLE = None
 # current language settings
 current_game_language = 'en'  # 当前游戏语言 / Current game language
 current_language = 'zh'  # 当前语言 / Current language

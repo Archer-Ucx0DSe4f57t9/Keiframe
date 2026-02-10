@@ -38,14 +38,15 @@ def setup_mixed_fonts(app):
     if not u_family:
         u_family, u_style = "Microsoft YaHei", None
 
-    config.FONT_PRIMARY_LATIN = u_family
-    config.FONT_PRIMARY_LATIN_STYLE = u_style
+    config.FONT_PRIMARY = u_family
+    config.FONT_PRIMARY_STYLE = u_style
 
     font = QFont(u_family, config.UI_FONT_SIZE)
     if u_style:
         font.setStyleName(u_style)
     app.setFont(font)
 
+    '''
     # ===== 加载 Message 字体 =====
     # 假设你把字体放在 "message" 文件夹下
     m_family, m_style = load_first_font_family_from_category_dir("message")
@@ -60,6 +61,7 @@ def setup_mixed_fonts(app):
 
     print(f"UI Font: {u_family} ({u_style})")
     print(f"MSG Font: {m_family} ({m_style})")
+    '''
 def main():
     logging_util.setup_logger()
     # 启用高DPI缩放
