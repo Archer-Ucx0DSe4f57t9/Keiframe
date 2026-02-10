@@ -8,7 +8,7 @@ from PyQt5.QtGui import QFont, QBrush, QColor
 from PyQt5.QtCore import Qt, QTimer
 
 from src import config
-from src.utils.fileutil import get_resources_dir, list_files
+from src.utils.font_uitils import set_font_size
 from src.mutaor_handlers.mutator_manager import MutatorManager
 from src.db.map_daos import get_all_map_names
 from pypinyin import lazy_pinyin, Style
@@ -40,7 +40,7 @@ def setup_time_labels(window):
     """创建时间显示标签和倒计时标签"""
      # 创建时间显示标签
     window.time_label = QLabel(window.current_time, window.main_container)
-    window.time_label.setFont(QFont('Consolas', 11))
+    set_font_size(window.time_label, config.TABLE_FONT_SIZE) # 使用统一的字体大小设置函数
     window.time_label.setStyleSheet('color: rgb(0, 255, 128); background-color: transparent')
     window.time_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
     window.time_label.setGeometry(10, 40, 100, 20)
@@ -49,7 +49,7 @@ def setup_time_labels(window):
     
     # 创建倒计时显示标签
     window.countdown_label = QLabel("", window.main_container)
-    window.countdown_label.setFont(QFont('Consolas', 11))
+    set_font_size(window.countdown_label, config.TABLE_FONT_SIZE) # 使用统一的字体大小设置函数
     # 使用不同的颜色（例如黄色）以作区分
     window.countdown_label.setStyleSheet('color: rgb(255, 255, 0); background-color: transparent')
     window.countdown_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
@@ -72,7 +72,7 @@ def setup_map_version_group(window):
     window.version_buttons = []
     for version in ['A', 'B']:
         btn = QPushButton(version)
-        btn.setFont(QFont('Arial', 11))
+        set_font_size(btn, 11) # 使用统一的字体大小设置函数
         btn.setFixedSize(48, 20)
         btn.setCheckable(True)
         btn.setStyleSheet('''
@@ -120,7 +120,6 @@ def setup_table_area(window):
                 background-color: transparent; 
                 padding-left: 5px; 
                 font-size: {config.TABLE_FONT_SIZE}px;
-                font-family: Arial;
             }}
             QTableWidget::horizontalHeader {{ 
                 border: none;
@@ -169,7 +168,7 @@ def setup_search_and_combo_box(window):
     window.search_box = QLineEdit(window.main_container)
     window.search_box.setPlaceholderText("搜索…")
     window.search_box.setFixedSize(50, 30)
-    window.search_box.setFont(QFont('Arial', 9))
+    set_font_size(window.search_box, 9) # 使用统一的字体大小设置函数
     window.search_box.setStyleSheet('''
         QLineEdit {
             color: white;
@@ -184,7 +183,7 @@ def setup_search_and_combo_box(window):
     # 创建下拉框
     window.combo_box = QComboBox(window.main_container)
     window.combo_box.setGeometry(60, 5, 100, 30)# 右移一点
-    window.combo_box.setFont(QFont('Arial', 9))
+    set_font_size(window.combo_box, 9) # 使用统一的字体大小设置函数
 
     # 设置下拉列表视图
     view = window.combo_box.view()
@@ -294,7 +293,7 @@ def setup_bottom_buttons(window):
                 border: 1px solid rgba(100, 100, 100, 100);
                 border-radius: 3px;
                 font-weight: bold;
-                font-family: Arial;
+
                 font-size: 12px;
             }
             QPushButton:hover {

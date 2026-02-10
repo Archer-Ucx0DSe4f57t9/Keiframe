@@ -18,7 +18,6 @@ class WindowHandleManager:
             hwnd = win32gui.FindWindow(None, title)
             if hwnd:
                 return hwnd
-        print(f"未找到游戏窗口")
         return None
 
     def get_hwnd(self):

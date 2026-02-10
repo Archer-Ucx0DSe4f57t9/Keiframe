@@ -27,7 +27,6 @@ class CountdownSelectionWindow(QWidget):
                 border: 1px solid gray;
                 border-radius: 3px;
                 padding: 5px;
-                font-family: "Microsoft YaHei", Arial;
                 font-size: 13px;
                 font-weight: bold;
                 min-width: 60px;
