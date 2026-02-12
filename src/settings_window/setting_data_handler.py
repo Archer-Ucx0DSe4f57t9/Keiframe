@@ -5,126 +5,114 @@ from src import config
 from src.db import map_daos, mutator_daos
 from src.utils.excel_utils import ExcelUtil
 from src.utils.data_validator import DataValidator
+import inspect
 
 class SettingsHandler:
     def __init__(self, settings_file, maps_db=None, mutators_db=None):
         self.settings_file = settings_file
         self.maps_db = maps_db
         self.mutators_db = mutators_db
-
+    def _get_base_from_config_module(self):
+        """从 config 模块中提取基础配置项，排除函数、类和模块等非数据项"""
+        base_config = {}
+        for k in dir(config):
+            if k.startswith("__"): continue
+            val = getattr(config, k)
+            if not inspect.ismodule(val) and not inspect.isfunction(val) and not inspect.isclass(val):
+                try:
+                    base_config[k] = copy.deepcopy(val)
+                except: continue
+        return base_config
+    
     def load_config(self):
-        """整合默认 config.py 和本地 settings.json"""
-        config_dict = {
-            # ===== 常规 =====
-            'current_language': getattr(config, 'current_language', 'zh'),
-            'LOG_LEVEL': getattr(config, 'LOG_LEVEL', 'WARNING'),
-            'debug_mode': getattr(config, 'debug_mode', False),
-            'debug_time_factor': getattr(config, 'debug_time_factor', 5.0),
+        """深度加载配置并合成 UI 需使用的复合项"""
+        base_config = self._get_base_from_config_module()
+        
+        # --- 修复 1: 合并合成项 (MAIN_WINDOW_POS) ---
+        # 确保 UI 能够找到这个键，否则 add_row 会报警告
+        base_config['MAIN_WINDOW_POS'] = [
+            base_config.get('MAIN_WINDOW_X', 1000),
+            base_config.get('MAIN_WINDOW_Y', 100)
+        ]
 
-            # ===== 快捷键 =====
-            'MAP_SHORTCUT': getattr(config, 'MAP_SHORTCUT', ''),
-            'LOCK_SHORTCUT': getattr(config, 'LOCK_SHORTCUT', ''),
-            'SCREENSHOT_SHORTCUT': getattr(config, 'SCREENSHOT_SHORTCUT', ''),
-            'MEMO_TEMP_SHORTCUT': getattr(config, 'MEMO_TEMP_SHORTCUT', ''),
-            'MEMO_TOGGLE_SHORTCUT': getattr(config, 'MEMO_TOGGLE_SHORTCUT', ''),
-            'COUNTDOWN_SHORTCUT': getattr(config, 'COUNTDOWN_SHORTCUT', ''),
-
-            # ===== 主窗口与界面 =====
-            'MAIN_WINDOW_POS': (getattr(config, 'MAIN_WINDOW_X', 1000), getattr(config, 'MAIN_WINDOW_Y', 100)),
-            'MAIN_WINDOW_WIDTH': getattr(config, 'MAIN_WINDOW_WIDTH', 200),
-            'MAIN_WINDOW_BG_COLOR': getattr(config, 'MAIN_WINDOW_BG_COLOR', 'rgba(43, 43, 43, 200)'),
-            'TABLE_FONT_SIZE': getattr(config, 'TABLE_FONT_SIZE', 12),
-            'TABLE_HEIGHT': getattr(config, 'TABLE_HEIGHT', 150),
-
-            # ===== 地图事件配置 =====
-            'MAP_ALERT_SECONDS': getattr(config, 'MAP_ALERT_SECONDS', 30),
-            'MAP_ALERT_WARNING_THRESHOLD_SECONDS': getattr(config, 'MAP_ALERT_WARNING_THRESHOLD_SECONDS', 10),
-            'MAP_ALERT_NORMAL_COLOR': getattr(config, 'MAP_ALERT_NORMAL_COLOR', 'rgb(239, 255, 238)'),
-            'MAP_ALERT_WARNING_COLOR': getattr(config, 'MAP_ALERT_WARNING_COLOR', 'rgb(255, 0, 0)'),
-            'TOAST_OFFSET_X': getattr(config, 'TOAST_OFFSET_X', 19),
-            'TOAST_OFFSET_Y': getattr(config, 'TOAST_OFFSET_Y', 540),
-            'TOAST_LINE_HEIGHT': getattr(config, 'TOAST_LINE_HEIGHT', 32),
-            'TOAST_FONT_SIZE': getattr(config, 'TOAST_FONT_SIZE', 20),
-            'MAP_SEARCH_KEYWORDS': getattr(config, 'MAP_SEARCH_KEYWORDS', {}),
-
-            # ===== 突变事件配置 =====
-            'MUTATOR_ALERT_SECONDS': getattr(config, 'MUTATOR_ALERT_SECONDS', 49),
-            'MUTATOR_WARNING_THRESHOLD_SECONDS': getattr(config, 'MUTATOR_WARNING_THRESHOLD_SECONDS', 10),
-            'MUTATOR_NORMAL_COLOR': getattr(config, 'MUTATOR_NORMAL_COLOR', 'rgb(255, 255, 255)'),
-            'MUTATOR_WARNING_COLOR': getattr(config, 'MUTATOR_WARNING_COLOR', 'rgb(255, 0, 0)'),
-
-            'MUTATOR_ALERT_OFFSET_X': getattr(config, 'MUTATOR_ALERT_OFFSET_X', 19),
-            'MUTATOR_ALERT_OFFSET_Y': getattr(config, 'MUTATOR_ALERT_OFFSET_Y', 324),
-            'MUTATOR_ALERT_LINE_HEIGHT': getattr(config, 'MUTATOR_ALERT_LINE_HEIGHT', 32),
-            'MUTATOR_ALERT_FONT_SIZE': getattr(config, 'MUTATOR_ALERT_FONT_SIZE', 19),
-            
-            'MUTATOR_ICON_TRANSPARENCY': getattr(config, 'MUTATOR_ICON_TRANSPARENCY', 0.7),
-            
-            # ===== 自定义倒计时配置 =====
-            'COUNTDOWN_OPTIONS': getattr(config, 'COUNTDOWN_OPTIONS', []),
-            'COUNTDOWN_MAX_CONCURRENT': getattr(config, 'COUNTDOWN_MAX_CONCURRENT', 3),
-            'COUNTDOWN_WARNING_THRESHOLD_SECONDS': getattr(config, 'COUNTDOWN_WARNING_THRESHOLD_SECONDS', 10),
-            'COUNTDOWN_DISPLAY_COLOR': getattr(config, 'COUNTDOWN_DISPLAY_COLOR', 'rgb(0, 255, 255)'),
-
-            # ===== 声音配置 =====
-            'ALERT_SOUND_COOLDOWN': getattr(config, 'ALERT_SOUND_COOLDOWN', 10),
-            'ALERT_SOUND_VOLUME': getattr(config, 'ALERT_SOUND_VOLUME', 90),
-
-            # ===== 笔记 =====
-            'MEMO_OPACITY': getattr(config, 'MEMO_OPACITY', 1.0),
-            'MEMO_DURATION': getattr(config, 'MEMO_DURATION', 5000),
-            'MEMO_FADE_TIME': getattr(config, 'MEMO_FADE_TIME', 1000),
-
-            # ===== 图像识别 =====
-            '''
-            'GAME_SCREEN_DPI': getattr(config, 'GAME_SCREEN_DPI', 96),
-            'GAME_ICO_RECONGIZE_INTERVAL': getattr(config, 'GAME_ICO_RECONGIZE_INTERVAL', 1),
-            'GAME_ICO_RECONGIZE_CONFIDENCE': getattr(config, 'GAME_ICO_RECONGIZE_CONFIDENCE', 0.9),
-            'DEBUG_SHOW_ENEMY_INFO_SQUARE': getattr(config, 'DEBUG_SHOW_ENEMY_INFO_SQUARE', False),
-            'GAME_ICO_RECONGIZE_TIMEOUT': getattr(config, 'GAME_ICO_RECONGIZE_TIMEOUT', 300),
-            '''
-
-            'GAME_ICON_POS_AMON_RACE': getattr(config, 'GAME_ICON_POS_AMON_RACE', [45, 300, 36, 36]),
-            'GAME_ICON_POS_AMON_TROOPS': getattr(config, 'GAME_ICON_POS_AMON_TROOPS', [1710, 938, 1904, 1035]),
-
-            'MUTATOR_AND_ENEMY_RACE_RECOGNIZER_ROI': getattr(config, 'MUTATOR_AND_ENEMY_RACE_RECOGNIZER_ROI', (1850, 50, 1920, 800)),
-            'ENEMY_COMP_RECOGNIZER_ROI': getattr(config, 'ENEMY_COMP_RECOGNIZER_ROI', (1450, 373 ,1920 ,800)),
-
-            'MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD': getattr(config, 'MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD', (298, 85)),
-            'MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD': getattr(config, 'MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD', (334, 103)),
-            'MALWARFARE_TIME_TOP_LFET_COORD': getattr(config, 'MALWARFARE_TIME_TOP_LFET_COORD', (431, 85)),
-            'MALWARFARE_TIME_BOTTOM_RIGHT_COORD': getattr(config, 'MALWARFARE_TIME_BOTTOM_RIGHT_COORD', (475, 103)),
-            'MALWARFARE_PAUSED_TOP_LFET_COORD': getattr(config, 'MALWARFARE_PAUSED_TOP_LFET_COORD', (343, 85)),
-            'MALWARFARE_PAUSED_BOTTOM_RIGHT_COORD': getattr(config, 'MALWARFARE_PAUSED_BOTTOM_RIGHT_COORD', (420, 103)),
-            'MALWARFARE_HERO_OFFSET':getattr(config, 'MALWARFARE_HERO_OFFSET', 97),
-            'MALWARFARE_ZWEIHAKA_OFFSET':getattr(config, 'MALWARFARE_ZWEIHAKA_OFFSET', 181),
-            'MALWARFARE_REPLAY_OFFSET':getattr(config, 'MALWARFARE_REPLAY_OFFSET', 49),
-
-        }
+        if self.maps_db:
+            try:
+                # 调用你提供的 map_daos.get_all_keywords
+                db_keywords = map_daos.get_all_keywords(self.maps_db)
+                # 即使 JSON 里没有，也要保证 UI 能看到数据库里的东西
+                base_config['MAP_SEARCH_KEYWORDS'] = db_keywords
+            except Exception as e:
+                print(f"从数据库加载关键词失败: {e}")
 
         if os.path.exists(self.settings_file):
             try:
                 with open(self.settings_file, 'r', encoding='utf-8') as f:
-                    user_cfg = json.load(f)
-                    config_dict.update(user_cfg)
-            except Exception as e:
-                self.logger.error(f"读取设置文件失败: {e}")
-        
-        return config_dict
+                    user_config = json.load(f)
+                    self._deep_update(base_config, user_config)
+            except: pass
+                
+        return base_config
+    
+    def _deep_update(self, base_dict, update_dict):
+        """递归合并字典，防止子字典（如 ROI）被整体覆盖"""
+        for k, v in update_dict.items():
+            if k in base_dict and isinstance(base_dict[k], dict) and isinstance(v, dict):
+                self._deep_update(base_dict[k], v)
+            else:
+                base_dict[k] = v
 
-    def save_all(self, new_config, nested_roi, keyword_dict):
-        """执行保存逻辑，包括数据库同步"""
-        # 1. 同步关键词到数据库
-        if keyword_dict and self.maps_db:
-            map_daos.update_keywords_batch(self.maps_db, keyword_dict)
-        
-        # 2. 处理 ROI 嵌套数据
-        new_config['MALWARFARE_ROI'] = nested_roi
-        
-        # 3. 写入 JSON
-        with open(self.settings_file, 'w', encoding='utf-8') as f:
-            json.dump(new_config, f, indent=4, ensure_ascii=False)
-        return True
+    def validate_and_import(self, file_path, config_type='map'):
+        """
+        验证并导入数据
+        返回: (bool 成功标志, list 错误信息列表/成功消息)
+        """
+        # 1. 解析 Excel
+        raw_data, parse_err = ExcelUtil.import_configs(file_path, config_type)
+        if parse_err:
+            return False, [f"文件解析失败: {parse_err}"]
+
+        # 2. 执行业务校验
+        # 使用传入的数据库连接实例化校验器
+        validator = None
+        if config_type == 'map': 
+            validator = DataValidator(self.maps_db)
+        elif config_type == 'mutator':
+            validator = DataValidator(self.mutators_db)
+        else:
+            return False, [f"未知的配置类型: {config_type}"]
+
+        valid_data, validation_errors = validator.validate(config_type, raw_data)
+        if validation_errors:
+            # 如果有错，返回错误列表给 UI 显示
+            return False, validation_errors
+
+        # 3. 校验通过，执行写入
+        try:
+            if config_type == 'map':
+                map_daos.bulk_import_map_configs(self.maps_db, valid_data)
+            # 可以扩展 mutator 的导入
+            return True, f"成功导入 {len(valid_data)} 条配置"
+        except Exception as e:
+            return False, [f"数据库写入异常: {str(e)}"]
+    
+    def save_all(self, config_data, keyword_dict=None):
+        """保存配置并同步数据库关键词"""
+        try:
+            # 1. 保存到 JSON
+            # 存入前可以清理掉 UI 专用的合成项，保持 JSON 简洁
+            final_save_data = copy.deepcopy(config_data)
+            
+            with open(self.settings_file, 'w', encoding='utf-8') as f:
+                json.dump(final_save_data, f, indent=4, ensure_ascii=False)
+            
+            # 2. 批量更新数据库关键词
+            if keyword_dict is not None and self.maps_db:
+                # 直接调用你提供的 map_daos 函数
+                map_daos.update_keywords_batch(self.maps_db, keyword_dict)
+                
+            return True, "设置及关键词已成功保存"
+        except Exception as e:
+            return False, f"保存失败: {str(e)}"
 
     def process_excel_import(self, path, config_type):
         """导入 Excel 数据并校验"""
@@ -141,11 +129,14 @@ class SettingsHandler:
             return True, len(valid_data)
         return False, errors
     
-    def get_all_map_data(self):
-        """导出专用：从数据库抓取全量地图配置"""
+    def get_all_map_configs_for_export(self):
+        """获取全量地图配置用于 Excel 导出"""
         if not self.maps_db: return []
         all_data = []
-        for name in map_daos.get_all_map_names(self.maps_db):
+        # 使用你提供的 get_all_map_names
+        map_names = map_daos.get_all_map_names(self.maps_db)
+        for name in map_names:
+            # 使用你提供的 load_map_by_name
             rows = map_daos.load_map_by_name(self.maps_db, name)
             for r in rows:
                 all_data.append({
@@ -153,7 +144,9 @@ class SettingsHandler:
                     'time_label': r['time']['label'],
                     'count_value': r['count'],
                     'event_text': r['event'],
-                    'sound_filename': r['sound']
+                    'army_text': r['army'],
+                    'sound_filename': r['sound'],
+                    'hero_text': r['hero']
                 })
         return all_data
     

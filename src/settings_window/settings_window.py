@@ -297,35 +297,22 @@ class SettingsWindow(QDialog):
         return new_values
 
     def on_import_excel(self, config_type):
-        """Excel 导入并校验"""
+        """导入 Excel 配置，调用 SettingsHandler 进行验证和处理"""
         path, _ = QFileDialog.getOpenFileName(self, "选择 Excel 文件", "", "Excel Files (*.xlsx)")
         if not path: return
-        
-        raw_data, err = ExcelUtil.import_configs(path, config_type)
-        if err: 
-            QMessageBox.critical(self, "错误", f"读取失败: {err}")
-            return
 
-        # 统一使用连接引用
-        conn = self.main_window.maps_db
-        validator = DataValidator(conn)
-        valid_data, errors = validator.validate(config_type, raw_data)
+        # 调用 handler 的验证导入逻辑
+        success, result = self.data_handler.validate_and_import(path, config_type)
 
-        if errors:
-            msg = "导入发现以下错误，请修正后重试：\n\n" + "\n".join(errors[:10])
-            QMessageBox.warning(self, "数据不合法", msg)
-            return
-
-        # --- 真正执行数据库写入 ---
-        try:
-            if config_type == 'map':
-                map_daos.bulk_import_map_configs(conn, valid_data)
-            elif config_type == 'mutator':
-                mutator_daos.bulk_import_mutator_configs(self.main_window.mutators_db, valid_data)
+        if success:
+            QMessageBox.information(self, "导入成功", result)
+        else:
+            # 如果验证失败，弹出详细的错误列表
+            error_msg = "\n".join(result[:15]) # 最多显示15条错误
+            if len(result) > 15:
+                error_msg += f"\n... 以及其他 {len(result)-15} 个错误"
             
-            QMessageBox.information(self, "成功", f"成功导入 {len(valid_data)} 条配置到数据库！")
-        except Exception as e:
-            QMessageBox.critical(self, "错误", f"数据库写入失败: {str(e)}")
+            QMessageBox.warning(self, "导入校验失败", f"发现数据问题，请修正：\n\n{error_msg}")
 
     def on_export_data(self, config_type):
         """将数据库中的配置导出为 Excel"""
@@ -358,8 +345,7 @@ class SettingsWindow(QDialog):
             """保存配置：合并了嵌套 ROI 处理、数据库同步以及修改确认逻辑"""
             # 1. 提取普通设置项
             new_values = self.get_ui_values()
-            roi_data = self._collect_roi_data() # 自行封装的函数来处理 ROI 数据
-            new_values['MALWARFARE_ROI'] = roi_data # 2. 处理快捷键输入，确保格式正确
+            new_values['MALWARFARE_ROI'] = self._collect_roi_data() 
             
             # 3. 处理关键词输入，直接更新数据库，不写入 JSON
             keywords = None
@@ -368,7 +354,7 @@ class SettingsWindow(QDialog):
                 new_values.pop('MAP_SEARCH_KEYWORDS', None)
 
             # 4. 【确认逻辑】对比差异并弹出确认框
-            changes = _generate_changes_report(self,new_values)
+            changes = self._generate_changes_report(new_values)
 
             if not changes:
                 QMessageBox.information(self, "提示", "没有检测到任何修改。")
@@ -385,35 +371,66 @@ class SettingsWindow(QDialog):
                 self.normalize_config(new_values)
                 success, msg = self.data_handler.save_all(new_values, keywords)
                 if success:
+                    QMessageBox.information(self, "保存成功", msg)
                     self.settings_saved.emit(new_values)
                     self.accept()
                 else:
                     QMessageBox.critical(self, "保存失败", msg)
+                    
+    def _normalize_data(self, data):
+        """递归将所有元组转换为列表，确保对比基准一致"""
+        if isinstance(data, tuple):
+            return [self._normalize_data(i) for i in data]
+        if isinstance(data, list):
+            return [self._normalize_data(i) for i in data]
+        if isinstance(data, dict):
+            return {k: self._normalize_data(v) for k, v in data.items()}
+        return data
     
     def _generate_changes_report(self, new_cfg):
-        """对比 original_config 和 new_cfg，生成可读的修改列表"""
-        report = []
-        for key, new_value in new_cfg.items():
-            old_value = self.original_config.get(key)
-            c_old = list(old) if isinstance(old, (list, tuple)) else old_value
-            c_new = list(new_value) if isinstance(new_value, (list, tuple)) else new_value
-            if c_old != c_new:
-                label = self.widgets.get(key, {}).get('label', key)
-                report.append(f"【{label}】: {old_value} -> {new_value}")
+            """对比配置变动，支持 ROI 的深度详细对比并统一数据类型"""
+            from src import config # 导入原始配置做兜底
+            report = []
+            
+            lang_map = {'zh': '中文', 'en': '英文'}
+            region_map = {'purified_count': '净化节点', 'time': '时间', 'paused': '暂停标识'}
 
-        # 如果 ROI 变了，由于是嵌套字典，手动增加一条提示
-            if self.original_config.get('MALWARFARE_ROI') != nested_roi:
-                report.append("【净网行动识别区域 (ROI)】已发生变动")
-        return report
+            for key, new_value in new_cfg.items():
+                # 获取旧值（优先从 original_config 拿，拿不到去 config.py 捞）
+                old_value = self.original_config.get(key)
+                if old_value is None:
+                    old_value = getattr(config, key, None)
+                
+                # --- 核心：对比前统一转换为列表进行递归标准化 ---
+                norm_old = self._normalize_data(old_value)
+                norm_new = self._normalize_data(new_value)
+                
+                if norm_old != norm_new:
+                    # --- 1. 处理 ROI 嵌套字典的细分报告 ---
+                    if key == 'MALWARFARE_ROI':
+                        old_roi = old_value if isinstance(old_value, dict) else {}
+                        new_roi = new_value if isinstance(new_value, dict) else {}
+                        
+                        for lang in ['zh', 'en']:
+                            o_lang = old_roi.get(lang, {})
+                            n_lang = new_roi.get(lang, {})
+                            
+                            for reg, label in region_map.items():
+                                # 获取旧值和新值，注意可能存在某个语言里没有这个区域的情况
+                                v_old = o_lang.get(reg)
+                                v_new = n_lang.get(reg)
+                                
+                                # 内部对比也需要标准化，消除 [[]] vs (()) 的差异
+                                if self._normalize_data(v_old) != self._normalize_data(v_new):
+                                    l_name = lang_map.get(lang, lang)
+                                    report.append(f"【ROI-{l_name}】{label}: {v_old} -> {v_new}")
+                    
+                    # --- 2. 处理普通配置项 (修正缩进，使其与 if key == 'MALWARFARE_ROI' 平级) ---
+                    else:
+                        label = self.widgets.get(key, {}).get('label', key)
+                        report.append(f"【{label}】: {old_value} -> {new_value}")
 
-    def save_to_json(self, config_data):
-        try:
-            with open(self.settings_file, 'w', encoding='utf-8') as f:
-                json.dump(config_data, f, indent=4, ensure_ascii=False)
-            QMessageBox.information(self, "成功", "设置已保存！\n部分设置需要重启程序才能生效。")
-        except Exception as e:
-            QMessageBox.critical(self, "错误", f"保存失败: {str(e)}")
-
+            return report
 # 独立运行测试
 if __name__ == '__main__':
     import sys
