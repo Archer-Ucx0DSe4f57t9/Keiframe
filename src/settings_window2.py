@@ -440,7 +440,7 @@ class SettingsWindow(QDialog):
         self.create_mutation_settings_tab() # 4. 因子提示配置 (Mutation Config)
         self.create_hotkey_tab()        # 5. 快捷键
         self.create_general_rec_tab()   # 6. 图像设置
-
+        self.create_data_management_tab() # 7. 数据管理
         main_layout.addWidget(self.tabs)
 
         btn_layout = QHBoxLayout()
@@ -752,47 +752,78 @@ class SettingsWindow(QDialog):
         self.tabs.addTab(tab, "快捷键")
 
     def create_general_rec_tab(self):
+        """图像识别设置标签页"""
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content = QWidget()
         layout = QFormLayout(content)
         
-        layout.addRow(QLabel("<b>[ 高级设置 ] 修改此处可能导致识别失效，如需修改，请截图完整游戏窗口，在photoshop等可查看图片内容具体坐标辅助下修改</b>"))
+        layout.addRow(QLabel("<b>[ 高级设置 ] 修改此处可能导致识别失效...</b>"))
         
-        '''
-        gb_basic = QGroupBox("基础参数")
-        gl_basic = QFormLayout(gb_basic)
-        self.add_row(gl_basic, "屏幕 DPI:", 'GAME_SCREEN_DPI', 'spin', max=500)
-        self.add_row(gl_basic, "识别间隔 (秒):", 'GAME_ICO_RECONGIZE_INTERVAL', 'spin', max=10)
-        self.add_row(gl_basic, "识别超时 (秒):", 'GAME_ICO_RECONGIZE_TIMEOUT', 'spin', max=600)
-        self.add_row(gl_basic, "最低置信度:", 'GAME_ICO_RECONGIZE_CONFIDENCE', 'double')
-        self.add_row(gl_basic, "显示调试框:", 'DEBUG_SHOW_ENEMY_INFO_SQUARE', 'bool')
-        layout.addRow(gb_basic)
-        '''
-        
+        # 种族因子识别区
         gb_icon = QGroupBox("种族/因子识别区域")
         gl_icon = QFormLayout(gb_icon)
         self.add_row(gl_icon, "因子识别区域:", 'MUTATOR_AND_ENEMY_RACE_RECOGNIZER_ROI', 'roi')
         self.add_row(gl_icon, "AI 种族识别区域:", 'ENEMY_COMP_RECOGNIZER_ROI', 'roi')
         layout.addRow(gb_icon)
         
-        gb_mw = QGroupBox("净网行动识别区域坐标 (Malwarfare)")
-        gl_mw = QFormLayout(gb_mw)
-        self.add_row(gl_mw, "已净化 (左上):", 'MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD', 'point')
-        self.add_row(gl_mw, "已净化 (右下):", 'MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD', 'point')
-        self.add_row(gl_mw, "时间 (左上):", 'MALWARFARE_TIME_TOP_LFET_COORD', 'point')
-        self.add_row(gl_mw, "时间 (右下):", 'MALWARFARE_TIME_BOTTOM_RIGHT_COORD', 'point')
-        self.add_row(gl_mw, "暂停标识 (左上):", 'MALWARFARE_PAUSED_TOP_LFET_COORD', 'point')
-        self.add_row(gl_mw, "单英雄时坐标偏移:", 'MALWARFARE_HERO_OFFSET', 'spin')
-        self.add_row(gl_mw, "原生双雄时坐标偏移:", 'MALWARFARE_ZWEIHAKA_OFFSET', 'spin')
-        self.add_row(gl_mw, "录像播放时坐标偏移:", 'MALWARFARE_REPLAY_OFFSET', 'spin')
-        
+        # 净网行动多语言 ROI - 注意这里现在正确调用了类方法
+        gb_mw = QGroupBox("净网行动多语言识别区域 (ROI)")
+        mw_layout = QVBoxLayout(gb_mw)
+        roi_tabs = self.create_roi_tabs() 
+        mw_layout.addWidget(roi_tabs)
         layout.addRow(gb_mw)
-        
 
+        # 偏移量
+        self.add_row(layout, "单英雄时坐标偏移:", 'MALWARFARE_HERO_OFFSET', 'spin')
+        self.add_row(layout, "原生双雄时坐标偏移:", 'MALWARFARE_ZWEIHAKA_OFFSET', 'spin')
+        self.add_row(layout, "录像播放时坐标偏移:", 'MALWARFARE_REPLAY_OFFSET', 'spin')
+        
         scroll.setWidget(content)
         self.tabs.addTab(scroll, "识别设置")
 
+    def create_roi_tabs(self):
+        """[类方法] 创建中英双语 ROI 编辑器"""
+        roi_tab_widget = QTabWidget()
+        self.roi_widgets = {} 
+
+        # 从副本读取数据，确保“取消”逻辑生效
+        current_roi = self.current_config.get('MALWARFARE_ROI', getattr(config, 'MALWARFARE_ROI', {}))
+
+        for lang in ['zh', 'en']:
+            page = QWidget()
+            layout = QFormLayout(page)
+            self.roi_widgets[lang] = {}
+            regions = {'purified_count': '净化节点', 'time': '时间', 'paused': '暂停标识'}
+            
+            for key, label in regions.items():
+                val = current_roi.get(lang, {}).get(key, ((0,0),(0,0)))
+                (x1, y1), (x2, y2) = val
+                roi_data = self.create_roi_widget(x1, y1, x2, y2)
+                self.roi_widgets[lang][key] = roi_data['spins']
+                layout.addRow(label, roi_data['box'])
+                
+            roi_tab_widget.addTab(page, "中文 (ZH)" if lang == 'zh' else "英文 (EN)")
+        return roi_tab_widget
+
+    def create_data_management_tab(self):
+        """Excel 数据备份与恢复"""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        
+        # 地图数据组
+        map_gb = QGroupBox("地图配置管理")
+        m_layout = QHBoxLayout(map_gb)
+        btn_exp = QPushButton("导出全部地图配置"); btn_imp = QPushButton("导入 Excel 配置")
+        
+        # 导出逻辑：需要从数据库获取全量数据
+        btn_exp.clicked.connect(lambda: self.on_export_data('map'))
+        btn_imp.clicked.connect(lambda: self.on_import_excel('map'))
+        
+        m_layout.addWidget(btn_exp); m_layout.addWidget(btn_imp)
+        layout.addWidget(map_gb)
+        layout.addStretch()
+        self.tabs.addTab(tab, "数据管理")
 
     def get_ui_values(self):
         new_values = {}
@@ -824,62 +855,122 @@ class SettingsWindow(QDialog):
         return new_values
 
     def on_import_excel(self, config_type):
-        """Excel 导入按钮点击事件"""
+        """Excel 导入并校验"""
         path, _ = QFileDialog.getOpenFileName(self, "选择 Excel 文件", "", "Excel Files (*.xlsx)")
         if not path: return
         
-        # 1. 从 Excel 读取
         raw_data, err = ExcelUtil.import_configs(path, config_type)
         if err: 
             QMessageBox.critical(self, "错误", f"读取失败: {err}")
             return
 
-        # 2. 调用验证器 (传入 conn)
-        validator = DataValidator(self.db_manager.get_maps_conn())
+        # 统一使用连接引用
+        conn = self.main_window.maps_db
+        validator = DataValidator(conn)
         valid_data, errors = validator.validate(config_type, raw_data)
 
         if errors:
-            # 显示详细的合法性检查报告
-            self.show_error_report(errors)
+            msg = "导入发现以下错误，请修正后重试：\n\n" + "\n".join(errors[:10])
+            QMessageBox.warning(self, "数据不合法", msg)
             return
 
-        # 3. 写入数据库
-        if config_type == 'map':
-            map_daos.bulk_import_map_configs(self.db_manager.get_maps_conn(), valid_data)
-        elif config_type == 'mutator':
-            mutator_daos.bulk_import_mutator_configs(self.db_manager.get_maps_conn(), valid_data)
-        
-        QMessageBox.information(self, "成功", f"成功导入 {len(valid_data)} 条合法配置！")
+        # --- 真正执行数据库写入 ---
+        try:
+            if config_type == 'map':
+                map_daos.bulk_import_map_configs(conn, valid_data)
+            elif config_type == 'mutator':
+                mutator_daos.bulk_import_mutator_configs(self.main_window.mutators_db, valid_data)
+            
+            QMessageBox.information(self, "成功", f"成功导入 {len(valid_data)} 条配置到数据库！")
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"数据库写入失败: {str(e)}")
+
+    def on_export_data(self, config_type):
+        """将数据库中的配置导出为 Excel"""
+        path, _ = QFileDialog.getSaveFileName(self, "选择保存位置", f"export_{config_type}.xlsx", "Excel Files (*.xlsx)")
+        if not path: return
+
+        try:
+            all_data = []
+            if config_type == 'map':
+                conn = self.main_window.maps_db
+                for name in map_daos.get_all_map_names(conn):
+                    rows = map_daos.load_map_by_name(conn, name)
+                    for r in rows:
+                        all_data.append({
+                            'map_name': r['map_name'],
+                            'time_label': r['time']['label'],
+                            'count_value': r['count'],
+                            'event_text': r['event'],
+                            'army_text': r['army'],
+                            'sound_filename': r['sound'],
+                            'hero_text': r['hero']
+                        })
+                ExcelUtil.export_configs(all_data, path, 'map')
+            # 此处可继续添加 mutator 的导出逻辑...
+            QMessageBox.information(self, "成功", f"数据已成功导出至: {path}")
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"导出失败: {str(e)}")
     
     def on_save(self):
-      new_config = self.get_ui_values()
-      changes = []
-      for key, new_val in new_config.items():
-          old_val = self.original_config.get(key)
-          
-          # 将对比双方都转为 list 进行数值比对，消除 (1,2) vs [1,2] 的差异
-          c_old = list(old_val) if isinstance(old_val, (list, tuple)) else old_val
-          c_new = list(new_val) if isinstance(new_val, (list, tuple)) else new_val
-          
-          if c_old != c_new:
-              label = self.widgets[key]['label']
-              changes.append(f"【{label}】 {old_val} -> {new_val}")
+            """保存配置：合并了嵌套 ROI 处理、数据库同步以及修改确认逻辑"""
+            # 1. 提取普通设置项
+            new_config = self.get_ui_values()
+            
+            # 2. 【核心更新】处理多语言 ROI 嵌套字典
+            nested_roi = {}
+            for lang in ['zh', 'en']:
+                nested_roi[lang] = {}
+                for region, spins in self.roi_widgets[lang].items():
+                    # 将 4 个 SpinBox 值打包成 ((x1, y1), (x2, y2)) 格式
+                    nested_roi[lang][region] = (
+                        (spins[0].value(), spins[1].value()), 
+                        (spins[2].value(), spins[3].value())
+                    )
+            new_config['MALWARFARE_ROI'] = nested_roi
 
-      if not changes:
-            QMessageBox.information(self, "提示", "没有检测到任何修改。")
-            self.accept()
-            return
+            # 3. 【核心更新】同步关键词到数据库，并从配置文件中剔除
+            if 'MAP_SEARCH_KEYWORDS' in self.widgets:
+                keyword_dict = self.widgets['MAP_SEARCH_KEYWORDS']['widget'].value()
+                # 注意：这里直接更新数据库，不需要写进 settings.json
+                map_daos.update_keywords_batch(self.main_window.maps_db, keyword_dict)
+                new_config.pop('MAP_SEARCH_KEYWORDS', None)
 
-      reply = QMessageBox.question(self, "确认修改", 
-                                     "检测到以下修改，确认保存吗？\n\n" + "\n".join(changes[:10]) + 
-                                     ("\n..." if len(changes)>10 else ""), 
-                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-      if reply == QMessageBox.Yes:
-            self.normalize_config(new_config)
-            self.save_to_json(new_config)
-            self.settings_saved.emit(new_config)
-            self.original_config = copy.deepcopy(new_config)
-            self.accept()
+            # 4. 【确认逻辑】对比差异并弹出确认框
+            changes = []
+            for key, new_val in new_config.items():
+                old_val = self.original_config.get(key)
+
+                # 数值比对，消除元组/列表差异
+                c_old = list(old_val) if isinstance(old_val, (list, tuple)) else old_val
+                c_new = list(new_val) if isinstance(new_val, (list, tuple)) else new_val
+
+                if c_old != c_new:
+                    # 尝试获取友好的中文标签名
+                    label = self.widgets.get(key, {}).get('label', key)
+                    changes.append(f"【{label}】 {old_val} -> {new_val}")
+
+            # 如果 ROI 变了，由于是嵌套字典，手动增加一条提示
+            if self.original_config.get('MALWARFARE_ROI') != nested_roi:
+                changes.append("【净网行动识别区域 (ROI)】已发生变动")
+
+            if not changes:
+                QMessageBox.information(self, "提示", "没有检测到任何修改。")
+                self.accept()
+                return
+
+            # 弹出你原有的确认框
+            reply = QMessageBox.question(self, "确认修改", 
+                                        "检测到以下修改，确认保存吗？\n\n" + "\n".join(changes[:10]) + 
+                                        ("\n..." if len(changes)>10 else ""), 
+                                        QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+            if reply == QMessageBox.Yes:
+                self.normalize_config(new_config)
+                self.save_to_json(new_config)
+                self.settings_saved.emit(new_config)
+                self.original_config = copy.deepcopy(new_config) # 更新原始参照
+                self.accept()
 
     def save_to_json(self, config_data):
         try:

@@ -13,11 +13,14 @@ from src.map_handlers import map_loader
 from src.output.toast_manager import ToastManager
 from src.mutaor_handlers.mutator_and_enemy_race_recognizer import Mutator_and_enemy_race_recognizer
 from src.memo_overlay import MemoOverlay
-from src.settings_window import SettingsWindow
+
 from src.countdown_manager import CountdownManager
 from src.utils.fileutil import get_project_root
 from src.db.db_manager import DBManager
 from src.db.map_daos import search_maps_by_keyword
+
+#from src.settings_window import SettingsWindow
+from src.settings_window.settings_window import SettingsWindow
 
 class TimerWindow(QMainWindow):
     # 创建信号用于地图更新

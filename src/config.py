@@ -73,25 +73,6 @@ MUTATOR_ICON_TRANSPARENCY = 0.7  # 突变因子图标透明度 / Mutator icon tr
 # wiki url
 WIKI_URL = 'https://starcraft.huijiwiki.com/wiki/合作任务/'  # Wiki链接 / Wiki URL
 
-# 搜索特殊关键词
-MAP_SEARCH_KEYWORDS = {
-    "火车": "湮灭快车",
-    "黑杀": "黑暗杀星",
-    "天锁": "天界封锁",
-    "庙a": "往日神庙-A",
-    "庙b": "往日神庙-B",
-    "撕裂a": "虚空撕裂-左",
-    "撕裂b": "虚空撕裂-右",
-    "地勤": "机会渺茫-人虫",
-    "地勤p": "机会渺茫-神",
-    "零件": "聚铁成兵",
-    "杀毒": "净网行动",
-    "穿梭机": "虚空降临",
-    "记者": "熔火危机",
-    # 可以继续添加……
-}
-
-
 # 笔记配置
 MEMO_OPACITY = 1.0        # 图片显示的透明度 (0.0 - 1.0)
 MEMO_DURATION = 5000      # 临时显示时的持续时间 (毫秒)，不含淡出时间
