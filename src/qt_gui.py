@@ -559,7 +559,7 @@ class TimerWindow(QMainWindow):
                         setattr(config, key, value)
                         # print(f"已更新配置: {key} = {value}")
             except Exception as e:
-                print(f"加载用户配置失败: {e}")
+                logger.error(f"加载用户配置失败: {e}")
 
     def open_settings(self):
         """打开设置窗口"""

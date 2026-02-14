@@ -8,7 +8,7 @@ from PyQt5.QtGui import QFontDatabase, QFont
 src_dir = os.path.join(get_project_root(),"src")
 if os.path.exists(os.path.join(src_dir, "config.py")):
     sys.path.insert(0, src_dir)
-    print(f"使用外部配置文件: {os.path.join(src_dir, 'config.py')}")
+    print(f"启动并使用外部配置文件: {os.path.join(src_dir, 'config.py')}")
 
 
 # 防止系统 / 用户环境污染 Qt 行为

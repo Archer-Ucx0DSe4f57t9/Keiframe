@@ -12,7 +12,7 @@ from src.utils.logging_util import get_logger
 from src.utils.fileutil import get_resources_dir
 from src.utils.window_utils import is_game_active
 from src.game_state_service import state
-
+from src.utils.logging_util import get_logger
 class Mutator_and_enemy_race_recognizer:
     """
     通过屏幕捕捉和模板匹配，识别游戏中的种族和突变因子图标。
@@ -35,7 +35,7 @@ class Mutator_and_enemy_race_recognizer:
         self._running = False
         self._thread = None
         self._current_game_time = 0.0
-        
+        self.logger = get_logger(__name__)
 
         # 加载模板
 
@@ -318,8 +318,6 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
     print("正在启动实时识别器...")
-    print("请确保星际争霸II游戏窗口是打开的。")
-    print("按 Ctrl+C 停止程序。")
 
     recognizer = Mutator_and_enemy_race_recognizer()
     recognizer.start()

@@ -5,6 +5,7 @@ from src import config
 from src.db import map_daos, mutator_daos
 from src.utils.excel_utils import ExcelUtil
 from src.utils.data_validator import DataValidator
+from src.utils.logging_util import get_logger
 import inspect
 from src.utils.temp_translate_utils import mutator_names_to_CHS
 class SettingsHandler:
@@ -36,6 +37,7 @@ class SettingsHandler:
         self.settings_file = settings_file
         self.maps_db = maps_db
         self.mutators_db = mutators_db
+        self.logger = get_logger(__name__)
     def _get_base_from_config_module(self):
         """从 config 模块中提取基础配置项，排除函数、类和模块等非数据项"""
         base_config = {}
@@ -66,7 +68,7 @@ class SettingsHandler:
                 # 即使 JSON 里没有，也要保证 UI 能看到数据库里的东西
                 base_config['MAP_SEARCH_KEYWORDS'] = db_keywords
             except Exception as e:
-                print(f"从数据库加载关键词失败: {e}")
+                logger.error(f"从数据库加载关键词失败: {e}")
 
         if os.path.exists(self.settings_file):
             try:

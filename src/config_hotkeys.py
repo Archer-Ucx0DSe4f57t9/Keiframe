@@ -4,6 +4,9 @@ import keyboard
 import traceback
 from PyQt5.QtCore import Qt
 from src import config
+from src.utils.logging_util import get_logger
+
+logger = get_logger("Hotkeys")
 
 def init_global_hotkeys(window):
     """初始化全局快捷键，并绑定到 TimerWindow 实例的方法 (原 init_global_hotkeys)"""
@@ -70,7 +73,7 @@ def init_global_hotkeys(window):
             window.logger.error(f'注册全局快捷键失败: {str(e)}')
             window.logger.error(traceback.format_exc())
         except Exception:
-            print("注册全局快捷键失败:", e)
+            logger.error("注册全局快捷键失败:", e)
         
 def handle_lock_shortcut(window):
     """处理锁定快捷键 (原 handle_lock_shortcut)"""
@@ -115,7 +118,7 @@ def handle_memo_hotkey(window, mode):
              # 但如果 trigger_memo_display 里只是发射信号，则是安全的
              window.trigger_memo_display(mode)
     except Exception as e:
-        print(f"Memo hotkey error: {e}")
+        logger.error(f"Memo hotkey error: {e}")
 
 def unhook_global_hotkeys(window):
     """窗口关闭时清理全局快捷键"""

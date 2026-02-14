@@ -60,7 +60,6 @@ class ExcelUtil:
 
         ws.protection.sheet = True # 开启保护以维持格式，由于单元格 unlocked，用户仍可编辑
         wb.save(file_path)
-        print(f"✅ 导出成功: {file_path}")
 
     @staticmethod
     def import_configs(file_path, config_type='map'):
