@@ -128,7 +128,7 @@ class CountdownManager(QWidget):
         # [修改] 循环长度 = 配置项数量 + 2个固定选项(清除/关闭)
         total_options = len(config.COUNTDOWN_OPTIONS) + 2
         
-        if self.current_option_index == -1:
+        if self.current_option_index == 0:
             self.current_option_index = 0
         else:
             self.current_option_index = (self.current_option_index + 1) % total_options
@@ -285,8 +285,8 @@ class CountdownManager(QWidget):
                     remaining, 
                     message, 
                     is_in_game, 
-                    sound_filename=sound_to_play,
-                    default_color=custom_color # <--- 传入自定义颜色
+                    sound_filename = sound_to_play,
+                    default_color = custom_color # <--- 传入自定义颜色
                 )
 
     def handle_hotkey_trigger(self, current_game_seconds):

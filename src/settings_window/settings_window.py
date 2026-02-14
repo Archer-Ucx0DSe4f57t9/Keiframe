@@ -197,6 +197,7 @@ class SettingsWindow(QDialog):
             self.widgets[key] = {'widget': widget, 'type': widget_type, 'label': label_text}
             layout.addRow(label_text, widget)
 
+        
     def create_roi_widget(self, x1, y1, x2, y2):
         box = QWidget()
         h = QHBoxLayout(box)
@@ -342,40 +343,45 @@ class SettingsWindow(QDialog):
             QMessageBox.critical(self, "错误", f"导出失败: {str(e)}")
     
     def on_save(self):
-            """保存配置：合并了嵌套 ROI 处理、数据库同步以及修改确认逻辑"""
-            # 1. 提取普通设置项
-            new_values = self.get_ui_values()
-            new_values['MALWARFARE_ROI'] = self._collect_roi_data() 
-            
-            # 3. 处理关键词输入，直接更新数据库，不写入 JSON
+        """保存配置：修复了数据分流顺序以及窗口驻留逻辑"""
+        # 强制清除表格焦点，确保正在编辑的单元格内容被提交
+        if self.focusWidget():
+            self.focusWidget().clearFocus()
+
+        # 1. 收集 UI 上的完整数据包
+        new_values = self.get_ui_values()
+        new_values['MALWARFARE_ROI'] = self._collect_roi_data() 
+        
+        # 2. 生成报告（此时 new_values 包含 MAP_SEARCH_KEYWORDS，对比才有效）
+        changes = self._generate_changes_report(new_values)
+
+        if not changes:
+            QMessageBox.information(self, "提示", "没有检测到任何修改，请修改后再保存或点击取消。")
+            return # 【修复】不再调用 self.accept()，窗口保持打开
+
+        # 3. 弹出确认框
+        reply = QMessageBox.question(self, "确认修改", 
+                                    "检测到以下修改，确认保存吗？\n\n" + "\n".join(changes[:10]) + 
+                                    ("\n..." if len(changes)>10 else ""), 
+                                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            # 4. 【数据分流】：分出关键词交给数据库，剩下的进 JSON
             keywords = None
-            if 'MAP_SEARCH_KEYWORDS' in self.widgets:
-                keywords = self.widgets['MAP_SEARCH_KEYWORDS']['widget'].value()
-                new_values.pop('MAP_SEARCH_KEYWORDS', None)
+            if 'MAP_SEARCH_KEYWORDS' in new_values:
+                keywords = new_values.pop('MAP_SEARCH_KEYWORDS')
 
-            # 4. 【确认逻辑】对比差异并弹出确认框
-            changes = self._generate_changes_report(new_values)
-
-            if not changes:
-                QMessageBox.information(self, "提示", "没有检测到任何修改。")
-                self.accept()
-                return
-
-            # 弹出你原有的确认框
-            reply = QMessageBox.question(self, "确认修改", 
-                                        "检测到以下修改，确认保存吗？\n\n" + "\n".join(changes[:10]) + 
-                                        ("\n..." if len(changes)>10 else ""), 
-                                        QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-
-            if reply == QMessageBox.Yes:
-                self.normalize_config(new_values)
-                success, msg = self.data_handler.save_all(new_values, keywords)
-                if success:
-                    QMessageBox.information(self, "保存成功", msg)
-                    self.settings_saved.emit(new_values)
-                    self.accept()
-                else:
-                    QMessageBox.critical(self, "保存失败", msg)
+            # 坐标项拆分 (X/Y 处理)
+            self.normalize_config(new_values)
+            
+            # 5. 执行物理保存
+            success, msg = self.data_handler.save_all(new_values, keywords)
+            if success:
+                QMessageBox.information(self, "保存成功", msg)
+                self.settings_saved.emit(new_values)
+                self.accept() # 只有成功保存才关闭
+            else:
+                QMessageBox.critical(self, "保存失败", msg)
                     
     def _normalize_data(self, data):
         """递归将所有元组转换为列表，确保对比基准一致"""
@@ -388,8 +394,8 @@ class SettingsWindow(QDialog):
         return data
     
     def _generate_changes_report(self, new_cfg):
-            """对比配置变动，支持 ROI 的深度详细对比并统一数据类型"""
-            from src import config # 导入原始配置做兜底
+            """对比配置变动，支持 ROI 和 关键词字典的深度详细对比"""
+            from src import config 
             report = []
             
             lang_map = {'zh': '中文', 'en': '英文'}
@@ -401,31 +407,37 @@ class SettingsWindow(QDialog):
                 if old_value is None:
                     old_value = getattr(config, key, None)
                 
-                # --- 核心：对比前统一转换为列表进行递归标准化 ---
+                # 标准化数据进行对比，消除 [[]] 和 (()) 的差异
                 norm_old = self._normalize_data(old_value)
                 norm_new = self._normalize_data(new_value)
                 
                 if norm_old != norm_new:
-                    # --- 1. 处理 ROI 嵌套字典的细分报告 ---
+                    # --- 情况 1：处理 ROI 嵌套字典的细分报告 ---
                     if key == 'MALWARFARE_ROI':
                         old_roi = old_value if isinstance(old_value, dict) else {}
                         new_roi = new_value if isinstance(new_value, dict) else {}
-                        
                         for lang in ['zh', 'en']:
                             o_lang = old_roi.get(lang, {})
                             n_lang = new_roi.get(lang, {})
-                            
                             for reg, label in region_map.items():
-                                # 获取旧值和新值，注意可能存在某个语言里没有这个区域的情况
-                                v_old = o_lang.get(reg)
-                                v_new = n_lang.get(reg)
-                                
-                                # 内部对比也需要标准化，消除 [[]] vs (()) 的差异
-                                if self._normalize_data(v_old) != self._normalize_data(v_new):
+                                # 内部对比也需标准化
+                                if self._normalize_data(o_lang.get(reg)) != self._normalize_data(n_lang.get(reg)):
                                     l_name = lang_map.get(lang, lang)
-                                    report.append(f"【ROI-{l_name}】{label}: {v_old} -> {v_new}")
-                    
-                    # --- 2. 处理普通配置项 (修正缩进，使其与 if key == 'MALWARFARE_ROI' 平级) ---
+                                    report.append(f"【ROI-{l_name}】{label}: {o_lang.get(reg)} -> {n_lang.get(reg)}")
+
+                    # --- 情况 2：【重点】详细处理别名映射的字典变动 ---
+                    elif key == 'MAP_SEARCH_KEYWORDS':
+                        added = set(norm_new.keys()) - set(norm_old.keys())
+                        removed = set(norm_old.keys()) - set(norm_new.keys())
+                        common = set(norm_old.keys()) & set(norm_new.keys())
+                        
+                        if added: report.append(f"【别名映射】新增: {list(added)}")
+                        if removed: report.append(f"【别名映射】删除: {list(removed)}")
+                        for k in common:
+                            if norm_old[k] != norm_new[k]:
+                                report.append(f"【别名映射】修改 '{k}': {norm_old[k]} -> {norm_new[k]}")
+
+                    # --- 情况 3：处理所有其他普通配置项 ---
                     else:
                         label = self.widgets.get(key, {}).get('label', key)
                         report.append(f"【{label}】: {old_value} -> {new_value}")

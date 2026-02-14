@@ -667,9 +667,9 @@ class SettingsWindow(QDialog):
         layout = QFormLayout(content)
 
         # 1. 提示框通用布局 (Toast Layout)
-        gb_layout = QGroupBox("提示框通用布局 (地图 & 倒计时) - 像素偏移 (Pixel Offset)")
+        gb_layout = QGroupBox("提示框通用布局 (地图事件)")
         gl_layout = QFormLayout(gb_layout)
-        hint = QLabel("基准点为游戏窗口左上角 (0, 0)")
+        hint = QLabel("游戏画面左上角为基准点(0,0),数字越大越靠近右/下")
         hint.setStyleSheet("color: gray; font-style: italic;")
         gl_layout.addRow(hint)
         self.add_row(gl_layout, "距离左侧 (X Offset):", 'TOAST_OFFSET_X', 'spin', max=3000)
@@ -681,7 +681,7 @@ class SettingsWindow(QDialog):
         # 2. 地图事件逻辑
         gb_alert = QGroupBox("地图事件逻辑 (Map Events)")
         gl_alert = QFormLayout(gb_alert)
-        self.add_row(gl_alert, "提前提醒时间 (秒):", 'MAP_ALERT_SECONDS', 'spin')
+        self.add_row(gl_alert, "提前提醒 (秒):", 'MAP_ALERT_SECONDS', 'spin')
         self.add_row(gl_alert, "警告阈值 (秒):", 'MAP_ALERT_WARNING_THRESHOLD_SECONDS', 'spin')
         self.add_row(gl_alert, "正常倒计时颜色:", 'MAP_ALERT_NORMAL_COLOR', 'color')
         self.add_row(gl_alert, "警告倒计时颜色:", 'MAP_ALERT_WARNING_COLOR', 'color')
@@ -712,21 +712,21 @@ class SettingsWindow(QDialog):
         layout = QFormLayout(content)
 
         # 1. 倒计时
-        gb_alert = QGroupBox("倒计时与警告")
+        gb_alert = QGroupBox("倒计时与警告设置 (Countdown & Alerts)")
         gl_alert = QFormLayout(gb_alert)
-        self.add_row(gl_alert, "提前提示时间 (秒):", 'MUTATOR_ALERT_SECONDS', 'spin')
-        self.add_row(gl_alert, "警告阈值时间 (秒):", 'MUTATOR_WARNING_THRESHOLD_SECONDS', 'spin')
+        self.add_row(gl_alert, "提前提示 (秒):", 'MUTATOR_ALERT_SECONDS', 'spin')
+        self.add_row(gl_alert, "警告阈值时(秒):", 'MUTATOR_WARNING_THRESHOLD_SECONDS', 'spin')
         self.add_row(gl_alert, "正常文本颜色:", 'MUTATOR_NORMAL_COLOR', 'color')
         self.add_row(gl_alert, "警告文本颜色:", 'MUTATOR_WARNING_COLOR', 'color')
         layout.addRow(gb_alert)
 
         # 3. 提示布局
-        gb_layout = QGroupBox("因子图标消息设置 (占窗口大小的比例大小)")
+        gb_layout = QGroupBox("因子图标消息设置 (Icon & Text Layout)")
         gl_layout = QFormLayout(gb_layout)
         self.add_row(gl_layout, "每行高度 (Line Height):", 'MUTATOR_ALERT_LINE_HEIGHT', 'spin', max=200)
         self.add_row(gl_layout, "字体大小 (Font Size):", 'MUTATOR_ALERT_FONT_SIZE', 'spin', max=100)
         self.add_row(gl_layout, "图标透明度:", 'MUTATOR_ICON_TRANSPARENCY', 'double')
-        label_hint = QLabel("以下填入的是占窗口大小的比例的位移,数字越大越靠近右/下")
+        label_hint = QLabel("数字越大越靠近右/下")
         label_hint.setStyleSheet("color: gray; font-size: 10pt; font-style: italic;")
         gl_layout.addRow(label_hint)
         
