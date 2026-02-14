@@ -3,7 +3,7 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QPushButton, QComboBox, QSpinBox, QHeaderView
 from src.utils.fileutil import get_resources_dir
 import os
-
+import re
 
 class DictTable(QTableWidget):
     """字典编辑器表格 - 第二列改为下拉选择"""
@@ -204,3 +204,76 @@ class CountdownOptionsInput(QWidget):
 
     def value(self):
         return self.table.get_data()
+
+class UniversalConfigTable(QTableWidget):
+    """通用背板数据编辑器，支持地图和突变因子"""
+    def __init__(self, parent=None):
+        super().__init__(0, 0, parent)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.setMinimumHeight(300)
+        self.current_type = 'map'
+        self.current_name = '' # 记录当前正在编辑的项（如：净网行动）
+
+    def update_table(self, config_type, data, name, registry):
+        self.reg = registry[config_type]
+        self.current_type = config_type
+        self.current_name = name
+        
+        self.clear()
+        self.setColumnCount(len(self.reg['headers']))
+        self.setHorizontalHeaderLabels(self.reg['headers'])
+        self.setRowCount(len(data))
+        
+        # 建立一个转换映射，处理 DAO 返回的简写 Key
+        key_map = {
+            'time_label': lambda r: r.get('time', {}).get('label', ''),
+            'count_value': lambda r: r.get('count', ''),
+            'event_text': lambda r: r.get('event', ''),
+            'army_text': lambda r: r.get('army', ''),
+            'sound_filename': lambda r: r.get('sound', ''),
+            'hero_text': lambda r: r.get('hero', ''),
+            'content_text': lambda r: r.get('content', '')
+        }
+
+        for r_idx, row_data in enumerate(data):
+            for c_idx, col_key in enumerate(self.reg['mapping']):
+                # 根据映射获取数据，如果没有映射则直接 get
+                val = key_map[col_key](row_data) if col_key in key_map else row_data.get(col_key, '')
+                self.setItem(r_idx, c_idx, QTableWidgetItem(str(val)))
+
+    def add_new_row(self):
+        """在末尾添加一行新数据"""
+        row = self.rowCount()
+        self.insertRow(row)
+        for c in range(self.columnCount()):
+            self.setItem(row, c, QTableWidgetItem(""))
+
+    def remove_selected_row(self):
+        """删除当前选中的行"""
+        r = self.currentRow()
+        if r >= 0:
+            self.removeRow(r)
+
+    def get_table_data(self):
+        """获取表格中的全量数据用于存入数据库"""
+        data_list = []
+        id_key = self.reg['id_col'] # 'map_name' 或 'mutator_name'
+        mapping = self.reg['mapping'] # ['time_label', 'count_value', ...]
+        
+        time_pattern = re.compile(r'^\d+:\d+$')
+
+        for r in range(self.rowCount()):
+            row_dict = {id_key: self.current_name}
+            
+            
+            for c, col_key in enumerate(mapping):
+                item = self.item(r, c) # 获取单元格内容，注意这里的 col_key 是映射后的简写 Key，需要转换回 DAO 需要的格式
+                val = item.text().strip() if item else ""# 这里的 val 是用户输入的字符串，需要根据 col_key 进行必要的转换和验证
+                
+                if col_key == 'time_label':
+                    if not time_pattern.match(val):
+                        # 抛出 ValueError，包含行号方便用户定位
+                        raise ValueError(f"第 {r+1} 行时间格式错误: '{val}'。请输入 '分:秒' 格式（如 1:20）。")
+                row_dict[col_key] = item.text().strip() if item else ""
+            data_list.append(row_dict)
+        return data_list

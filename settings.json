@@ -1,5 +1,5 @@
 {
-    "current_language": "zh",
+    "current_game_language": "en",
     "LOG_LEVEL": "WARNING",
     "debug_mode": false,
     "debug_time_factor": 5.0,
@@ -12,29 +12,6 @@
     "MEMO_OPACITY": 1.0,
     "MEMO_DURATION": 5000,
     "MEMO_FADE_TIME": 1000,
-    "TOAST_OFFSET_X": 19,
-    "TOAST_OFFSET_Y": 540,
-    "TOAST_LINE_HEIGHT": 32,
-    "TOAST_FONT_SIZE": 20,
-    "MAP_ALERT_SECONDS": 30,
-    "MAP_ALERT_WARNING_THRESHOLD_SECONDS": 10,
-    "MAP_ALERT_NORMAL_COLOR": "rgb(239, 255, 238)",
-    "MAP_ALERT_WARNING_COLOR": "rgb(255, 0, 0)",
-    "MAP_SEARCH_KEYWORDS": {
-        "火车": "湮灭快车",
-        "黑杀": "黑暗杀星",
-        "天锁": "天界封锁",
-        "庙a": "往日神庙-A",
-        "庙b": "往日神庙-B",
-        "撕裂a": "虚空撕裂-左",
-        "撕裂b": "虚空撕裂-右",
-        "地勤": "机会渺茫-人虫",
-        "地勤p": "机会渺茫-神",
-        "零件": "聚铁成兵",
-        "杀毒": "净网行动",
-        "穿梭机": "虚空降临",
-        "记者": "熔火危机"
-    },
     "COUNTDOWN_MAX_CONCURRENT": 3,
     "COUNTDOWN_WARNING_THRESHOLD_SECONDS": 10,
     "COUNTDOWN_DISPLAY_COLOR": "rgb(0, 255, 255)",
@@ -42,33 +19,41 @@
         {
             "time": 120,
             "label": "神器/二三哥",
-            "sound": "Default.mp3"
+            "sound": "alert.wav"
         },
         {
             "time": 100,
             "label": "基地",
-            "sound": "Default.mp3"
+            "sound": "alert.wav"
         },
         {
             "time": 60,
             "label": "bb/孵化场",
-            "sound": "Default.mp3"
+            "sound": "alert.wav"
         },
         {
             "time": 90,
             "label": "大哥巢",
-            "sound": "Default.mp3"
+            "sound": "alert.wav"
         }
     ],
+    "MAP_ALERT_SECONDS": 30,
+    "MAP_ALERT_WARNING_THRESHOLD_SECONDS": 15,
+    "MAP_ALERT_NORMAL_COLOR": "rgb(239, 255, 238)",
+    "MAP_ALERT_WARNING_COLOR": "rgb(255, 0, 0)",
+    "TOAST_OFFSET_X": 19,
+    "TOAST_OFFSET_Y": 540,
+    "TOAST_LINE_HEIGHT": 32,
+    "TOAST_FONT_SIZE": 20,
     "MUTATOR_ALERT_SECONDS": 49,
     "MUTATOR_WARNING_THRESHOLD_SECONDS": 10,
     "MUTATOR_NORMAL_COLOR": "rgb(255, 255, 255)",
     "MUTATOR_WARNING_COLOR": "rgb(255, 0, 0)",
+    "MUTATOR_ALERT_OFFSET_X": 19,
+    "MUTATOR_ALERT_OFFSET_Y": 324,
     "MUTATOR_ALERT_LINE_HEIGHT": 32,
     "MUTATOR_ALERT_FONT_SIZE": 19,
     "MUTATOR_ICON_TRANSPARENCY": 0.7,
-    "MUTATOR_ALERT_OFFSET_Y": 324,
-    "MUTATOR_ALERT_OFFSET_X": 19,
     "MAP_SHORTCUT": "f3",
     "LOCK_SHORTCUT": "f4",
     "SCREENSHOT_SHORTCUT": "ctrl + shift + -",
@@ -87,29 +72,75 @@
         1920,
         800
     ],
-    "MALWARFARE_PURIFIED_COUNT_TOP_LEFT_COORD": [
-        298,
-        85
-    ],
-    "MALWARFARE_PURIFIED_COUNT_BOTTOMRIGHT_COORD": [
-        334,
-        103
-    ],
-    "MALWARFARE_TIME_TOP_LFET_COORD": [
-        431,
-        85
-    ],
-    "MALWARFARE_TIME_BOTTOM_RIGHT_COORD": [
-        475,
-        103
-    ],
-    "MALWARFARE_PAUSED_TOP_LFET_COORD": [
-        343,
-        85
-    ],
     "MALWARFARE_HERO_OFFSET": 97,
     "MALWARFARE_ZWEIHAKA_OFFSET": 181,
     "MALWARFARE_REPLAY_OFFSET": 49,
-    "MAIN_WINDOW_X": 970,
-    "MAIN_WINDOW_Y": 1002
+    "MALWARFARE_ROI": {
+        "zh": {
+            "purified_count": [
+                [
+                    184,
+                    80
+                ],
+                [
+                    207,
+                    95
+                ]
+            ],
+            "time": [
+                [
+                    244,
+                    81
+                ],
+                [
+                    273,
+                    94
+                ]
+            ],
+            "paused": [
+                [
+                    216,
+                    79
+                ],
+                [
+                    245,
+                    95
+                ]
+            ]
+        },
+        "en": {
+            "purified_count": [
+                [
+                    298,
+                    85
+                ],
+                [
+                    334,
+                    103
+                ]
+            ],
+            "time": [
+                [
+                    431,
+                    85
+                ],
+                [
+                    475,
+                    103
+                ]
+            ],
+            "paused": [
+                [
+                    343,
+                    85
+                ],
+                [
+                    420,
+                    103
+                ]
+            ]
+        }
+    },
+    "MAIN_WINDOW_X": 1000,
+    "MAIN_WINDOW_Y": 1049
 }
