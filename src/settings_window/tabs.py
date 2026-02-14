@@ -64,7 +64,122 @@ class SettingsTabsBuilder:
 
         tab.setLayout(layout)
         parent.tabs.addTab(tab, "界面显示")
+    
+    @staticmethod
+    def create_data_management_tab(parent):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        
+        # 1. 顶部导入导出按钮组
+        io_gb = QGroupBox("数据备份与恢复 (Excel)")
+        io_layout = QHBoxLayout(io_gb)
+        for t, label in [('map', '地图配置'), ('mutator', '突变因子')]:
+            btn_exp = QPushButton(f"导出{label}")
+            btn_imp = QPushButton(f"导入{label}并同步到数据库")
+            btn_exp.clicked.connect(lambda _, x=t: parent.on_export_data(x))
+            btn_imp.clicked.connect(lambda _, x=t: parent.on_import_excel(x))
+            io_layout.addWidget(btn_exp)
+            io_layout.addWidget(btn_imp)
+        layout.addWidget(io_gb)
 
+        # --- 2. 背板数据查看/编辑区 ---
+        view_gb = QGroupBox("背板数据在线编辑")
+        view_layout = QVBoxLayout(view_gb)
+        
+        # 二级联动下拉框
+        sel_layout = QHBoxLayout()
+        type_combo = QComboBox(); type_combo.addItems(["地图 (Map)", "突变因子 (Mutator)"])
+        name_combo = QComboBox()
+        sel_layout.addWidget(QLabel("类型:")); sel_layout.addWidget(type_combo)
+        sel_layout.addWidget(QLabel("目标:")); sel_layout.addWidget(name_combo)
+        sel_layout.addStretch()
+        view_layout.addLayout(sel_layout)
+
+        # 数据表格
+        from src.settings_window.complex_inputs import UniversalConfigTable
+        data_table = UniversalConfigTable()
+        view_layout.addWidget(data_table)
+
+        # 编辑按钮组
+        edit_btn_layout = QHBoxLayout()
+        add_btn = QPushButton("添加行"); del_btn = QPushButton("删除行")
+        save_db_btn = QPushButton("保存当前页到数据库 (Save to DB)")
+        save_db_btn.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold;")
+        
+        edit_btn_layout.addWidget(add_btn); edit_btn_layout.addWidget(del_btn)
+        edit_btn_layout.addStretch()
+        edit_btn_layout.addWidget(save_db_btn)
+        view_layout.addLayout(edit_btn_layout)
+        layout.addWidget(view_gb)
+
+        type_combo.clear()
+        for key, reg in parent.data_handler.BACKPLANE_REGISTRY.items():
+            # addItem(显示文本, 绑定的数据)
+            type_combo.addItem(reg['name'], key)
+        
+        # --- 3. 逻辑绑定 ---
+        def on_type_changed():
+            name_combo.clear()
+            config_key = type_combo.currentData() 
+            if not config_key: return
+            
+            res = parent.data_handler.get_names_by_type(config_key)
+
+            for item in res:
+                # 确保 item 是可解包的
+                if isinstance(item, (list, tuple)) and len(item) == 2:
+                    raw, chs = item
+                    name_combo.addItem(chs, raw)
+                else:
+                    # 如果只有一个值，则原始名和显示名用同一个
+                    val = item[0] if isinstance(item, (list, tuple)) and len(item) > 0 else str(item)
+                    name_combo.addItem(str(val), str(val))
+                    
+            on_name_changed()
+
+        def on_name_changed():
+            """二级联动：具体目标改变"""
+            config_key = type_combo.currentData()
+            raw_name = name_combo.currentData() # 直接拿原始名
+            
+            if config_key and raw_name:
+                data = parent.data_handler.get_data_by_name(config_key, raw_name)
+                # 传入注册表，UniversalConfigTable 内部会自动根据 cfg_key 渲染
+                data_table.update_table(config_key, data, raw_name, parent.data_handler.BACKPLANE_REGISTRY)
+
+        def do_save_to_db():
+            config_key = type_combo.currentData()
+            raw_name = name_combo.currentData()
+            
+            if not config_key or not raw_name: return
+            
+            try:
+                # 1. 这里会触发正则校验
+                table_data = data_table.get_table_data()
+                
+                # 2. 如果校验通过，执行保存
+                success, msg = parent.data_handler.save_backplane_to_db(config_key, raw_name, table_data)
+                if success:
+                    QMessageBox.information(parent, "成功同步到数据库", msg)
+                else:
+                    QMessageBox.critical(parent, "同步失败", msg)
+                    
+            except ValueError as e:
+                # 捕获正则校验失败的错误
+                QMessageBox.warning(parent, "格式错误", str(e))
+            except Exception as e:
+                QMessageBox.critical(parent, "系统错误", f"同步异常: {str(e)}")
+
+        # 信号连接
+        type_combo.currentIndexChanged.connect(on_type_changed)
+        name_combo.currentIndexChanged.connect(on_name_changed)
+        add_btn.clicked.connect(data_table.add_new_row)
+        del_btn.clicked.connect(data_table.remove_selected_row)
+        save_db_btn.clicked.connect(do_save_to_db)
+
+        on_type_changed() # 初始加载
+        parent.tabs.addTab(tab, "背板信息")
+      
     @staticmethod
     def create_map_settings_tab(parent):
         """地图与倒计时标签页"""
@@ -218,107 +333,7 @@ class SettingsTabsBuilder:
             roi_tab_widget.addTab(page, "中文 (ZH)" if lang == 'zh' else "英文 (EN)")
         return roi_tab_widget
 
-    @staticmethod
-    def create_data_management_tab(parent):
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        
-        # 1. 顶部导入导出按钮组
-        io_gb = QGroupBox("数据备份与恢复 (Excel)")
-        io_layout = QHBoxLayout(io_gb)
-        for t, label in [('map', '地图配置'), ('mutator', '突变因子')]:
-            btn_exp = QPushButton(f"导出{label}")
-            btn_imp = QPushButton(f"导入{label}")
-            btn_exp.clicked.connect(lambda _, x=t: parent.on_export_data(x))
-            btn_imp.clicked.connect(lambda _, x=t: parent.on_import_excel(x))
-            io_layout.addWidget(btn_exp)
-            io_layout.addWidget(btn_imp)
-        layout.addWidget(io_gb)
 
-        # --- 2. 背板数据查看/编辑区 ---
-        view_gb = QGroupBox("背板数据在线编辑")
-        view_layout = QVBoxLayout(view_gb)
-        
-        # 二级联动下拉框
-        sel_layout = QHBoxLayout()
-        type_combo = QComboBox(); type_combo.addItems(["地图 (Map)", "突变因子 (Mutator)"])
-        name_combo = QComboBox()
-        sel_layout.addWidget(QLabel("类型:")); sel_layout.addWidget(type_combo)
-        sel_layout.addWidget(QLabel("目标:")); sel_layout.addWidget(name_combo)
-        sel_layout.addStretch()
-        view_layout.addLayout(sel_layout)
-
-        # 数据表格
-        from src.settings_window.complex_inputs import UniversalConfigTable
-        data_table = UniversalConfigTable()
-        view_layout.addWidget(data_table)
-
-        # 编辑按钮组
-        edit_btn_layout = QHBoxLayout()
-        add_btn = QPushButton("添加行"); del_btn = QPushButton("删除行")
-        save_db_btn = QPushButton("同步到数据库 (Save to DB)")
-        save_db_btn.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold;")
-        
-        edit_btn_layout.addWidget(add_btn); edit_btn_layout.addWidget(del_btn)
-        edit_btn_layout.addStretch()
-        edit_btn_layout.addWidget(save_db_btn)
-        view_layout.addLayout(edit_btn_layout)
-        layout.addWidget(view_gb)
-
-        # --- 3. 逻辑绑定 ---
-        def on_type_changed():
-            name_combo.clear()
-            is_map = type_combo.currentIndex() == 0
-            is_mutator =type_combo.currentIndex() == 1
-            res = parent.data_handler.get_names_by_type('map' if is_map else 'mutator')
-            if is_map: name_combo.addItems(res)
-            else:
-                for raw, chs in res: name_combo.addItem(chs, raw)
-            on_name_changed()
-
-        def on_name_changed():
-            is_map = type_combo.currentIndex() == 0
-            is_mutator =type_combo.currentIndex() == 1
-            config_type = 'map' if is_map else 'mutator'
-            raw_name = name_combo.currentText() if is_map else name_combo.currentData()
-            
-            if raw_name:
-                data = parent.data_handler.get_data_by_name(config_type, raw_name)
-                # 修复报错：传入注册表字典
-                data_table.update_table(config_type, data, raw_name, parent.data_handler.BACKPLANE_REGISTRY)
-
-        def do_save_to_db():
-            is_map = type_combo.currentIndex() == 0
-            is_mutator =type_combo.currentIndex() == 1
-            cfg_type = 'map' if is_map else 'mutator'
-            raw_name = name_combo.currentText() if is_map else name_combo.currentData()
-            try:
-                # 1. 这里会触发正则校验
-                table_data = data_table.get_table_data()
-                
-                # 2. 如果校验通过，执行保存
-                success, msg = parent.data_handler.save_backplane_to_db(cfg_type, raw_name, table_data)
-                if success:
-                    QMessageBox.information(parent, "成功", msg)
-                else:
-                    QMessageBox.critical(parent, "错误", msg)
-                    
-            except ValueError as e:
-                # 捕获正则校验失败的错误
-                QMessageBox.warning(parent, "格式错误", str(e))
-            except Exception as e:
-                QMessageBox.critical(parent, "系统错误", f"同步异常: {str(e)}")
-
-        # 信号连接
-        type_combo.currentIndexChanged.connect(on_type_changed)
-        name_combo.currentIndexChanged.connect(on_name_changed)
-        add_btn.clicked.connect(data_table.add_new_row)
-        del_btn.clicked.connect(data_table.remove_selected_row)
-        save_db_btn.clicked.connect(do_save_to_db)
-
-        on_type_changed() # 初始加载
-        parent.tabs.addTab(tab, "背板信息")
-      
     ''''辅助函数合集'''
     @staticmethod
     def _create_widget_only(parent, key, widget_type, label_text, **kwargs):

@@ -18,6 +18,7 @@ class SettingsHandler:
             'id_col': 'map_name',
             'dao_load': map_daos.load_map_by_name,
             'dao_import': map_daos.bulk_import_map_configs,
+            'dao_get_names': map_daos.get_all_map_names,
             'headers': ["时间点 (Label)", "节点 (净网限定)", "提醒事件", "科技等级", "声音文件", "风暴英雄"],
             # 这里的映射必须与 DAO 中的 bulk_import 键名严格一致
             'mapping': ['time_label', 'count_value', 'event_text', 'army_text', 'sound_filename', 'hero_text']
@@ -29,6 +30,7 @@ class SettingsHandler:
             'id_col': 'mutator_name',
             'dao_load': mutator_daos.load_mutator_by_name,
             'dao_import': mutator_daos.bulk_import_mutator_configs,
+            'dao_get_names': mutator_daos.get_all_mutator_names,
             'headers': ["时间点 (Label)", "提醒内容", "声音文件"],
             'mapping': ['time_label', 'content_text', 'sound_filename']
         }
@@ -93,33 +95,26 @@ class SettingsHandler:
         返回: (bool 成功标志, list 错误信息列表/成功消息)
         """
         # 1. 解析 Excel
-        raw_data, parse_err = ExcelUtil.import_configs(file_path, config_type)
-        if parse_err:
-            return False, [f"文件解析失败: {parse_err}"]
+        raw_data, parse_err = ExcelUtil.import_configs(file_path, config_type) #
+        if parse_err: return False, [parse_err]
 
-        # 2. 执行业务校验
-        # 使用传入的数据库连接实例化校验器
-        validator = None
-        if config_type == 'map': 
-            validator = DataValidator(self.maps_db)
-        elif config_type == 'mutator':
-            validator = DataValidator(self.mutators_db)
-        else:
-            return False, [f"未知的配置类型: {config_type}"]
-
-        valid_data, validation_errors = validator.validate(config_type, raw_data)
+        # 根据类型选择数据库连接进行校验
+        db_conn = getattr(self, self.BACKPLANE_REGISTRY[config_type]['db_conn_attr'])
+        validator = DataValidator(db_conn)
+        
+        valid_data, validation_errors = validator.validate(config_type, raw_data) #
+        
+        # [关键] 只要存在任何一行错误，立即中止导入，防止脏数据入库
         if validation_errors:
-            # 如果有错，返回错误列表给 UI 显示
             return False, validation_errors
 
-        # 3. 校验通过，执行写入
+        # 执行写入逻辑
         try:
-            if config_type == 'map':
-                map_daos.bulk_import_map_configs(self.maps_db, valid_data)
-            # 可以扩展 mutator 的导入
-            return True, f"成功导入 {len(valid_data)} 条配置"
+            reg = self.BACKPLANE_REGISTRY[config_type]
+            reg['dao_import'](db_conn, valid_data) #
+            return True, f"成功同步 {len(valid_data)} 条记录"
         except Exception as e:
-            return False, [f"数据库写入异常: {str(e)}"]
+            return False, [f"写入失败: {str(e)}"]
     
     def save_backplane_to_db(self, config_type, target_name, data_list):
         """通用保存逻辑：不再使用 if-else 判断类型"""
@@ -181,25 +176,32 @@ class SettingsHandler:
             return True, len(valid_data)
         return False, errors
     
-    def get_all_map_configs_for_export(self):
-        """获取全量地图配置用于 Excel 导出"""
-        if not self.maps_db: return []
+    def get_all_configs_for_export(self, config_type):
+        """根据类型获取全量背板数据，用于 Excel 导出"""
+        reg = self.BACKPLANE_REGISTRY.get(config_type)
+        if not reg: return []
+        
+        db_conn = getattr(self, reg['db_conn_attr'])
         all_data = []
-        # 使用你提供的 get_all_map_names
-        map_names = map_daos.get_all_map_names(self.maps_db)
-        for name in map_names:
-            # 使用你提供的 load_map_by_name
-            rows = map_daos.load_map_by_name(self.maps_db, name)
+        
+        # 简化版：直接遍历 names
+        names = reg['dao_get_names'](db_conn)
+        # 2. 遍历加载每项的配置
+        for name in names:
+            rows = reg['dao_load'](db_conn, name)
             for r in rows:
-                all_data.append({
-                    'map_name': r['map_name'],
-                    'time_label': r['time']['label'],
-                    'count_value': r['count'],
-                    'event_text': r['event'],
-                    'army_text': r['army'],
-                    'sound_filename': r['sound'],
-                    'hero_text': r['hero']
-                })
+                # 扁平化数据以适配 Excel 结构
+                item = {reg['id_col']: name}
+                item['time_label'] = r['time']['label']if isinstance(r.get('time'), dict) else ""
+                
+                # 动态填充其他映射字段
+                for col_key in reg['mapping']:
+                    if col_key != 'time_label':continue # time_label 已特殊处理
+                    source_key = col_key.replace('_text', '').replace('_filename', '').replace('_value', '')
+                    if source_key == 'count': source_key = 'count' # 适配 map_daos
+                    item[col_key] = r.get(source_key, '')
+                
+                all_data.append(item)
         return all_data
     
     def export_to_excel(self, config_type, path):
@@ -209,15 +211,21 @@ class SettingsHandler:
             ExcelUtil.export_configs(all_data, path, 'map')
 
     def get_names_by_type(self, config_type):
-        """获取地图或突变因子的名称列表（支持翻译）"""
+        """统一返回格式为 [(原始名, 显示名), ...]"""
+        results = []
         if config_type == 'map':
-            return map_daos.get_all_map_names(self.maps_db)
+            # 获取所有地图名称
+            names = map_daos.get_all_map_names(self.maps_db)
+            # 地图不需要翻译，原始名和显示名一致
+            results = [(n, n) for n in names]
         elif config_type == 'mutator':
+            # 获取所有突变因子英文名
             raw_names = mutator_daos.get_all_mutator_names(self.mutators_db)
-            # 返回 (原始名, 显示名) 的元组列表
-            return [(n, mutator_names_to_CHS.get(n, n)) for n in raw_names]
-        else:
-            return []
+            # 即使翻译表中没有，也至少保证有两个元素
+            results = [(n, mutator_names_to_CHS.get(n, n)) for n in raw_names]
+        
+        # 增加防御性检查：过滤掉不符合 (a, b) 格式的脏数据
+        return [item for item in results if isinstance(item, (list, tuple)) and len(item) == 2]
 
     def get_data_by_name(self, config_type, name):
         """获取特定项的详细背板配置数据"""

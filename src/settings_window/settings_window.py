@@ -321,26 +321,19 @@ class SettingsWindow(QDialog):
         if not path: return
 
         try:
-            all_data = []
-            if config_type == 'map':
-                conn = self.main_window.maps_db
-                for name in map_daos.get_all_map_names(conn):
-                    rows = map_daos.load_map_by_name(conn, name)
-                    for r in rows:
-                        all_data.append({
-                            'map_name': r['map_name'],
-                            'time_label': r['time']['label'],
-                            'count_value': r['count'],
-                            'event_text': r['event'],
-                            'army_text': r['army'],
-                            'sound_filename': r['sound'],
-                            'hero_text': r['hero']
-                        })
-                ExcelUtil.export_configs(all_data, path, 'map')
-            # 此处可继续添加 mutator 的导出逻辑...
+            # 1. 调用 Handler 获取格式化后的全量数据
+            all_data = self.data_handler.get_all_configs_for_export(config_type)
+            
+            if not all_data:
+                QMessageBox.warning(self, "警告", "数据库中没有找到任何可导出的数据。")
+                return
+
+            # 2. 执行文件写入
+            ExcelUtil.export_configs(all_data, path, config_type)
             QMessageBox.information(self, "成功", f"数据已成功导出至: {path}")
         except Exception as e:
             QMessageBox.critical(self, "错误", f"导出失败: {str(e)}")
+
     
     def on_save(self):
         """保存配置：修复了数据分流顺序以及窗口驻留逻辑"""

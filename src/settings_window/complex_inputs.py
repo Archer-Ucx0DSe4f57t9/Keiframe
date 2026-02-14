@@ -260,12 +260,11 @@ class UniversalConfigTable(QTableWidget):
         id_key = self.reg['id_col'] # 'map_name' 或 'mutator_name'
         mapping = self.reg['mapping'] # ['time_label', 'count_value', ...]
         
-        time_pattern = re.compile(r'^\d+:\d+$')
+        time_pattern = re.compile(r'^([0-5]?\d):([0-5]\d)$')# 简单的 mm:ss 格式验证，后续可以根据需要增强
 
         for r in range(self.rowCount()):
             row_dict = {id_key: self.current_name}
-            
-            
+
             for c, col_key in enumerate(mapping):
                 item = self.item(r, c) # 获取单元格内容，注意这里的 col_key 是映射后的简写 Key，需要转换回 DAO 需要的格式
                 val = item.text().strip() if item else ""# 这里的 val 是用户输入的字符串，需要根据 col_key 进行必要的转换和验证

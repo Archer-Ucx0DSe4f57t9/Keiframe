@@ -40,3 +40,4 @@ src/monkey.js
 /test/ocr/ocr sampling/
 /tests/ocr sampling
 export_map.xlsx
+*.xlsx

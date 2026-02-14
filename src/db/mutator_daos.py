@@ -28,7 +28,7 @@ def load_mutator_by_name(conn, mutator_name):
 # 获取所有突变列表
 def get_all_mutator_names(conn):
     sql = """
-    SELECT * FROM mutator_meta ORDER BY sort_order ASC;
+    SELECT mutator_name FROM mutator_meta ORDER BY sort_order ASC;
     """
     cur = conn.execute(sql)
     rows = cur.fetchall()
@@ -64,12 +64,14 @@ def bulk_import_mutator_configs(conn, data_list):
     """
     processed_data = []
     for item in data_list:
-        # 同样支持自动时间换算
-        t_val = convert_time_to_seconds(str(item['time_label']))
+        t_val = item.get('time_value')
+        if t_val is None:
+            t_val = convert_time_to_seconds(str(item['time_label']))
         processed_data.append((
             item['mutator_name'], item['time_label'], t_val, 
             item.get('content_text'), item.get('sound_filename')
         ))
-    
+
+
     conn.executemany(sql, processed_data)
     conn.commit()

@@ -73,30 +73,22 @@ class ExcelUtil:
         try:
             # 强制将所有列读为 object，防止初次解析时丢失精度
             df = pd.read_excel(file_path, dtype=object)
-            
+ 
             if identity_chs not in df.columns:
                 return None, f"❌ 找不到 '{identity_chs}' 列，请检查表头。"
 
             df = df.rename(columns=rev_map)
             data = df.to_dict(orient='records')
-            
+
             results = []
             for row in data:
                 # 过滤完全空的行
                 if pd.isna(row.get(identity_key)): continue
-                
+
                 # 业务逻辑：非“净网行动”清空 count_value
                 if str(row.get('map_name')).strip() != '净网行动':
                     row['count_value'] = None
 
-                # 时间换算与标准化 mm:ss
-                if 'time_label' in row and not pd.isna(row['time_label']):
-                    t_val = ExcelUtil.parse_time_label(row['time_label'])
-                    row['time_value'] = t_val
-                    row['time_label'] = ExcelUtil.format_seconds_to_label(t_val)
-                else:
-                    row['time_value'] = 0
-                
                 results.append(row)
             return results, None
         except Exception as e:
@@ -106,14 +98,6 @@ class ExcelUtil:
     def parse_time_label(label):
         """智能解析时间 (支持 0.35 浮点数还原)"""
         if pd.isna(label): return 0
-        if isinstance(label, (datetime.time, datetime.datetime)):
-            if 0 < label.hour < 12: return label.hour * 60 + label.minute
-            return label.hour * 3600 + label.minute * 60 + label.second
-        if isinstance(label, (float, int)):
-            if isinstance(label, float) and label < 1: # Excel 浮点数陷阱
-                ts = int(round(label * 86400))
-                return (ts // 3600) * 60 + (ts % 3600 // 60) if ts >= 3600 else ts
-            return int(label)
         try:
             parts = list(map(int, str(label).strip().split(':')))
             return parts[0] * 60 + parts[1] if len(parts) == 2 else (parts[0] * 3600 + parts[1] * 60 + parts[2] if len(parts) == 3 else int(float(label)))

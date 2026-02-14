@@ -110,11 +110,13 @@ def bulk_import_map_configs(conn, data_list):
     processed_data = []
     for item in data_list:
         # 自动换算：$$TotalSeconds = Minutes \times 60 + Seconds$$
-        t_val = convert_time_to_seconds(str(item['time_label']))
+        t_val = item.get('time_value')
+        if t_val is None:
+            t_val = convert_time_to_seconds(str(item['time_label']))
         processed_data.append((
             item['map_name'], item['time_label'], t_val, item.get('count_value'),
             item.get('event_text'), item.get('army_text'), item.get('sound_filename'), item.get('hero_text')
         ))
-    
+
     conn.executemany(sql, processed_data)
     conn.commit()
