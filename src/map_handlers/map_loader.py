@@ -66,7 +66,7 @@ def handle_map_selection(window, map_name):
         
     # 根据地图名称实例化正确的事件管理器
     if map_name == '净网行动':
-        window.logger.warning("检测到特殊地图 '净网行动'，正在启用 MalwarfareEventManager。")
+        window.logger.info("检测到特殊地图 '净网行动'，正在启用 MalwarfareEventManager。")
         window.map_event_manager = MapwarfareEventManager(window.table_area, window.toast_manager, window.logger)
         window.is_map_Malwarfare = True
         

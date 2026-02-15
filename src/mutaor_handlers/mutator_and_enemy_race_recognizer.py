@@ -250,7 +250,7 @@ class Mutator_and_enemy_race_recognizer:
 
             # 条件：已超过 60 秒 AND 突变因子检测未完成
             if self._current_game_time >= 60 and not self.mutator_detection_complete:
-                self.logger.warning("游戏时间已超过 60 秒，且突变因子未确认，将结果确认为空。")
+                self.logger.info("游戏时间已超过 60 秒，且突变因子未确认，将结果确认为空。")
                 self.recognized_mutators = [] # 确认结果为空列表
                 self.mutator_detection_complete = True
                 self.recognition_signal.emit({'race': None, 'mutators': self.recognized_mutators})

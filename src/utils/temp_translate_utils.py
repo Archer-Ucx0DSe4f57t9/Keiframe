@@ -17,5 +17,5 @@ MUTATOR_HEADER_MAP = {
 }
 
 #名称到简略中文名称映射，将来迁移到语言模块
-mutator_names_to_CHS = {'部署': '部署', '小软': '小软', '裂隙': '裂隙', '杀戮': '杀戮',
-                        '炸弹': '炸弹', '风暴': '风暴', '部署神族': '部署神族'}
+mutator_names_to_CHS = {'AggressiveDeployment': '部署', 'Propagators': '小软', 'VoidRifts': '裂隙', 'KillBots': '杀戮',
+                        'BoomBots': '炸机', 'HeroesFromtheStorm': '风暴', 'AggressiveDeploymentProtoss': '部署神族'}

@@ -406,7 +406,7 @@ class TimerWindow(QMainWindow):
 
         #新游戏时清除所有原有的计时器
         elif action == 'reset_game_info':
-            self.logger.warning('收到新游戏信号，正在重置识别器和游戏状态')
+            self.logger.info('收到新游戏信号，正在重置识别器和游戏状态')
             # 重置识别器状态，并重新开始扫描
             if hasattr(self, 'mutator_and_enemy_race_recognizer') and self.mutator_and_enemy_race_recognizer:
                  self.mutator_and_enemy_race_recognizer.reset_and_start() # 调用识别器的重置和启动方法

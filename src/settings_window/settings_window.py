@@ -112,32 +112,7 @@ class SettingsWindow(QDialog):
                     )
         return nested_roi
 
-    def get_available_maps(self):
-        """根据当前设置的语言读取地图文件列表"""
-        # 获取当前 UI 中选择的语言（而不是 config 里的，这样可以实时预览切换）
-        lang = "zh"
-        if 'current_language' in self.widgets:
-            lang = self.widgets['current_language']['widget'].currentText()
-        else:
-            lang = self.current_config.get('current_language', 'zh')
 
-        # 计算路径
-        maps_dir = get_resources_dir(os.path.join('maps', lang))
-        
-        map_files = []
-        if os.path.exists(maps_dir):
-            try:
-                # 读取文件列表，过滤掉后缀名
-                for f in os.listdir(maps_dir):
-                    if os.path.isfile(os.path.join(maps_dir, f)):
-                        name, _ = os.path.splitext(f)
-                        map_files.append(name)
-            except Exception as e:
-                self.logger.error(f"读取地图列表失败: {e}")
-        
-        return sorted(map_files)
-      
-      
     def add_row(self, layout, label_text, key, widget_type, **kwargs):
         val = self.current_config.get(key)
         if val is None and widget_type != 'dict': # dict可能为空字典
@@ -169,7 +144,7 @@ class SettingsWindow(QDialog):
         elif widget_type == 'color':
             widget = ColorInput(str(val))
         elif widget_type == 'dict':
-            map_list = self.get_available_maps()
+            map_list = map_daos.get_all_map_names(self.data_handler.maps_db) if self.data_handler.maps_db else []
             widget = DictInput(val if isinstance(val, dict) else {}, map_list)
             self.widgets[key] = {'widget': widget, 'type': 'dict', 'label': label_text}
             layout.addRow(QLabel(label_text))
