@@ -260,7 +260,7 @@ class UniversalConfigTable(QTableWidget):
         id_key = self.reg['id_col'] # 'map_name' 或 'mutator_name'
         mapping = self.reg['mapping'] # ['time_label', 'count_value', ...]
         
-        time_pattern = re.compile(r'^([0-5]?\d):([0-5]\d)$')# 简单的 mm:ss 格式验证，后续可以根据需要增强
+        time_pattern = re.compile(r'^([0-6]?\d):([0-5]\d)$')# 简单的 mm:ss 格式验证，后续可以根据需要增强
 
         for r in range(self.rowCount()):
             row_dict = {id_key: self.current_name}

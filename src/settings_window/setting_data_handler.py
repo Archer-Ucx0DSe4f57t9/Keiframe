@@ -99,7 +99,8 @@ class SettingsHandler:
         if parse_err: return False, [parse_err]
 
         # 根据类型选择数据库连接进行校验
-        db_conn = getattr(self, self.BACKPLANE_REGISTRY[config_type]['db_conn_attr'])
+        reg = self.BACKPLANE_REGISTRY[config_type]
+        db_conn = getattr(self, reg['db_conn_attr'])
         validator = DataValidator(db_conn)
         
         valid_data, validation_errors = validator.validate(config_type, raw_data) #
@@ -110,9 +111,20 @@ class SettingsHandler:
 
         # 执行写入逻辑
         try:
-            reg = self.BACKPLANE_REGISTRY[config_type]
-            reg['dao_import'](db_conn, valid_data) #
-            return True, f"成功同步 {len(valid_data)} 条记录"
+            # 提取 Excel 中涉及的所有唯一名称 (例如：['亡者之夜', '净网行动'])
+            target_names = list(set(item[reg['id_col']] for item in valid_data))
+            
+            if target_names:
+                # 物理删除这些目标的旧数据，确保 Excel 中删除的行也能反馈到数据库
+                placeholders = ', '.join(['?'] * len(target_names))
+                sql_delete = f"DELETE FROM {reg['table_name']} WHERE {reg['id_col']} IN ({placeholders})"
+                db_conn.execute(sql_delete, target_names)
+            
+            # 批量插入新数据
+            reg['dao_import'](db_conn, valid_data)
+            db_conn.commit()
+            
+            return True, f"成功同步 {len(valid_data)} 条记录，已覆盖原有的 {len(target_names)} 个项目。"
         except Exception as e:
             return False, [f"写入失败: {str(e)}"]
     
@@ -188,15 +200,19 @@ class SettingsHandler:
         names = reg['dao_get_names'](db_conn)
         # 2. 遍历加载每项的配置
         for name in names:
+            display_name = name
+            if config_type == 'mutator':
+                display_name = mutator_names_to_CHS.get(name, name)
+            
             rows = reg['dao_load'](db_conn, name)
             for r in rows:
                 # 扁平化数据以适配 Excel 结构
-                item = {reg['id_col']: name}
+                item = {reg['id_col']: display_name}
                 item['time_label'] = r['time']['label']if isinstance(r.get('time'), dict) else ""
                 
                 # 动态填充其他映射字段
                 for col_key in reg['mapping']:
-                    if col_key != 'time_label':continue # time_label 已特殊处理
+                    if col_key == 'time_label':continue # time_label 已特殊处理
                     source_key = col_key.replace('_text', '').replace('_filename', '').replace('_value', '')
                     if source_key == 'count': source_key = 'count' # 适配 map_daos
                     item[col_key] = r.get(source_key, '')

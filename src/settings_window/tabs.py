@@ -72,14 +72,26 @@ class SettingsTabsBuilder:
         
         # 1. 顶部导入导出按钮组
         io_gb = QGroupBox("数据备份与恢复 (Excel)")
-        io_layout = QHBoxLayout(io_gb)
+        io_layout = QVBoxLayout(io_gb) # 改为垂直布局以放置提示文字
+        
+        # 增加提示文字
+        hint_label = QLabel(
+            "注意：导入 Excel 会直接覆盖数据库对应项的全部旧数据。\n"
+            "建议：若仅微调数据，请优先使用下方的“在线编辑”功能，更安全快捷。"
+        )
+        hint_label.setStyleSheet("color: #d32f2f; font-weight: bold; margin-bottom: 5px;")
+        io_layout.addWidget(hint_label)
+        
+        btn_container = QHBoxLayout()
         for t, label in [('map', '地图配置'), ('mutator', '突变因子')]:
             btn_exp = QPushButton(f"导出{label}")
-            btn_imp = QPushButton(f"导入{label}并同步到数据库")
+            btn_imp = QPushButton(f"导入{label}")
             btn_exp.clicked.connect(lambda _, x=t: parent.on_export_data(x))
             btn_imp.clicked.connect(lambda _, x=t: parent.on_import_excel(x))
-            io_layout.addWidget(btn_exp)
-            io_layout.addWidget(btn_imp)
+            btn_container.addWidget(btn_exp)
+            btn_container.addWidget(btn_imp)
+        
+        io_layout.addLayout(btn_container)
         layout.addWidget(io_gb)
 
         # --- 2. 背板数据查看/编辑区 ---

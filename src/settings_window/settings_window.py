@@ -69,12 +69,13 @@ class SettingsWindow(QDialog):
         
         builder = SettingsTabsBuilder()
         builder.create_general_tab(self)       # 1. 常规设置
-        builder.create_interface_tab(self)     # 2. 界面与显示
-        builder.create_map_settings_tab(self)  # 3. 地图提醒 (Map Config)
-        builder.create_mutation_settings_tab(self) # 4. 因子提示配置 (Mutation Config)
-        builder.create_hotkey_tab(self)        # 5. 快捷键
-        builder.create_general_rec_tab(self)   # 6. 图像设置
-        builder.create_data_management_tab(self) # 7. 数据管理
+        builder.create_data_management_tab(self) # 2.背板信息管理
+        builder.create_interface_tab(self)     # 3. 界面与显示
+        builder.create_map_settings_tab(self)  # 4. 地图提醒 (Map Config)
+        builder.create_mutation_settings_tab(self) # 5. 因子提示配置 (Mutation Config)
+        builder.create_hotkey_tab(self)        # 6. 快捷键
+        builder.create_general_rec_tab(self)   # 7. 图像ocr设置
+        
         main_layout.addWidget(self.tabs)
 
         btn_layout = QHBoxLayout()
@@ -299,6 +300,15 @@ class SettingsWindow(QDialog):
 
     def on_import_excel(self, config_type):
         """导入 Excel 配置，调用 SettingsHandler 进行验证和处理"""
+        # 1. 弹出警告确认
+        reply = QMessageBox.warning(
+            self, "确认导入",
+            "导入 Excel 将会【完全覆盖】并【删除】数据库中对应地图/因子的现有配置！\n"
+            "建议仅在批量迁移数据时使用导入功能。\n\n是否继续？",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if reply == QMessageBox.No: return
+        
         path, _ = QFileDialog.getOpenFileName(self, "选择 Excel 文件", "", "Excel Files (*.xlsx)")
         if not path: return
 

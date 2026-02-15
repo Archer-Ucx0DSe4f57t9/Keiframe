@@ -4,7 +4,7 @@ MAP_HEADER_MAP = {
         'time_label': '提醒时间点 (格式 分:秒)',
         'count_value': '已净化节点数（净网专用）',
         'event_text': '事件提醒内容',
-        'army_text': '兵种/阵营信息',
+        'army_text': '补充（科技等级/混合体/...）',
         'sound_filename': '语音文件名',
         'hero_text': '风暴英雄'
     }
@@ -16,6 +16,6 @@ MUTATOR_HEADER_MAP = {
     'sound_filename': '语音文件名'
 }
 
-#名称到简略中文名称映射，用于提示显示,将来迁移到语言模块
-mutator_names_to_CHS = {'AggressiveDeployment': '进攻部署', 'Propagators': '同化体', 'VoidRifts': '虚空裂隙', 'KillBots': '杀戮机器',
-                        'BoomBots': '炸弹机器', 'HeroesFromtheStorm': '风暴英雄', 'AggressiveDeploymentProtoss': '部署神族'}
+#名称到简略中文名称映射，将来迁移到语言模块
+mutator_names_to_CHS = {'部署': '部署', '小软': '小软', '裂隙': '裂隙', '杀戮': '杀戮',
+                        '炸弹': '炸弹', '风暴': '风暴', '部署神族': '部署神族'}

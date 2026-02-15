@@ -2,6 +2,8 @@
 import pandas as pd
 from src.db import map_daos, mutator_daos
 from src.utils.excel_utils import ExcelUtil
+from src.utils.temp_translate_utils import mutator_names_to_CHS
+
 import re
 
 class DataValidator:
@@ -30,7 +32,13 @@ class DataValidator:
         allowed_names = set(cfg['fetch_func'](self.conn)) #
         
         # 严格正则：必须是 分:秒，且秒数不能超过 59
-        time_pattern = re.compile(r'^([0-5]?\d):([0-5]\d)$') 
+        time_pattern = re.compile(r'^([0-6]?\d):([0-5]\d)$') 
+        
+        
+        rev_mutator_map = {}
+        if config_type == 'mutator':
+            rev_mutator_map = {v: k for k, v in mutator_names_to_CHS.items()}
+        
         
         errors, valid_rows = [], []
         for i, row in enumerate(data_list):
@@ -38,11 +46,19 @@ class DataValidator:
             row_errs = []
             
             # 1. 名称合法性校验
-            name = str(row.get(cfg['id_field'], '')).strip()
-            if not name or name not in allowed_names:
-                row_errs.append(f"名称 '{name}' 在数据库中不存在")
+            raw_name = str(row.get(cfg['id_field'], '')).strip()
+            internal_name = raw_name
+            
+            if config_type == 'mutator' and raw_name in rev_mutator_map:
+                internal_name = rev_mutator_map[raw_name]
+            
+            if not internal_name or internal_name not in allowed_names:
+                row_errs.append(f"名称 '{raw_name}' 在数据库中不存在")
+            else:
+                #将 row 里的名称更新为数据库识别的英文名，确保后续 DAO 写入正确
+                row[cfg['id_field']] = internal_name
 
-            # 2. 严格时间解析校验（拦截“我我我我”等脏数据）
+            # 2. 严格时间解析校验（拦截脏数据）
             label = str(row.get('time_label', '')).strip()
             if not time_pattern.match(label):
                 row_errs.append(f"时间格式非法: '{label}' (正确示例: 1:20)")
@@ -51,7 +67,7 @@ class DataValidator:
                 row['time_value'] = ExcelUtil.parse_time_label(label) #
 
             # 3. 特有规则逻辑...
-            row_errs.extend(cfg['specific_rules'](row, name))
+            row_errs.extend(cfg['specific_rules'](row, internal_name))
 
             if row_errs:
                 errors.append(f"第 {line} 行: " + " | ".join(row_errs))
