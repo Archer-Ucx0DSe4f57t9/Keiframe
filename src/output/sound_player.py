@@ -77,7 +77,7 @@ class SoundManager(QObject):
 
         path = self.find_sound_file(filename)
         if not path:
-            logger.warning("SoundManager: sound file not found: %s", filename)
+            logger.info("SoundManager: sound file not found: %s", filename)
             return False
 
         try:

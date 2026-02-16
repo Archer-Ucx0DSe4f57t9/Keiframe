@@ -147,7 +147,7 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
                     # 更新全局变量中的地图信息
                     state.current_selected_map = map_found
                 else:
-                    logger.error('地图识别失败,- 原因: 无法从API响应中获取地图名称')
+                    logger.info('地图识别失败,- 原因: 无法从API响应中获取地图名称')
             except Exception:
                 logger.error(f'地图识别出错: {traceback.format_exc()}')
 

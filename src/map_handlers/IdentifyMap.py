@@ -200,5 +200,5 @@ def identify_map(player_data: List[Dict[str, Any]]) -> Optional[str]:
             logger.info(f'地图识别成功: {m}')
             return m
 
-    logger.warning('未能识别地图')
+    logger.info('未能识别地图')
     return None

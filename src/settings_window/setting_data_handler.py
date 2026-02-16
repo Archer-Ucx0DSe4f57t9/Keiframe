@@ -90,26 +90,22 @@ class SettingsHandler:
                 base_dict[k] = v
 
     def validate_and_import(self, file_path, config_type='map'):
-        """
-        验证并导入数据
-        返回: (bool 成功标志, list 错误信息列表/成功消息)
-        """
+        """验证并导入数据：改为先删除 Excel 中涉及的地图/因子的旧数据，再重新插入"""
         # 1. 解析 Excel
-        raw_data, parse_err = ExcelUtil.import_configs(file_path, config_type) #
+        raw_data, parse_err = ExcelUtil.import_configs(file_path, config_type)
         if parse_err: return False, [parse_err]
 
-        # 根据类型选择数据库连接进行校验
+        # 根据类型选择数据库连接
         reg = self.BACKPLANE_REGISTRY[config_type]
         db_conn = getattr(self, reg['db_conn_attr'])
         validator = DataValidator(db_conn)
         
-        valid_data, validation_errors = validator.validate(config_type, raw_data) #
+        valid_data, validation_errors = validator.validate(config_type, raw_data)
         
-        # [关键] 只要存在任何一行错误，立即中止导入，防止脏数据入库
         if validation_errors:
             return False, validation_errors
 
-        # 执行写入逻辑
+        # 2. 执行“覆盖式”写入逻辑
         try:
             # 提取 Excel 中涉及的所有唯一名称 (例如：['亡者之夜', '净网行动'])
             target_names = list(set(item[reg['id_col']] for item in valid_data))

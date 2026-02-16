@@ -239,7 +239,13 @@ class UniversalConfigTable(QTableWidget):
             for c_idx, col_key in enumerate(self.reg['mapping']):
                 # 根据映射获取数据，如果没有映射则直接 get
                 val = key_map[col_key](row_data) if col_key in key_map else row_data.get(col_key, '')
-                self.setItem(r_idx, c_idx, QTableWidgetItem(str(val)))
+                import pandas as pd
+                if val is None or (isinstance(val, float) and pd.isna(val)):
+                    display_text = ""
+                else:
+                    display_text = str(val)
+
+                self.setItem(r_idx, c_idx, QTableWidgetItem(display_text))
 
     def add_new_row(self):
         """在末尾添加一行新数据"""
@@ -268,7 +274,7 @@ class UniversalConfigTable(QTableWidget):
             for c, col_key in enumerate(mapping):
                 item = self.item(r, c) # 获取单元格内容，注意这里的 col_key 是映射后的简写 Key，需要转换回 DAO 需要的格式
                 val = item.text().strip() if item else ""# 这里的 val 是用户输入的字符串，需要根据 col_key 进行必要的转换和验证
-                
+                row_dict[col_key] = val if val != "" else None # 将空字符串转换为 None，便于数据库存储
                 if col_key == 'time_label':
                     if not time_pattern.match(val):
                         # 抛出 ValueError，包含行号方便用户定位

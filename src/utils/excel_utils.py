@@ -73,7 +73,8 @@ class ExcelUtil:
         try:
             # 强制将所有列读为 object，防止初次解析时丢失精度
             df = pd.read_excel(file_path, dtype=object)
- 
+            df = df.where(pd.notnull(df), None)
+
             if identity_chs not in df.columns:
                 return None, f"❌ 找不到 '{identity_chs}' 列，请检查表头。"
 

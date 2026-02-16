@@ -76,8 +76,9 @@ class SettingsTabsBuilder:
         
         # 增加提示文字
         hint_label = QLabel(
-            "注意：导入 Excel 会直接覆盖数据库对应项的全部旧数据。\n"
-            "建议：若仅微调数据，请优先使用下方的“在线编辑”功能，更安全快捷。"
+            "注意：导入 Excel 会直接覆盖数据库对应类型的全部旧数据（excel无记录则删除）。\n"
+            "建议：若仅微调数据，请优先使用下方的“在线编辑”功能。\n"
+            "建议提前备份resources/db内的map.db或者mutators.db文件，以防误操作导致数据丢失。" 
         )
         hint_label.setStyleSheet("color: #d32f2f; font-weight: bold; margin-bottom: 5px;")
         io_layout.addWidget(hint_label)
@@ -296,7 +297,9 @@ class SettingsTabsBuilder:
         content = QWidget()
         layout = QFormLayout(content)
         
-        layout.addRow(QLabel("<b>[ 高级设置 ] 修改此处可能导致识别失效...</b>"))
+        hint_label = QLabel("[ 高级设置 ] 修改此处可能导致识别失效，请谨慎操作！\n")
+        hint_label.setStyleSheet("color: #d32f2f; font-weight: bold; margin-bottom: 5px;")
+        layout.addRow(hint_label)
         
         # 种族因子识别区
         gb_icon = QGroupBox("种族/因子识别区域")
