@@ -51,14 +51,14 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,  # 建议保留控制台以观察游戏数据抓取日志
+    console=False,  # 建议保留控制台以观察游戏数据抓取日志
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
     # 如果 resources 目录下有图标，取消下面注释
-    # icon=os.path.join(pro_root, 'resources', 'icon.ico') 
+    icon=os.path.join(pro_root, 'resources','icons','icon.ico') 
 )
 
 # 3. 收集所有文件到文件夹

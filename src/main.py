@@ -1,6 +1,7 @@
 #main.py
 import os
 import sys
+from datetime import datetime, timedelta
 from src.utils.fileutil import get_project_root, get_resources_dir
 from PyQt5.QtGui import QFontDatabase, QFont
 
@@ -25,13 +26,40 @@ import src.utils.logging_util as logging_util
 from src.utils.font_uitils import load_first_font_family_from_category_dir
 from src import config
 
+# 日志文件管理：当日志文件超过 1MB 时，保留最近 7 天的日志
+def rotate_log_file(log_path, max_size_mb=1, days_to_keep=7):
+    if not os.path.exists(log_path):
+        return
 
+    # 1. 检查文件大小 (转换 MB 为 Bytes)
+    if os.path.getsize(log_path) > max_size_mb * 1024 * 1024:
+        print(f"Log file exceeds {max_size_mb}MB, cleaning up old entries...")
+
+        cutoff_date = datetime.now() - timedelta(days=days_to_keep)
+        remaining_lines = []
+
+        with open(log_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    # 提取每行开头的日期部分 "2026-02-16"
+                    date_str = line.split(' ')[0]
+                    log_date = datetime.strptime(date_str, '%Y-%m-%d')
+
+                    if log_date >= cutoff_date:
+                        remaining_lines.append(line)
+                except (ValueError, IndexError):
+                    # 如果行格式不符合预期（如换行符），保留该行
+                    remaining_lines.append(line)
+
+        # 2. 写回保留的内容
+        with open(log_path, 'w', encoding='utf-8') as f:
+            f.writelines(remaining_lines)
 
 def setup_mixed_fonts(app):
     # ===== 加载主 UI 字体 =====
     # 假设你把字体放在 "primary" 文件夹下
     u_family, u_style = load_first_font_family_from_category_dir("primary")
-    
+
     # 兜底方案
     if not u_family:
         u_family, u_style = "Microsoft YaHei", None
@@ -44,23 +72,9 @@ def setup_mixed_fonts(app):
         font.setStyleName(u_style)
     app.setFont(font)
 
-    '''
-    # ===== 加载 Message 字体 =====
-    # 假设你把字体放在 "message" 文件夹下
-    m_family, m_style = load_first_font_family_from_category_dir("message")
-    
-    
-    if not m_family:
-        print("未找到 Message 字体，使用 UI 字体作为后备")
-        m_family, m_style = u_family, u_style
 
-    config.FONT_MESSAGE = m_family
-    config.FONT_MESSAGE_STYLE = m_style
-
-    print(f"UI Font: {u_family} ({u_style})")
-    print(f"MSG Font: {m_family} ({m_style})")
-    '''
 def main():
+    rotate_log_file('Keiframe.log')
     logging_util.setup_logger()
     # 启用高DPI缩放
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
@@ -72,7 +86,7 @@ def main():
 
     app = QApplication(sys.argv)
     setup_mixed_fonts(app)
-    
+
     # 设置DPI缩放策略为PassThrough，确保精确的DPI缩放
     app.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough

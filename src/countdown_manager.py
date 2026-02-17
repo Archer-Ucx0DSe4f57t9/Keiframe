@@ -108,7 +108,10 @@ class CountdownManager(QWidget):
         self.logger.info(f"开始倒计时选择流程，锚点时间: {current_game_time}")
         self.anchor_game_time = current_game_time
         self.is_selecting = True
-        self.current_option_index = -1
+        
+        # [修改] 初始直接设为 0（选中第一个选项）
+        self.current_option_index = 0 
+        
         self.show_selection_ui()
         self.hotkey_commit_timer.start(5000)
 
@@ -118,48 +121,43 @@ class CountdownManager(QWidget):
             x = geo.x()
             y = geo.y() - 80 
             self.selection_window.move(x, y)
-        self.selection_window.highlight_button(-1)
+            
+        # [修改] 按照当前的 current_option_index 进行高亮，而不是固定 -1
+        self.selection_window.highlight_button(self.current_option_index)
         self.selection_window.show()
 
     def cycle_selection(self):
         if not self.is_selecting:
             return
         
-        # [修改] 循环长度 = 配置项数量 + 2个固定选项(清除/关闭)
         total_options = len(config.COUNTDOWN_OPTIONS) + 2
         
-        if self.current_option_index == 0:
-            self.current_option_index = 0
-        else:
-            self.current_option_index = (self.current_option_index + 1) % total_options
+        # [修改] 修复死循环，直接 +1 然后取模即可实现完美循环
+        self.current_option_index = (self.current_option_index + 1) % total_options
             
         self.selection_window.highlight_button(self.current_option_index)
         self.hotkey_commit_timer.start(5000)
 
     def commit_current_hotkey_selection(self):
-
+        """处理快捷键超时自动确认"""
         if self.is_selecting:
-            if self.current_option_index == -1:
-                self.logger.info("倒计时选择超时且未选择任何项，取消操作。")
-                self.cancel_selection()
-            else:
-                # [修改] 根据索引构建选中的选项数据
-                num_config_options = len(config.COUNTDOWN_OPTIONS)
-                
-                selected_opt = None
-                if self.current_option_index < num_config_options:
-                    # 选中了常规倒计时
-                    selected_opt = config.COUNTDOWN_OPTIONS[self.current_option_index]
-                elif self.current_option_index == num_config_options:
-                    # 选中了倒数第二个：清除最近
-                    selected_opt = {'action': 'clear_recent'}
-                elif self.current_option_index == num_config_options + 1:
-                    # 选中了最后一个：关闭
-                    selected_opt = {'action': 'close'}
-                
-                if selected_opt:
-                    self.logger.info(f"倒计时选择超时，自动确认选项索引: {self.current_option_index}")
-                    self.confirm_selection(selected_opt)
+            # [修改] 因为现在初始值是 0，不存在 -1 的情况了，直接处理即可
+            num_config_options = len(config.COUNTDOWN_OPTIONS)
+            
+            selected_opt = None
+            if self.current_option_index < num_config_options:
+                # 选中了常规倒计时
+                selected_opt = config.COUNTDOWN_OPTIONS[self.current_option_index]
+            elif self.current_option_index == num_config_options:
+                # 选中了倒数第二个：清除最近
+                selected_opt = {'action': 'clear_recent'}
+            elif self.current_option_index == num_config_options + 1:
+                # 选中了最后一个：关闭
+                selected_opt = {'action': 'close'}
+            
+            if selected_opt:
+                self.logger.info(f"倒计时选择超时，自动确认选项索引: {self.current_option_index}")
+                self.confirm_selection(selected_opt)
 
     def confirm_selection(self, opt_dict):
         """确认选择，添加倒计时到队列"""
