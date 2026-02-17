@@ -33,12 +33,7 @@ ext-exe/obj/
 ext-exe/bin/
 src/monkey.js
 /src/map_handlers/debugpath/
-/tests/debug_out/
-/tests/samples/
-/tests/debug_output
-/废案
-/test/ocr/ocr sampling/
-/tests/ocr sampling
-export_map.xlsx
 *.xlsx
+/tests
 /python
+/废案
