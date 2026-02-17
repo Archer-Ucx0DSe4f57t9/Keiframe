@@ -224,7 +224,8 @@ class SettingsTabsBuilder:
         ])
         SettingsTabsBuilder._add_compact_row(parent, gl_layout, "字体布局:", [
             ("行高:", 'TOAST_LINE_HEIGHT', 'spin', {'max': 200}),
-            ("字号:", 'TOAST_FONT_SIZE', 'spin', {'max': 100})
+            ("字号:", 'TOAST_FONT_SIZE', 'spin', {'max': 100}),
+            ("文字垂直偏移:", 'TOAST_VERTICAL_OFFSET', 'spin', {'min': -100, 'max': 100})
         ])
         layout.addRow(gb_layout)
 
@@ -266,7 +267,8 @@ class SettingsTabsBuilder:
         ])
         SettingsTabsBuilder._add_compact_row(parent, gl_layout, "字体布局:", [
             ("行高:", 'MUTATOR_ALERT_LINE_HEIGHT', 'spin', {'max': 200}),
-            ("字号:", 'MUTATOR_ALERT_FONT_SIZE', 'spin', {'max': 100})
+            ("字号:", 'MUTATOR_ALERT_FONT_SIZE', 'spin', {'max': 100}),
+            ("文字垂直偏移:", 'MUTATOR_VERTICAL_OFFSET', 'spin', {'min': -100, 'max': 100})
         ])
         parent.add_row(gl_layout, "图标透明度:", 'MUTATOR_ICON_TRANSPARENCY', 'double')
         layout.addRow(gb_layout)

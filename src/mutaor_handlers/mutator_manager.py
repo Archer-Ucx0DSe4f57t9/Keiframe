@@ -254,11 +254,7 @@ class MutatorManager(QWidget):
         alert_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         if (alert_label.x() != alert_label_x or alert_label.y() != alert_label_y
                 or alert_label.width() != sc2_width or alert_label.height() != line_height):
-            alert_label.setFixedSize(sc2_width, line_height)
             alert_label.move(alert_label_x, alert_label_y)
-            #alert_label.setWindowFlags(
-            #    Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.WA_TranslucentBackground
-            #)
 
         # 动态更新文本、颜色和字体大小
         text_color = config.MUTATOR_NORMAL_COLOR
@@ -276,8 +272,11 @@ class MutatorManager(QWidget):
             x=alert_label_x, y=alert_label_y,
             width=sc2_width, height=line_height,
             font_size=font_size,
-            sound_filename=sound_filename
+            sound_filename=sound_filename,
+            vertical_offset=getattr(config, 'MUTATOR_VERTICAL_OFFSET', 0) # 从config读取垂直偏移，默认为0
         )
+        alert_label.setFixedHeight(line_height)
+        alert_label.adjustSize()
 
     def hide_mutator_alert(self, mutator_name):
         """隐藏突变因子提醒"""

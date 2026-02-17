@@ -46,6 +46,7 @@ TOAST_OFFSET_X = 19 #提示框距离左侧边框的像素距离 0.01*1920
 TOAST_OFFSET_Y = 540 # 第一条提示距离顶部边框的像素距离 0.5*1080
 TOAST_LINE_HEIGHT = 32 # 提示框行高 (像素，如果设为 0 则自动根据窗口高度计算，建议设置固定值以配合像素定位)
 TOAST_FONT_SIZE = 20 # 提示文字大小 (像素)
+TOAST_VERTICAL_OFFSET = -5 # 提示文字垂直偏移 (像素)，正值向下，负值向上
 
 # 地图提醒配置
 MAP_ALERT_SECONDS = 30  # 提前提醒时间（秒）/ Time before alert (in seconds)
@@ -62,6 +63,7 @@ MUTATOR_ALERT_OFFSET_Y = 324 # 提示列表距离顶部边框的像素距离 (�
 MUTATOR_ALERT_OFFSET_X = 19 # 提示框距离左侧边框的像素距离 (原 0.01 -> 19px)
 MUTATOR_ALERT_LINE_HEIGHT = 32 # 提示框单行高度 (原 0.03 -> 32px)
 MUTATOR_ALERT_FONT_SIZE = 19 # 提示文字大小 (原 0.6 * LineHeight -> 19px)
+MUTATOR_VERTICAL_OFFSET = -5 # 提示文字垂直偏移 (像素)，正值向下，负值向上
 
 # 提醒配置：
 ALERT_SOUND_COOLDOWN = 10 # 同名警告最短间隔（秒），低于间隔的音频不播放

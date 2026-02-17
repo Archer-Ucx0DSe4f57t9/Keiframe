@@ -111,11 +111,13 @@ class ToastManager:
         alert_label.update_message(
             message,
             text_color,
-            x=alert_label_x, y=alert_label_y,
+            x=alert_label_x, 
+            y=alert_label_y,
             width=sc2_width, # 宽度依然可以保持跟随窗口，或者你也想改成固定宽度？
             height=line_height,
             font_size=font_size,
-            sound_filename=final_sound_filename
+            sound_filename=final_sound_filename,
+            vertical_offset=getattr(config,'TOAST_VERTICAL_OFFSET',0) # 从config读取垂直偏移，默认为0
         )
 
     def remove_alert(self, event_id):

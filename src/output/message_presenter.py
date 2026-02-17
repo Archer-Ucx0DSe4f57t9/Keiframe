@@ -1,3 +1,4 @@
+#message_presenter.py
 import os
 from PyQt5.QtCore import Qt, QRect
 from PyQt5.QtGui import QFont, QPixmap, QPainter, QPen, QColor, QFontMetrics
@@ -18,7 +19,8 @@ class OutlinedLabel(QLabel):
         self._font = QFont(config.FONT_PRIMARY, 16)
         self._cached_pixmap = None
         self._cached_props = (None, None, None)  # (text, font.pointSize(), outline_width)
-
+        self._vertical_offset = 0 # 从config读取，默认为0
+        
     def setFont(self, font):
         super().setFont(font)
         self._font = font
@@ -101,6 +103,12 @@ class OutlinedLabel(QLabel):
             self._line_height = max(1, int(line_height))
         self._cached_pixmap = None
 
+    def set_vertical_offset(self, offset: int):
+        """设置垂直偏移量并使缓存失效"""
+        self._vertical_offset = int(offset)
+        self._cached_pixmap = None
+        self.update()
+
     def _render_to_pixmap(self):
         """
         渲染文本到缓存 pixmap。若 self._line_height 被设置，则确保 pixmap.height >= line_height，
@@ -152,7 +160,7 @@ class OutlinedLabel(QLabel):
         painter.setFont(font)
 
         # baseline_y：在高度 h 内垂直居中：baseline = (h - text_h)//2 + ascent
-        baseline_y = (h - text_h) // 2 + ascent
+        baseline_y = (h - text_h) // 2 + ascent+ self._vertical_offset
         x0 = padding_left
 
         # 1) 阴影
@@ -239,18 +247,21 @@ class MessagePresenter(QLabel):
             ex_style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
             # 加上 WS_EX_TRANSPARENT 和 WS_EX_LAYERED
             win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE,
-                                   ex_style | win32con.WS_EX_TRANSPARENT | win32con.WS_EX_LAYERED)
+                                   ex_style | win32con.WS_EX_LAYERED)
 
-    def update_message(self, message, color, x=None, y=None, width=None, height=None, font_size=16, sound_filename:str = None):
+    def update_message(self, message, color, x=None, y=None, width=None, height=None, 
+                       font_size=16, sound_filename:str = None, vertical_offset=0):
 
         # 仅在发生变化时设置 text / style（OutlinedLabel 会缓存渲染）
         if message != self._last_message or color != self._last_color:
+            # 如果外部指定了 height，告诉 text_label 期望的行高（像素）
             if height is not None:
                 self.text_label.set_line_height(int(height))
+            self.text_label.set_vertical_offset(vertical_offset) # 设置垂直偏移
             self.text_label.set_font_pixel_size(int(font_size))  # 用像素字体
             self.text_label.setText(message)
             # 通过 palette 或 stylesheet 设置前景色（这里用 setStyleSheet）
-            self.text_label.setStyleSheet(f'color: {color}; background-color: transparent;')
+            self.text_label.setStyleSheet(f'color: {color};background-color: transparent;')
             self._last_message = message
             self._last_color = color
 
@@ -261,10 +272,11 @@ class MessagePresenter(QLabel):
                 self.icon_label.setPixmap(px)
 
         if x is not None and y is not None:
-            if width and height:
-                # 仅在尺寸变化时调用 setFixedSize（避免频繁布局重算）
-                if self.width() != width or self.height() != height:
-                    self.setFixedSize(width, height)
+            # 让 MessagePresenter 根据内部布局（图标+文字）自动收缩宽度
+            self.adjustSize() 
+            # 如果你希望高度还是固定的（比如为了垂直对齐），可以保留 height
+            if height:
+                self.setFixedHeight(int(height))
             self.move(x, y)
 
         if sound_filename is not None:
@@ -272,7 +284,37 @@ class MessagePresenter(QLabel):
 
         if not self.isVisible():
             self.show()
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
 
+        bg_color = QColor(0, 0, 0, 150)
+        painter.setBrush(bg_color)
+        painter.setPen(Qt.NoPen)
+
+        # ===== 关键部分 =====
+        padding_x = 5
+        padding_y = 2
+
+        if self.icon_label and self.icon_label.isVisible():
+            # 包含图标 + 文字
+            content_rect = self.layout().geometry()
+        else:
+            # 只包裹文字
+            content_rect = self.text_label.geometry()
+
+        bg_rect = content_rect.adjusted(
+            -padding_x,
+            -padding_y,
+            padding_x,
+            padding_y
+        )
+
+        painter.drawRoundedRect(bg_rect, 8, 8)
+
+        painter.end()
+
+        super().paintEvent(event)
 
 
     def hide_alert(self):
