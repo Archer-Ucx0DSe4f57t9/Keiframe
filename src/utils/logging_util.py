@@ -11,9 +11,9 @@ def setup_logger(base_dir=None):
     if base_dir:
         log_dir = os.path.join(base_dir, 'log')
         os.makedirs(log_dir, exist_ok=True)
-        log_file = os.path.join(log_dir, 'sc2_timer.log')
+        log_file = os.path.join(log_dir, 'sc2_Keiframe.log')
     else:
-        log_file = 'sc2_timer.log'
+        log_file = 'Keiframe.log'
     
     # 配置根日志记录器
     logging.basicConfig(
