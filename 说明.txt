@@ -1,6 +1,6 @@
-SC2 Timer 使用说明
+Keiframe 使用说明
 
-Git: https://github.com/ylkangpeter/sc2-expo
+Git: https://github.com/Archer-Ucx0DSe4f57t9/Keiframe/
 
 所有配置文件，包括没有后缀名称的"地图文件"如："虚空降临"，或者是conf、py结尾的文件,均可使用记事本或其他文本编辑器打开和修改，。
 

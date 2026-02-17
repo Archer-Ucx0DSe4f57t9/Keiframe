@@ -46,7 +46,7 @@ exe = EXE(
     a.scripts,
     [],  # onedir 模式下这里保持为空
     exclude_binaries=True,
-    name='SC2timer',
+    name='Keiframe',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -70,5 +70,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='SC2timer_dist'
+    name='Keiframe'
 )
