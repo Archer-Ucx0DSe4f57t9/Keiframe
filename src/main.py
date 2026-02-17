@@ -20,12 +20,10 @@ os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QGuiApplication
-from qt_gui import TimerWindow
+from src.qt_gui import TimerWindow
 import src.utils.logging_util as logging_util
 from src.utils.font_uitils import load_first_font_family_from_category_dir
-import image_util
-import config
-import show_fence
+from src import config
 
 
 
@@ -83,7 +81,7 @@ def main():
     timer = TimerWindow()
     
     #
-    show_fence.show_square()
+    #show_fence.show_square()
     sys.exit(app.exec_())
 
 

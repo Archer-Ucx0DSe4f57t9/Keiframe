@@ -48,9 +48,6 @@ def init_global_hotkeys(window):
         if lock_shortcut:
             keyboard.add_hotkey(lock_shortcut, lambda: safe_emit('lock_signal'))
 
-        if screenshot_shortcut:
-            keyboard.add_hotkey(screenshot_shortcut, lambda: safe_emit('screenshot_signal'))
-
         if memo_temp_key:
             # 需要传参数的，用 memo_signal 发射参数
             keyboard.add_hotkey(memo_temp_key, lambda: safe_emit('memo_signal', 'temp'))

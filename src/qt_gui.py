@@ -4,11 +4,11 @@ import json
 import traceback
 import threading, asyncio
 from PyQt5.QtWidgets import (QMainWindow, QApplication,QMessageBox)
-from control_window import ControlWindow
+from src.control_window import ControlWindow
 from PyQt5.QtCore import Qt, QTimer, QPoint, pyqtSignal
 from PyQt5 import QtCore
 
-from src import  config, ui_setup, game_state_service, config_hotkeys, game_time_handler, app_window_manager, language_manager, image_util
+from src import  config, ui_setup, game_state_service, config_hotkeys, game_time_handler, app_window_manager, language_manager
 from src.map_handlers import map_loader
 from src.output.toast_manager import ToastManager
 from src.mutaor_handlers.mutator_and_enemy_race_recognizer import Mutator_and_enemy_race_recognizer
@@ -34,7 +34,6 @@ class TimerWindow(QMainWindow):
     countdown_hotkey_signal = pyqtSignal()
     map_switch_signal = pyqtSignal()      # 新增：地图切换信号
     lock_signal = pyqtSignal()            # 新增：锁定信号
-    screenshot_signal = pyqtSignal()      # 新增：截图信号
     
     def get_screen_resolution(self):
         return app_window_manager.get_screen_resolution()
@@ -127,7 +126,6 @@ class TimerWindow(QMainWindow):
         self.countdown_hotkey_signal.connect(self.process_countdown_hotkey_logic)
         self.map_switch_signal.connect(self.process_map_switch_logic)
         self.lock_signal.connect(self.process_lock_logic)
-        self.screenshot_signal.connect(self.handle_screenshot_logic) # 连接到实际截图逻辑
         
         #倒计时按钮功能
         self.countdown_manager = CountdownManager(self, self.toast_manager)
@@ -256,31 +254,6 @@ class TimerWindow(QMainWindow):
             self.control_window.update_icon()
             self.control_window.state_changed.emit(not self.control_window.is_locked)
 
-    # 3. 截图
-    def handle_screenshot_hotkey(self):
-        """供后台线程调用：仅发射信号"""
-        self.screenshot_signal.emit()
-    
-    def handle_screenshot_logic(self):
-        """主线程执行：截图逻辑 (原 handle_screenshot_hotkey 内容移动至此)"""
-        # ... (原 handle_screenshot_hotkey 的完整代码内容) ...
-        if not config.DEBUG_SHOW_ENEMY_INFO_SQUARE:
-            return
-        try:
-            successful_captures = 0
-            for rect in self.rect_screenshots:
-                try:
-                    save_path = image_util.capture_screen_rect(rect)
-                    if save_path:
-                        self.logger.info(f'成功保存截图到: {save_path}')
-                        successful_captures += 1
-                except Exception as capture_error:
-                    self.logger.error(f'区域截图失败: {str(capture_error)}')
-            # ... (日志记录)
-        except Exception as e:
-            self.logger.error(f'截图处理失败: {str(e)}')
-            self.logger.error(traceback.format_exc())
-
     # 4. 倒计时 (已修复，保持现状，确保名字对应)
     def handle_countdown_hotkey(self):
         self.countdown_hotkey_signal.emit()
@@ -359,7 +332,7 @@ class TimerWindow(QMainWindow):
 
     def init_tray(self):
         """初始化系统托盘"""
-        from tray_manager import TrayManager
+        from src.tray_manager import TrayManager
         self.tray_manager = TrayManager(self)
 
     def mousePressEvent(self, event):

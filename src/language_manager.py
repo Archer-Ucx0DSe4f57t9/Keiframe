@@ -3,7 +3,7 @@ import sys
 import re
 import traceback
 import json
-import config
+from src import config
 from src.utils.fileutil import get_resources_dir, list_files, get_project_root
 
 def get_text(window, key):

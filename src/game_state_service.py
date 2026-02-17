@@ -15,7 +15,7 @@ from src import config
 from src.utils.debug_utils import get_mock_data, reset_mock, get_mock_screen_data
 from src.utils.logging_util import get_logger
 from src.utils.window_utils import get_sc2_window_geometry, is_game_active
-from src import show_fence
+#from src import show_fence
 
 logger = get_logger(__name__)
 
@@ -153,7 +153,7 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
 
             # 检测部队
             troop = None
-
+            '''
             def troop_detection_callback(result):
                 global troop
                 if result['success']:
@@ -164,7 +164,7 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
                     troop = None
 
             show_fence.detect_troop(troop_detection_callback)
-
+            '''
     # 更新地图相关
     active_screens = game_screen_for_check_in_game_data.get('activeScreens', [])
     # 获取activeScreens数组

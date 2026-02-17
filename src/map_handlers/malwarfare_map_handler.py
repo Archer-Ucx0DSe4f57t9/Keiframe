@@ -11,7 +11,7 @@ from src.utils.logging_util import get_logger
 from src.map_handlers.malwarfate_ocr_processor import MalwarfareOcrProcessor
 from src import config
 from src.game_state_service import state
-
+from src.utils.fileutil import get_project_root
 
 
 class MalwarfareMapHandler:
@@ -37,7 +37,7 @@ class MalwarfareMapHandler:
         self._time_recognition_failures = 0 #时间识别的连续失败计数器
         
         # 获取当前文件所在目录，用于构建绝对路径 (仅用于Debug输出)
-        base_dir = os.path.dirname(__file__)
+        base_dir = get_project_root()
         self.debug_path = os.path.join(base_dir, 'debugpath')
         if self.debug and not os.path.exists(self.debug_path):
             os.makedirs(self.debug_path)

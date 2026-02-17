@@ -41,3 +41,4 @@ src/monkey.js
 /tests/ocr sampling
 export_map.xlsx
 *.xlsx
+/python
