@@ -38,7 +38,9 @@ def mousePressEvent_handler(window, event):
     # 检查窗口是否处于可点击状态（非锁定状态）
     is_clickable = not window.testAttribute(Qt.WA_TransparentForMouseEvents)
     pos = event.pos()
-    DRAG_AREA = QRect(162, 5, 38, 30)
+    icon_size = 25
+    drag_x = config.MAIN_WINDOW_WIDTH - icon_size - 5 
+    DRAG_AREA = QRect(drag_x, 0, 35, 35)
     SEARCH_BOX_AREA = QRect(10, 5, 50, 30)
     
     if event.button() != Qt.LeftButton:

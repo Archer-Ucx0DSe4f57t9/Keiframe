@@ -12,6 +12,8 @@ from src.utils.font_uitils import set_font_size
 from src.mutaor_handlers.mutator_manager import MutatorManager
 from src.db.map_daos import get_all_map_names
 from pypinyin import lazy_pinyin, Style
+from PyQt5.QtGui import QPixmap
+from src.utils.fileutil import get_resources_dir
 
 # 辅助函数 1: 设置窗口样式
 def setup_window_style(window):
@@ -162,7 +164,7 @@ def setup_table_area(window):
 
 
 # 辅助函数 6: 创建搜索框和下拉框
-def setup_search_and_combo_box(window):
+def setup_search_and_combo_box_and_drag_icon(window):
     """创建搜索框和地图下拉框"""
     # ... (搜索框和下拉框创建和样式代码) ... (保持与原文件一致)
     window.search_box = QLineEdit(window.main_container)
@@ -234,7 +236,26 @@ def setup_search_and_combo_box(window):
     window.clear_search_timer = QTimer()
     window.clear_search_timer.setSingleShot(True)
     # 注意：搜索框的信号连接 (textChanged.connect) 需要保留在 TimerWindow 的 __init__ 中，以便访问内部函数。
+    
+    ####################
+    #拖拽图标相关
+    window.drag_icon_label = QLabel(window.main_container)
+    # 计算位置：假设窗口宽度为 config.MAIN_WINDOW_WIDTH
+    # 我们将其放在最右侧，留出 2px 的边距
+    icon_size = 25
+    icon_x = config.MAIN_WINDOW_WIDTH - icon_size - 2
+    window.drag_icon_label.setGeometry(icon_x, 3, icon_size, icon_size) 
 
+    # 加载图片并保持比例
+    icon_path = os.path.join(get_resources_dir('icons'), 'drag_cursor.png')
+    if os.path.exists(icon_path):
+        pixmap = QPixmap(icon_path).scaled(icon_size, icon_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        window.drag_icon_label.setPixmap(pixmap)
+
+    # 核心：设置鼠标穿透
+    window.drag_icon_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+    window.drag_icon_label.setStyleSheet("background: transparent;")
+    
 # 辅助函数 7: 创建突变和指挥官替换区域
 def setup_mutator_ui(window):
     """创建突变管理器和指挥官替换按钮"""
@@ -353,7 +374,7 @@ def init_ui(window):
     setup_time_labels(window)
     setup_map_version_group(window)
     setup_table_area(window)
-    setup_search_and_combo_box(window)
+    setup_search_and_combo_box_and_drag_icon(window)
     setup_mutator_ui(window)
     setup_bottom_buttons(window)
     # 强制显示窗口 (保持原样)

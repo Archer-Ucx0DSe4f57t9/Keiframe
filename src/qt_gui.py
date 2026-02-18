@@ -105,7 +105,7 @@ class TimerWindow(QMainWindow):
         self.init_tray()
 
         # 搜索框的信号连接
-        if hasattr(self, 'map_list'): # 确保 setup_search_and_combo_box 已创建 map_list
+        if hasattr(self, 'map_list'): # 确保 setup_search_and_combo_box_and_drag_icon 已创建 map_list
             self.setup_search_box_connections(self.map_list)
 
         self.ctrl_pressed = False

@@ -141,7 +141,7 @@ class MutatorManager(QWidget):
             if(self.is_muatator_required_to_notify(mutator_name)==True):
                 time_points = self.load_mutator_config(mutator_name)
                 self.active_mutator_time_points[mutator_name] = time_points
-                self.logger.warning(f"手动加载 {mutator_name} 配置。时间点数量: {len(time_points)}")
+                self.logger.info(f"手动加载 {mutator_name} 配置。时间点数量: {len(time_points)}")
         else:
             button.setIcon(button.gray_icon)
             button.setGraphicsEffect(None)
