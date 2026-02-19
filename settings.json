@@ -58,8 +58,7 @@
     "MUTATOR_ICON_TRANSPARENCY": 0.7,
     "MAP_SHORTCUT": "f3",
     "LOCK_SHORTCUT": "f4",
-    "SCREENSHOT_SHORTCUT": "ctrl + shift + -",
-    "MEMO_TEMP_SHORTCUT": "ctrl + b",
+    "MEMO_TEMP_SHORTCUT": "ctrl + g",
     "MEMO_TOGGLE_SHORTCUT": "backslash",
     "COUNTDOWN_SHORTCUT": "`",
     "MUTATOR_AND_ENEMY_RACE_RECOGNIZER_ROI": [

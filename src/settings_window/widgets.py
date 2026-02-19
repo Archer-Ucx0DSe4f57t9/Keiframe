@@ -2,6 +2,7 @@
 # 这个文件定义了设置界面中使用的自定义控件，如快捷键输入框和颜色选择器
 from PyQt5.QtWidgets import QLineEdit, QWidget, QHBoxLayout, QPushButton, QColorDialog
 from PyQt5.QtGui import QKeyEvent, QColor,QKeySequence
+from PyQt5.QtCore import Qt
 import re
 
 # ==========================================
