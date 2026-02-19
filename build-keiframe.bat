@@ -39,7 +39,8 @@ if exist resources (
 )
 
 :: 复制其他说明文件
-if exist README.md copy /y README.md "%RELEASE_DIR%\"
+if exist 使用说明.pdf copy /y 使用说明.pdf "%RELEASE_DIR%\"
+if exist 端口修复.bat copy /y 端口修复.bat "%RELEASE_DIR%\"
 
 echo [4/4] 打包完成！
 echo 最终软件位于: %RELEASE_DIR%
