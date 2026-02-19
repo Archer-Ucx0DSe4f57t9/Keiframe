@@ -14,7 +14,6 @@ def init_global_hotkeys(window):
         # 解析快捷键配置
         map_shortcut = config.MAP_SHORTCUT.replace(' ', '').lower()
         lock_shortcut = config.LOCK_SHORTCUT.replace(' ', '').lower()
-        screenshot_shortcut = config.SCREENSHOT_SHORTCUT.replace(' ', '').lower()
         memo_temp_key = getattr(config, 'MEMO_TEMP_SHORTCUT', '`').replace(' ', '').lower()
         memo_toggle_key = getattr(config, 'MEMO_TOGGLE_SHORTCUT', 'backslash').replace(' ', '').lower()
         countdown_key = getattr(config, 'COUNTDOWN_SHORTCUT', 'F8').replace(' ', '').lower()
@@ -61,7 +60,7 @@ def init_global_hotkeys(window):
         # 记录成功
         try:
             window.logger.info(
-                f'成功注册全局快捷键: {map_shortcut}, {lock_shortcut}, {screenshot_shortcut}, {memo_temp_key}, {memo_toggle_key},{countdown_key}')
+                f'成功注册全局快捷键: {map_shortcut}, {lock_shortcut}, {memo_temp_key}, {memo_toggle_key},{countdown_key}')
         except Exception:
             pass
 

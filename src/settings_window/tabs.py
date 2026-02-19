@@ -283,7 +283,6 @@ class SettingsTabsBuilder:
         
         parent.add_row(layout, "地图切换快捷键:", 'MAP_SHORTCUT', 'hotkey')
         parent.add_row(layout, "锁定窗口快捷键:", 'LOCK_SHORTCUT', 'hotkey')
-        parent.add_row(layout, "截图快捷键:", 'SCREENSHOT_SHORTCUT', 'hotkey')
         parent.add_row(layout, "笔记临时显示:", 'MEMO_TEMP_SHORTCUT', 'hotkey')
         parent.add_row(layout, "笔记开关显示:", 'MEMO_TOGGLE_SHORTCUT', 'hotkey')
         parent.add_row(layout, "自定义倒计时菜单:", 'COUNTDOWN_SHORTCUT', 'hotkey')

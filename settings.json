@@ -1,5 +1,5 @@
 {
-    "current_game_language": "en",
+    "current_game_language": "zh",
     "LOG_LEVEL": "WARNING",
     "debug_mode": false,
     "debug_time_factor": 5.0,
@@ -45,6 +45,7 @@
     "TOAST_OFFSET_Y": 540,
     "TOAST_LINE_HEIGHT": 35,
     "TOAST_FONT_SIZE": 20,
+    "TOAST_VERTICAL_OFFSET": -5,
     "MUTATOR_ALERT_SECONDS": 49,
     "MUTATOR_WARNING_THRESHOLD_SECONDS": 10,
     "MUTATOR_NORMAL_COLOR": "rgb(255, 255, 255)",
@@ -53,6 +54,7 @@
     "MUTATOR_ALERT_OFFSET_Y": 324,
     "MUTATOR_ALERT_LINE_HEIGHT": 32,
     "MUTATOR_ALERT_FONT_SIZE": 19,
+    "MUTATOR_VERTICAL_OFFSET": -5,
     "MUTATOR_ICON_TRANSPARENCY": 0.7,
     "MAP_SHORTCUT": "f3",
     "LOCK_SHORTCUT": "f4",
@@ -141,6 +143,6 @@
             ]
         }
     },
-    "MAIN_WINDOW_X": 1000,
-    "MAIN_WINDOW_Y": 1049
+    "MAIN_WINDOW_X": 974,
+    "MAIN_WINDOW_Y": 1064
 }

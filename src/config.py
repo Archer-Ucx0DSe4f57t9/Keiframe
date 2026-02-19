@@ -16,14 +16,17 @@ FONT_PRIMARY_STYLE = None
 FONT_MESSAGE = None
 FONT_MESSAGE_STYLE = None
 # current language settings
-current_game_language = 'en'  # 当前游戏语言 / Current game language
+current_game_language = 'zh'  # 当前游戏语言 / Current game language
 current_language = 'zh'  # 当前语言 / Current language
 
 # 快捷键
 MAP_SHORTCUT = 'ctrl + shift + ['  # 地图快捷键 / Map shortcut key
 LOCK_SHORTCUT = 'ctrl + shift + ]'  # 锁定快捷键 / Lock shortcut key
-SCREENSHOT_SHORTCUT = 'ctrl + shift + -'  # 截图快捷键 / Screenshot shortcut key
-
+# 笔记快捷键
+MEMO_TEMP_SHORTCUT = 'ctrl + shift + -'  # 临时显示快捷键
+MEMO_TOGGLE_SHORTCUT = 'ctrl + shift + backslash' # 持续开关快捷键
+# 倒计时快捷键
+COUNTDOWN_SHORTCUT = "ctrl + shift + `"
 
 # 窗体设置项(主界面位置)
 MAIN_WINDOW_X = 1000
@@ -80,9 +83,7 @@ MEMO_OPACITY = 1.0        # 图片显示的透明度 (0.0 - 1.0)
 MEMO_DURATION = 5000      # 临时显示时的持续时间 (毫秒)，不含淡出时间
 MEMO_FADE_TIME = 1000     # 淡出动画时间 (毫秒)
 
-# 笔记快捷键
-MEMO_TEMP_SHORTCUT = '-'  # 临时显示快捷键
-MEMO_TOGGLE_SHORTCUT = 'backslash' # 持续开关快捷键
+
 
 
 # === 倒计时功能配置 ===
@@ -102,9 +103,6 @@ COUNTDOWN_WARNING_THRESHOLD_SECONDS = 10
 
 # 默认颜色
 COUNTDOWN_DISPLAY_COLOR = "rgb(0, 255, 255)"
-
-# 倒计时快捷键
-COUNTDOWN_SHORTCUT = "`"
 
 # 倒计时显示位置 (相对于SC2窗口的百分比)
 COUNTDOWN_DISPLAY_Y_PERCENT = 0.15 

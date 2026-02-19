@@ -242,12 +242,12 @@ class MessagePresenter(QLabel):
             from PyQt5 import sip
             import win32gui, win32con
 
-            hwnd = self.winId()  # 获取窗口句柄
+            hwnd = int(self.winId())  # 获取窗口句柄
             # 当前扩展样式
             ex_style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
             # 加上 WS_EX_TRANSPARENT 和 WS_EX_LAYERED
             win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE,
-                                   ex_style | win32con.WS_EX_LAYERED)
+                                   ex_style | win32con.WS_EX_LAYERED | win32con.WS_EX_TRANSPARENT)
 
     def update_message(self, message, color, x=None, y=None, width=None, height=None, 
                        font_size=16, sound_filename:str = None, vertical_offset=0):
