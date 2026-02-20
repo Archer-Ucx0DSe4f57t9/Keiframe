@@ -2,7 +2,8 @@
 
 [English](README.md)
 [![Deep Dive on zread](https://img.shields.io/badge/zread-Technical%20Notes-blue)](https://zread.ai/Archer-Ucx0DSe4f57t9/Keiframe)  
-[![License](https://img.shields.io/github/license/Archer-Ucx0DSe4f57t9/Keiframe)]
+[![License](https://img.shields.io/github/license/Archer-Ucx0DSe4f57t9/keiframe)](https://github.com/Archer-Ucx0DSe4f57t9/keiframe/blob/main/LICENSE)
+
 KeiFrame 是一个面向《星际争霸 II》合作模式的时间线驱动事件提醒的背板工具。
 
 本仓库仅包含开发者向源码版本。  
