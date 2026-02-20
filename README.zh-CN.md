@@ -6,7 +6,7 @@
 KeiFrame 是一个面向《星际争霸 II》合作模式的时间线驱动事件提醒的背板工具。
 
 本仓库仅包含开发者向源码版本。  
-普通用户发行版与使用说明另行维护于https://www.kdocs.cn/l/cvCj6uEth9os。
+普通用户发行版与使用说明另行维护于https://www.kdocs.cn/l/cvCj6uEth9os
 
 维护者：Archer（Nga ID：天童凯伊）
 
