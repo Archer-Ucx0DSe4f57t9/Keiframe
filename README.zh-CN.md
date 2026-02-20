@@ -6,7 +6,7 @@
 KeiFrame 是一个面向《星际争霸 II》合作模式的时间线驱动事件提醒的背板工具。
 
 本仓库仅包含开发者向源码版本。  
-普通用户发行版与使用说明另行维护。
+普通用户发行版与使用说明另行维护于https://www.kdocs.cn/l/cvCj6uEth9os。
 
 维护者：Archer（Nga ID：天童凯伊）
 
@@ -50,7 +50,7 @@ KeiFrame 基于 `sc2timer` 进行结构重构与扩展开发。
 
 ## 项目结构
 
-
+对于项目不同模块的具体功能，建议点击顶部zread链接查看。但请注意，zread对于游戏具体功能有不少错误。
 ```
 
 Keiframe/
@@ -75,9 +75,9 @@ Keiframe/
 │   │   ├── IdentifyMap.py            # 地图识别逻辑
 │   │   ├── map_event_manager.py      # 通用地图事件调度
 │   │   ├── map_loader.py             # 地图配置加载
-│   │   ├── malwarfare_map_handler.py # 专用的 Malwarfare 地图处理器
-│   │   ├── malwarfare_event_manager.py # Malwarfare 特定事件
-│   │   └── malwarfate_ocr_processor.py # Malwarfare 的 OCR 文本提取
+│   │   ├── malwarfare_map_handler.py # 净网行动的画面识别模块
+│   │   ├── malwarfare_event_manager.py # 净网行动的事件管理器
+│   │   └── malwarfate_ocr_processor.py # 净网行动的OCR文本识别引擎
 │   ├── mutaor_handlers/              # 突变和种族识别
 │   │   ├── mutator_and_enemy_race_recognizer.py # 模板匹配识别器
 │   │   └── mutator_manager.py        # 突变数据管理

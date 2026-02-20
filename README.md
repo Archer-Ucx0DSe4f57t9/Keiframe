@@ -10,7 +10,7 @@
 KeiFrame is a timeline-driven event reminder engine for StarCraft II Co-op missions.
 
 This repository contains the developer-focused source version of the project.  
-End-user distributions and usage documentation are maintained separately at https://www.kdocs.cn/l/cvCj6uEth9os .
+End-user distributions and usage documentation are maintained separately at https://www.kdocs.cn/l/cvCj6uEth9os (simplified Chinese only).
 
 Maintained by Archer
 
@@ -54,7 +54,7 @@ All mission data is decoupled from core engine logic.
 
 ## Project Structure
 
-
+For specific functionalities of different project modules, we recommend clicking the zread link at the top. However, please note that zread contains numerous inaccuracies regarding the game's specific features.
 ```
 
 Keiframe/
@@ -79,9 +79,9 @@ Keiframe/
 │   │   ├── IdentifyMap.py            # Map identification logic
 │   │   ├── map_event_manager.py      # Generic map event scheduling
 │   │   ├── map_loader.py             # Map configuration loading
-│   │   ├── malwarfare_map_handler.py # Specialized Malwarfare map handler
-│   │   ├── malwarfare_event_manager.py # Malwarfare-specific events
-│   │   └── malwarfate_ocr_processor.py # OCR text extraction for Malwarfare
+│   │   ├── malwarfare_map_handler.py # Image recognition module for Malwarfare
+│   │   ├── malwarfare_event_manager.py # Malwarfare-specific events manager
+│   │   └── malwarfate_ocr_processor.py # OCR text recognition processor for Malwarfare
 │   ├── mutaor_handlers/              # Mutator and race recognition
 │   │   ├── mutator_and_enemy_race_recognizer.py # Template matching recognizer
 │   │   └── mutator_manager.py        # Mutator data management
