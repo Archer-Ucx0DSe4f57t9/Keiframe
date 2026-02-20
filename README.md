@@ -1,75 +1,200 @@
-# SC2 Expo
-Git: https://github.com/ylkangpeter/sc2-expo
+# KeiFrame
 
-[English Version](#english) | [中文版本](#chinese)
+[简体中文](README.zh-CN.md)
 
-<a name="chinese"></a>
-## 项目简介
-SC2 Expo 是一个星际争霸2游戏辅助工具，主要功能包括：
-- 游戏地图识别和定时提醒（地图识别部分代码源自 https://github.com/FluffyMaguro/SC2_Coop_Overlay）
-- 游戏画面截图和部队识别功能
-- 支持自定义提醒和快捷键设置
+[![Deep Dive on zread](https://img.shields.io/badge/zread-Technical%20Notes-blue)](https://zread.ai/Archer-Ucx0DSe4f57t9/Keiframe)  
 
-## 环境要求
-- Python 3.7 或更高版本
-- Windows 操作系统
+[![License](https://img.shields.io/github/license/Archer-Ucx0DSe4f57t9/Keiframe)]  
 
-## 安装步骤
-1. 使用国内镜像源安装依赖（推荐）：
-```bash
-pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+KeiFrame is a timeline-driven event reminder engine for StarCraft II Co-op missions.
+
+This repository contains the developer-focused source version of the project.  
+End-user distributions and usage documentation are maintained separately at https://www.kdocs.cn/l/cvCj6uEth9os .
+
+Maintained by Archer
+
+---
+
+## Overview
+
+KeiFrame evolved from `sc2timer` with structural refactoring and extended event handling.
+
+The project focuses on:
+
+- Timeline abstraction
+- Event-driven reminder logic
+- Configurable rendering layer
+- Audio notification pipeline
+- Extensible data definitions
+
+The software does NOT modify game files, inject processes, or access protected resources.
+
+---
+
+## Architecture
+
+### Timeline Engine
+- SQLite-based time definitions
+- Countdown lifecycle management
+- Event dispatch system
+
+### Presentation Layer
+- GUI configuration
+- Font and color customization
+- Overlay message rendering
+
+### Audio Layer
+- Custom audio playback
+- Event-trigger mapping
+
+All mission data is decoupled from core engine logic.
+
+---
+
+## Project Structure
+
+
 ```
 
-2. 或者使用默认源安装：
+Keiframe/
+├── src/                              │   ├── main.py                       # Application entry point
+│   ├── config.py                     # Central configuration (overridden by settings.json)
+│   ├── config_hotkeys.py             # Hotkey binding configuration
+│   ├── qt_gui.py                     # Main Qt window and signal/slot connections
+│   ├── control_window.py             # Lock/unlock control panel
+│   ├── game_state_service.py         # Game state monitoring via port 6119
+│   ├── game_time_handler.py          # Time flow management
+│   ├── language_manager.py           # Multi-language support (EN/ZH)
+│   ├── memo_overlay.py               # Map notes overlay with animations
+│   ├── countdown_manager.py          # Concurrent timer management
+│   ├── db/                           # Database layer
+│   │   ├── db_manager.py             # SQLite connection management
+│   │   ├── daos.py                   # Data Access Objects base classes
+│   │   ├── map_daos.py               # Map data operations
+│   │   ├── mutator_daos.py           # Mutator data operations
+│   │   └── enemy_comp_daos.py        # Enemy composition data operations
+│   ├── map_handlers/                 # Map identification and event management
+│   │   ├── map_processor.py          # Map template loader and processor
+│   │   ├── IdentifyMap.py            # Map identification logic
+│   │   ├── map_event_manager.py      # Generic map event scheduling
+│   │   ├── map_loader.py             # Map configuration loading
+│   │   ├── malwarfare_map_handler.py # Specialized Malwarfare map handler
+│   │   ├── malwarfare_event_manager.py # Malwarfare-specific events
+│   │   └── malwarfate_ocr_processor.py # OCR text extraction for Malwarfare
+│   ├── mutaor_handlers/              # Mutator and race recognition
+│   │   ├── mutator_and_enemy_race_recognizer.py # Template matching recognizer
+│   │   └── mutator_manager.py        # Mutator data management
+│   ├── output/                       # Output and presentation layer
+│   │   ├── message_presenter.py      # Alert text rendering with outlines
+│   │   ├── toast_manager.py          # Toast notification management
+│   │   └── sound_player.py           # Audio playback system
+│   ├── settings_window/              # Configuration UI
+│   │   ├── settings_window.py        # Main settings dialog
+│   │   ├── tabs.py                   # Settings tab organization
+│   │   ├── widgets.py                # Custom UI widgets
+│   │   ├── setting_data_handler.py   # Settings data management
+│   │   └── complex_inputs.py         # Complex input components
+│   ├── ui_setup.py                   # UI initialization helpers
+│   ├── app_window_manager.py         # Window management utilities
+│   ├── tray_manager.py               # System tray icon and menu
+│   ├── troop_util.py                 # Troop-related utilities
+│   └── utils/                        # Utility modules
+│       ├── fileutil.py               # File path operations
+│       ├── logging_util.py           # Logging configuration
+│       ├── math_utils.py             # Mathematical calculations
+│       ├── font_uitils.py            # Font loading and management
+│       ├── window_utils.py           # Window positioning utilities
+│       ├── data_validator.py         # Data validation helpers
+│       ├── debug_utils.py            # Debug utilities
+│       └── excel_utils.py            # Excel file operations
+├── resources/                        # Runtime resources
+│   ├── db/                           # SQLite database files
+│   │   ├── maps.db                   # Map data database
+│   │   ├── mutators.db               # Mutator data database
+│   │   ├── enemies.db                # Enemy composition database
+│   │   └── db_backups/               # Database backup files
+│   ├── enemy_comps/                  # Enemy composition CSV files
+│   ├── templates/                    # Recognition templates
+│   │   ├── en_blue/ en_green/ en_orange/ en_yellow/
+│   │   ├── zh_blue/ zh_green/ zh_orange/ zh_yellow/
+│   │   ├── races/                    # Race icon templates
+│   │   └── mutators/                 # Mutator icon templates
+│   ├── icons/                        # Application icons
+│   ├── fonts/                        # Custom font files
+│   ├── sounds/                       # Alert sound files
+│   ├── memo/                         # Map note images
+│   └── troops/                       # Troop icon resources
+├── python/                           # Embedded Python environment
+├── requirements.txt                  # Python dependencies
+├── settings.json                     # User settings override
+└── build-keiframe.bat                # Windows build script
+
+
+```
+
+---
+
+## Development Setup
+
 ```bash
+git clone https://github.com/<your-github>/keiframe.git
+cd keiframe
+
+python -m venv .venv
+
+# Windows
+.venv\Scripts\activate
+# macOS / Linux
+source .venv/bin/activate
+
 pip install -r requirements.txt
+
+python -m keiframe
+
 ```
 
-## 启动方式
-双击 `start.vbs` 文件即可启动程序。
+----------
 
-## 打包说明
-### 使用PyInstaller打包（build_exe.py）
-```bash
-# 默认打包（单文件模式）
-python build_exe.py
+## Port (6119)
 
-# 分离依赖库模式打包（推荐，启动更快）
-python build_exe.py --separate-libs
+Default listening port: `6119`
 
-# 使用UPX压缩（可选）
-python build_exe.py --use-upx
-```
-## 配置说明
-在 `src/config.py` 文件中可以修改以下配置项：
-在 resource目录下编辑文件内容，来做具体的提醒，红点相关资料参考 https://bbs.nga.cn/read.php?tid=17265336&rand=787
+If binding fails:
 
-### 调试相关
-- `DEBUG_MODE`：调试模式开关（True/False）
-- `LOG_LEVEL`：日志级别（'INFO'/'DEBUG'/'WARNING'/'ERROR'）
+-   Ensure the port is not occupied
+    
+-   Run the following commands` (Windows, admin required)
+    ```bash
+    stop winnat
+    netsh int ipv4 add excludedportrange protocol=tcp startport=6119 numberofports=1
+	net start winnat
+    ```
+----------
 
-### 提示窗口设置
-- `TOAST_DURATION`：Toast提示窗口显示时间（毫秒）
-- `TOAST_OPACITY`：Toast窗口背景透明度（0-255）
-- `TOAST_POSITION`：Toast窗口垂直位置（窗口高度的比例，0-1）
-  
-### 时间提醒设置
-- `TIME_ALERT_SECONDS`：提前提醒时间（秒）
+## Contributing
 
-### 其他设置
-其他更多设置，详见config.py文件
+-   Keep mission data separate from engine logic
+    
+-   Avoid hardcoded behavior
+    
+-   Maintain modular structure
+    
+-   Open an issue before major refactoring
+    
 
-### AB图添加快捷键功能
-神庙、虚空撕裂等图，会显示AB图的选项，可以点选，或者通过快捷键 ctrl + shift + [ 来改变状态，快捷键修改详见config.py
+----------
 
-## 界面预览
-![程序界面预览](img/tray.png)
-![程序界面预览](img/sample.png)
-![程序界面预览](img/背板.png)
-![程序界面预览](img/替换随机指挥官.png)
-![程序界面预览](img/未配置指挥官.png)
+## License
 
-## 注意事项
-1. 确保游戏窗口可见，不要最小化
-2. 程序会在系统托盘显示图标
-3. 可以通过托盘图标右键菜单退出程序
+MIT License
+
+See `LICENSE` for details.
+
+----------
+
+## Credits
+
+Originally based on `sc2timer`https://github.com/ylkangpeter/sc2-expo
+
+Refactored and maintained by Archer.
