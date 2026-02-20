@@ -9,8 +9,10 @@
 
 KeiFrame is a timeline-driven event reminder engine for StarCraft II Co-op missions.
 
+Currenly, all notification messages are written in Simplified Chinese only.
+
 This repository contains the developer-focused source version of the project.  
-End-user distributions and usage documentation are maintained separately at https://www.kdocs.cn/l/cvCj6uEth9os (simplified Chinese only).
+End-user distributions and usage documentation are maintained separately at https://www.kdocs.cn/l/cvCj6uEth9os (Simplified Chinese only).
 
 Maintained by Archer
 
