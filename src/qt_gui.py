@@ -73,7 +73,7 @@ class TimerWindow(QMainWindow):
         # 初始化日志记录器
         from src.utils.logging_util import get_logger
         self.logger = get_logger(__name__)
-        self.logger.info('SC2 Timer 启动')
+        self.logger.info('Keiframe 启动')
 
         
         # 初始化状态

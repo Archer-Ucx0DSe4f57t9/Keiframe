@@ -101,7 +101,6 @@ class SettingsHandler:
         validator = DataValidator(db_conn)
         
         valid_data, validation_errors = validator.validate(config_type, raw_data)
-        
         if validation_errors:
             return False, validation_errors
 
@@ -168,21 +167,6 @@ class SettingsHandler:
             return True, "设置及关键词已成功保存"
         except Exception as e:
             return False, f"保存失败: {str(e)}"
-
-    def process_excel_import(self, path, config_type):
-        """导入 Excel 数据并校验"""
-        raw_data, err = ExcelUtil.import_configs(path, config_type)
-        if err: return False, err
-        
-        validator = DataValidator(self.maps_db)
-        valid_data, errors = validator.validate(config_type, raw_data)
-        
-        if not errors:
-            # 执行数据库写入
-            if config_type == 'map':
-                map_daos.bulk_import_map_configs(self.maps_db, valid_data)
-            return True, len(valid_data)
-        return False, errors
     
     def get_all_configs_for_export(self, config_type):
         """根据类型获取全量背板数据，用于 Excel 导出"""

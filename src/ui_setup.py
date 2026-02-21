@@ -18,8 +18,26 @@ from src.utils.fileutil import get_resources_dir
 # 辅助函数 1: 设置窗口样式
 def setup_window_style(window):
     """设置主窗口的基本样式和属性"""
-    window.setWindowTitle('SC2 Timer')
-    window.setGeometry(config.MAIN_WINDOW_X, config.MAIN_WINDOW_Y, config.MAIN_WINDOW_WIDTH, 30)
+    window.setWindowTitle('KeiFrame')
+    
+    # 1. 获取屏幕的可用几何区域 (考虑了缩放和任务栏)
+    screen = QApplication.primaryScreen().availableGeometry()
+    screen_width = screen.width()
+    screen_height = screen.height()
+    
+    # 2. 从配置获取期望位置
+    target_x = config.MAIN_WINDOW_X
+    target_y = config.MAIN_WINDOW_Y
+    window_w = config.MAIN_WINDOW_WIDTH
+    window_h = 220 # 初始高度
+    
+    # 3. 边界限制 (Clamping)
+    # 确保左边界不小于 0，右边界不超过屏幕宽度
+    final_x = max(0, min(target_x, screen_width - window_w))
+    # 确保顶边界不小于 0，底边界不超过屏幕高度
+    final_y = max(0, min(target_y, screen_height - window_h))
+    
+    window.setGeometry(final_x, final_y, window_w, window_h)
     window.setWindowFlags(
         Qt.FramelessWindowHint |
         Qt.WindowStaysOnTopHint |
