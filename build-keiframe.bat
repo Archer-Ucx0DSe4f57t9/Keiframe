@@ -5,7 +5,7 @@ setlocal enabledelayedexpansion
 :: ================= 配置区 =================
 set PROJECT_NAME=Keiframe
 set SPEC_FILE=Keiframe.spec
-set RELEASE_DIR=Keiframe_Release_v1.0
+set "RELEASE_DIR=%~dp0dist\Keiframe_Release_v1.02"
 :: =========================================
 
 echo [1/4] 正在清理旧的打包文件...

@@ -97,8 +97,8 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
         # 更新当前游戏时间
         if 'displayTime' in game_data:
             current_time = game_data['displayTime']
-            # 更新全局变量中的时间
-            state.game_time = current_time
+            # 更新全局变量中的时间,只有当新的时间比当前时间更大时才更新，避免因API偶尔返回较小的时间而导致回退
+            if current_time > state.game_time : state.game_time = current_time
             logger.debug(f'更新游戏时间: {current_time}')
 
         # 生成当前游戏的唯一标识（使用玩家列表的哈希值）
