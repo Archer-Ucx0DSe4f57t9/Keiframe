@@ -35,7 +35,8 @@ src/monkey.js
 /src/map_handlers/debugpath/
 *.xlsx
 /tests
-/python
+/python/Lib
+/python/Scripts
 /废案
 /Keiframe_Release_v1.0
 *.7z
@@ -44,3 +45,7 @@ src/monkey.js
 /Keiframe_Release_v1.02
 /.venv
 settings.json
+
+#project embeddable required
+!/python/*.pyd
+!/python/*.dll
