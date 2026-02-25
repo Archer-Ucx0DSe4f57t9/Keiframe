@@ -108,6 +108,8 @@ class SoundManager(QObject):
             logger.exception("SoundManager: failed to play %s: %s", filename, e)
             return False
 
+    '''
+    临时没用
     def _on_media_status(self, status, filename):
         # 目前我们不做主动清理；如果希望在播放完成后释放内存可在此实现
         from PyQt5.QtMultimedia import QMediaPlayer
@@ -116,7 +118,7 @@ class SoundManager(QObject):
             # p = self._players.pop(filename, None)
             # if p: p.stop(); p.deleteLater()
             pass
-
+    '''
     # 可选：手动清理缓存播放器
     def clear_cache(self):
         for p in list(self._players.values()):

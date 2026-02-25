@@ -36,6 +36,17 @@ def handle_version_selection(window):
         window.combo_box.setCurrentIndex(index)
 
 def handle_map_selection(window, map_name):
+    
+    # 设置列宽函数
+    def get_event_and_army_column_width_factor(map_name) ->tuple:
+        match map_name:
+            case '往日神庙-A':
+                return 0.5,0.5
+            case '往日神庙-B':
+                return 0.5,0.5
+            case '升格之链':
+                return 0.4,0.6
+        return 0.6,0.4
     """处理地图选择变化事件 (原 TimerWindow.on_map_selected)"""
     # 检查是否是由用户手动选择触发的
     if hasattr(window, 'toast_manager') and window.toast_manager:
@@ -63,6 +74,7 @@ def handle_map_selection(window, map_name):
         else:
             window.logger.warning(f"未在下拉框中找到地图: {new_map}，继续加载原地图。")   
          
+    table_width = config.MAIN_WINDOW_WIDTH - config.MUTATOR_WIDTH
         
     # 根据地图名称实例化正确的事件管理器
     if map_name == '净网行动':
@@ -78,11 +90,13 @@ def handle_map_selection(window, map_name):
         
         window.countdown_label.show()
         window.table_area.setColumnCount(5)
-        window.table_area.setColumnWidth(0, 40) # Count
-        window.table_area.setColumnWidth(1, 50) # Time
-        window.table_area.setColumnWidth(2, config.MAIN_WINDOW_WIDTH - config.MUTATOR_WIDTH - 95) # Event (宽列)
-        window.table_area.setColumnWidth(3, 5) # 新增 Sound 列（隐藏）
-        window.table_area.setColumnWidth(4, 5) # Hero 列（隐藏/留空）
+        window.table_area.setColumnWidth(0, 20) # Count
+        window.table_area.setColumnWidth(1, 40) # Time
+        window.table_area.setColumnWidth(2, int((table_width - 60) * 0.6)) # Event (宽列)
+        window.table_area.setColumnWidth(3, int((table_width - 60) * 0.4)) # Army/Note
+        window.table_area.setColumnWidth(4, 0) # Sound File (隐藏)
+        window.table_area.setColumnHidden(3,False)
+        window.table_area.setColumnHidden(4,True)
 
     else:
         window.logger.info(f"使用标准地图 '{map_name}'，正在启用 MapEventManager。")
@@ -94,14 +108,27 @@ def handle_map_selection(window, map_name):
             window.malwarfare_handler.shutdown()
             window.malwarfare_handler = None
         
+        event_width_factor, army_width_factor = get_event_and_army_column_width_factor(map_name)
+
         window.countdown_label.hide()
         window.countdown_label.setText("")
         window.table_area.setColumnCount(5) 
-        window.table_area.setColumnWidth(0, 50)          # Time
-        window.table_area.setColumnWidth(1, config.MAIN_WINDOW_WIDTH -config.MUTATOR_WIDTH - 90) # Event
-        window.table_area.setColumnWidth(2, 30)          # Army/Note
-        window.table_area.setColumnWidth(3, 5)           # Sound File (隐藏)
-        window.table_area.setColumnWidth(4, 5)           # Hero Event (隐藏)
+        window.table_area.setColumnWidth(0, 40)          # Time
+        window.table_area.setColumnWidth(1, int((table_width - 40) * event_width_factor)) # Event
+        window.table_area.setColumnWidth(2, int((table_width - 40) * army_width_factor)) # Army/Note
+        window.table_area.setColumnWidth(3, 0)           # Sound File (隐藏)
+        window.table_area.setColumnWidth(4, 0)           # Hero Event (隐藏)
+        window.table_area.setColumnHidden(3,True)
+        window.table_area.setColumnHidden(4,True)
+
+    #Debug用
+    from PyQt5.QtWidgets import QHeaderView
+    header = window.table_area.horizontalHeader()
+    window.logger.warning(
+        f"mode={[header.sectionResizeMode(i) for i in range(window.table_area.columnCount())]}, "
+        f"min={header.minimumSectionSize()}, stretchLast={header.stretchLastSection()}, "
+        f"widths={[window.table_area.columnWidth(i) for i in range(window.table_area.columnCount())]}"
+    )
 
     # 处理地图版本按钮组的显示 (原有的版本检测逻辑)
     if '-' in map_name:
@@ -190,17 +217,17 @@ def handle_map_selection(window, map_name):
                     event_item.setForeground(QBrush(QColor(255, 255, 255)))
                     window.table_area.setItem(row, 2, event_item) 
                     
-                    # 3. Sound (隐藏列)
+                    # 3. Army
+                    army_item = QTableWidgetItem(army_text)
+                    army_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                    army_item.setForeground(QBrush(QColor(255, 255, 255)))
+                    window.table_area.setItem(row, 3, army_item)
+                    
+                    # 4. Sound (隐藏列，音频文件)
                     sound_item = QTableWidgetItem(sound_text)
                     sound_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
                     sound_item.setForeground(QBrush(QColor(255, 255, 255)))
-                    window.table_area.setItem(row, 3, sound_item)
-                    
-                    # 4. Hero (隐藏列，风暴英雄)
-                    hero_item = QTableWidgetItem(hero_text)
-                    hero_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                    hero_item.setForeground(QBrush(QColor(255, 255, 255)))
-                    window.table_area.setItem(row, 4, hero_item)
+                    window.table_area.setItem(row, 4, sound_item)
                 else:
                         # 标准地图处理逻辑 (2或3列)
                         
@@ -241,3 +268,5 @@ def handle_map_selection(window, map_name):
                         window.table_area.setItem(row, 4, hero_item)
     except Exception as e:
         window.logger.error(f'加载地图数据时出错: {str(e)}\n{traceback.format_exc()}')
+
+        

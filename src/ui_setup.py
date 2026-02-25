@@ -2,7 +2,8 @@
 import os
 from PyQt5.QtWidgets import (
     QWidget, QLabel, QComboBox, QHBoxLayout,
-    QPushButton, QHBoxLayout, QLineEdit, QApplication
+    QPushButton, QHBoxLayout, QLineEdit, QApplication,
+    QHeaderView
 )
 from PyQt5.QtGui import QFont, QBrush, QColor
 from PyQt5.QtCore import Qt, QTimer
@@ -124,12 +125,17 @@ def setup_table_area(window):
     # ... (表格区域创建和样式代码) ... (保持与原文件一致)
     from PyQt5.QtWidgets import QTableWidget
     window.table_area = QTableWidget(window.main_container)
+    header = window.table_area.horizontalHeader()
+    header.setSectionResizeMode(QHeaderView.Fixed)
+    header.setStretchLastSection(False)
+    header.setMinimumSectionSize(0)
     window.table_area.setGeometry(0, 65, config.MAIN_WINDOW_WIDTH-config.MUTATOR_WIDTH, config.TABLE_HEIGHT)
-    window.table_area.setColumnCount(3)
+    window.table_area.setColumnCount(4)
     window.table_area.horizontalHeader().setVisible(False)
     window.table_area.setColumnWidth(0, 50)
-    window.table_area.setColumnWidth(2, 5)
     window.table_area.setColumnWidth(1, config.MAIN_WINDOW_WIDTH-config.MUTATOR_WIDTH - 55)
+    window.table_area.setColumnWidth(2, 5)
+    window.table_area.setColumnWidth(3, 5)
     window.table_area.verticalHeader().setVisible(False)
     window.table_area.setEditTriggers(QTableWidget.NoEditTriggers)
     window.table_area.setSelectionBehavior(QTableWidget.SelectRows)
