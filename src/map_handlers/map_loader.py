@@ -121,15 +121,6 @@ def handle_map_selection(window, map_name):
         window.table_area.setColumnHidden(3,True)
         window.table_area.setColumnHidden(4,True)
 
-    #Debug用
-    from PyQt5.QtWidgets import QHeaderView
-    header = window.table_area.horizontalHeader()
-    window.logger.warning(
-        f"mode={[header.sectionResizeMode(i) for i in range(window.table_area.columnCount())]}, "
-        f"min={header.minimumSectionSize()}, stretchLast={header.stretchLastSection()}, "
-        f"widths={[window.table_area.columnWidth(i) for i in range(window.table_area.columnCount())]}"
-    )
-
     # 处理地图版本按钮组的显示 (原有的版本检测逻辑)
     if '-' in map_name:
         prefix = map_name.rsplit('-', 1)[0]
