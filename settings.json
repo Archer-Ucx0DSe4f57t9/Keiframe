@@ -19,22 +19,22 @@
         {
             "time": 120,
             "label": "神器/二三哥",
-            "sound": "alert.wav"
+            "sound": "Default.mp3"
         },
         {
             "time": 100,
             "label": "基地",
-            "sound": "alert.wav"
+            "sound": "Default.mp3"
         },
         {
             "time": 60,
             "label": "bb/孵化场",
-            "sound": "alert.wav"
+            "sound": "Default.mp3"
         },
         {
             "time": 90,
             "label": "大哥巢",
-            "sound": "alert.wav"
+            "sound": "Default.mp3"
         }
     ],
     "MAP_ALERT_SECONDS": 30,
