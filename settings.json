@@ -5,7 +5,7 @@
     "debug_time_factor": 5.0,
     "ALERT_SOUND_VOLUME": 90,
     "ALERT_SOUND_COOLDOWN": 10,
-    "MAIN_WINDOW_WIDTH": 200,
+    "MAIN_WINDOW_WIDTH": 250,
     "MAIN_WINDOW_BG_COLOR": "rgba(43, 43, 43, 200)",
     "TABLE_FONT_SIZE": 12,
     "TABLE_HEIGHT": 150,
