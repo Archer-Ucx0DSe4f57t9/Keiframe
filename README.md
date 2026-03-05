@@ -2,7 +2,6 @@
 
 [简体中文](README.zh-CN.md)
 
-[![Deep Dive on zread](https://img.shields.io/badge/zread-Technical%20Notes-blue)](https://zread.ai/Archer-Ucx0DSe4f57t9/Keiframe)
 [![Deepwiki wiki](https://img.shields.io/badge/DeepWiki-wiki-blue)](https://deepwiki.com/Archer-Ucx0DSe4f57t9/Keiframe)  
 
 [![License](https://img.shields.io/github/license/Archer-Ucx0DSe4f57t9/keiframe)](https://github.com/Archer-Ucx0DSe4f57t9/keiframe/blob/main/LICENSE)
@@ -57,7 +56,7 @@ All mission data is decoupled from core engine logic.
 
 ## Project Structure
 
-For specific functionalities of different project modules, we recommend clicking the deepwiki or zread link at the top. However, please note that both of them may contain numerous inaccuracies regarding the game's specific features.
+For specific functionalities of different project modules, we recommend clicking the deepwiki at the top. However, please note that both of them may contain numerous inaccuracies regarding the game's specific features.
 ```
 
 Keiframe/
@@ -198,6 +197,6 @@ See `LICENSE` for details.
 
 ## Credits
 
-Originally based on `sc2timer`https://github.com/ylkangpeter/sc2-expo
+Originally based on `sc2timer` from ylkangpeter
 
 Refactored and maintained by Archer.

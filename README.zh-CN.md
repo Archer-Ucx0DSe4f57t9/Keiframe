@@ -2,7 +2,6 @@
 
 [English](README.md)
 
-[![Deep Dive on zread](https://img.shields.io/badge/zread-Technical%20Notes-blue)](https://zread.ai/Archer-Ucx0DSe4f57t9/Keiframe)
 [![Deepwiki wiki](https://img.shields.io/badge/DeepWiki-wiki-blue)](https://deepwiki.com/Archer-Ucx0DSe4f57t9/Keiframe)    
 [![License](https://img.shields.io/github/license/Archer-Ucx0DSe4f57t9/keiframe)](https://github.com/Archer-Ucx0DSe4f57t9/keiframe/blob/main/LICENSE)
 
@@ -199,6 +198,6 @@ MIT License
 
 ## 致谢
 
-基于 `sc2timer` （https://github.com/ylkangpeter/sc2-expo） 项目开发。
+基于 ylkangpeter 的`sc2timer` 项目开发。
 
 重构与维护：Archer
