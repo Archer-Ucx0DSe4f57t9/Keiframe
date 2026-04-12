@@ -1,4 +1,3 @@
-#game_time_handler
 # 处理游戏时间更新的逻辑
 import time
 import traceback
@@ -29,17 +28,20 @@ def update_game_time(window):
 
             window.logger.debug(f'游戏时间更新: {formatted_time} (格式化后), 原始数据: {game_time}')
 
-            # 根据当前时间调整表格滚动位置和行颜色
             try:
                 # 将当前时间转换为总秒数
                 current_seconds = hours * 3600 + minutes * 60 + seconds
 
+                # 判断“游戏秒”是否变化
+                is_new_game_second = (window._last_dispatch_game_second != current_seconds)
+
                 # === 突变信息相关 ===
-                if hasattr(window, 'mutator_manager'):
+                # 这类提醒按秒处理就够了
+                if is_new_game_second and hasattr(window, 'mutator_manager'):
                     window.logger.debug(f'正在检查突变: {formatted_time} (格式化后), 原始数据: {game_time}')
                     window.mutator_manager.check_alerts(current_seconds, window.game_state.is_in_game)
 
-                # ===地图信息相关===
+                # === 地图信息相关 ===
                 if hasattr(window, 'map_event_manager'):
                     window.logger.debug(f'正在检查地图事件: {formatted_time} (格式化后), 原始数据: {game_time}')
                     if window.is_map_Malwarfare:
@@ -61,21 +63,20 @@ def update_game_time(window):
                                     window.countdown_label.setText("")
                             else:
                                 window.countdown_label.setText("")
-                            
-                            # 只有在获取到有效数据，且游戏未暂停时，才更新事件
+
+                            # 这里先保持原逻辑，不做秒级节流
+                            # 因为 OCR 数据刷新不一定和 game_time 完全同步
                             if ocr_data and not ocr_data.get('is_paused') and ocr_data.get('time'):
                                 current_count = ocr_data.get('n', 1)
                                 time_str = ocr_data.get('time')
 
                                 try:
-                                    # 将 "M:SS" 格式的时间字符串转换为总秒数
                                     parts = time_str.split(':')
                                     if len(parts) == 2:
                                         minutes = int(parts[0])
                                         seconds = int(parts[1])
                                         countdown_seconds = minutes * 60 + seconds
 
-                                        # 将数据传递给 SpecialLevelEventManager
                                         window.map_event_manager.update_events(
                                             current_count,
                                             countdown_seconds,
@@ -84,29 +85,38 @@ def update_game_time(window):
                                     else:
                                         window.logger.warning(f"从OCR接收到无效的时间格式: {time_str}")
                                 except (ValueError, TypeError) as e:
-                                        window.logger.error(f"解析OCR时间 '{time_str}' 失败: {e}")
+                                    window.logger.error(f"解析OCR时间 '{time_str}' 失败: {e}")
                             else:
-                                window.logger.debug(f"游戏暂停或无有效OCR数据，跳过地图事件更新。")
+                                window.logger.debug("游戏暂停或无有效OCR数据，跳过地图事件更新。")
                     else:
-                        # 标准地图环境逻辑
+                        # 标准地图逻辑按秒处理即可
                         if window.countdown_label.isVisible():
                             window.countdown_label.hide()
-                            window.countdown_label.setText("") 
-                        window.map_event_manager.update_events(current_seconds, window.game_state.is_in_game)
+                            window.countdown_label.setText("")
 
+                        if is_new_game_second:
+                            window.map_event_manager.update_events(current_seconds, window.game_state.is_in_game)
 
-                #===突变因子识别器相关===
-                if hasattr(window, 'mutator_and_enemy_race_recognizer'):
-                    window.logger.debug(f'尝试推送到因子识别器时间{current_seconds}')
-                    window.mutator_and_enemy_race_recognizer .update_game_time(current_seconds)
+                # === 突变因子识别器相关 ===
+                if is_new_game_second and hasattr(window, 'mutator_and_enemy_race_recognizer'):
+                    window.logger.debug(f'尝试推送到因子识别器时间 {current_seconds}')
+                    window.mutator_and_enemy_race_recognizer.update_game_time(current_seconds)
 
-                #===倒计时模块相关===
-                if hasattr(window, 'countdown_manager'):
-                    # window.game_state.is_in_game 是当前的游戏状态 ('in_game', 'loading' 等)
+                # ===神器提醒相关 ===
+                if is_new_game_second and hasattr(window, 'artifact_notifier'):
+                    window.logger.debug(f'尝试推送到 ArtifactNotifier 时间 {current_seconds}')
+                    window.artifact_notifier.update_game_time(current_seconds)
+
+                # === 倒计时模块相关 ===
+                if is_new_game_second and hasattr(window, 'countdown_manager'):
                     window.countdown_manager.update_game_time(
-                        current_seconds, 
+                        current_seconds,
                         window.game_state.is_in_game
                     )
+
+                # 更新“已分发秒数”
+                if is_new_game_second:
+                    window._last_dispatch_game_second = current_seconds
 
             except Exception as e:
                 window.logger.error(f'调整表格滚动位置和颜色失败: {str(e)}\n{traceback.format_exc()}')
@@ -117,7 +127,6 @@ def update_game_time(window):
 
     except Exception as e:
         window.logger.error(f'获取游戏时间失败: {str(e)}\n{traceback.format_exc()}')
-        # 如果获取失败，显示默认时间
         window.time_label.setText("00:00")
 
     window.logger.debug(f'本次更新总耗时：{time.time() - start_time:.2f}秒\n')

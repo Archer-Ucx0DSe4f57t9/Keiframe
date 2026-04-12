@@ -233,7 +233,7 @@ class MutatorManager(QWidget):
 
         if not isinstance(alert_label, MessagePresenter):
             icon_path = os.path.join(get_resources_dir(), 'icons','mutators', f'{mutator_name}.png')
-            alert_label = MessagePresenter(self.parent(), icon_path=icon_path, font_size=font_size)
+            alert_label = MessagePresenter(self.parent(), icon_path=icon_path)
             self.mutator_alert_labels[mutator_name] = alert_label
 
         # 1. 设置标签的几何信息

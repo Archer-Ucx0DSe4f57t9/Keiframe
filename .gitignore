@@ -50,3 +50,4 @@ settings.json
 !/python/*.pyd
 !/python/*.dll
 /python/share
+/.vs

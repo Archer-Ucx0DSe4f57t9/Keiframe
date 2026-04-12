@@ -13,8 +13,9 @@ from src.map_handlers import map_loader
 from src.output.toast_manager import ToastManager
 from src.mutaor_handlers.mutator_and_enemy_race_recognizer import Mutator_and_enemy_race_recognizer
 from src.memo_overlay import MemoOverlay
-
+from src.artifact_notifier import ArtifactNotifier
 from src.countdown_manager import CountdownManager
+
 from src.utils.fileutil import get_project_root
 from src.db.db_manager import DBManager
 from src.db.map_daos import search_maps_by_keyword
@@ -78,6 +79,7 @@ class TimerWindow(QMainWindow):
         
         # 初始化状态
         self.current_time = ""
+        self._last_dispatch_game_second = None
         self.drag_position = QPoint(0, 0)
         self.game_state = game_state_service.state
 
@@ -144,6 +146,9 @@ class TimerWindow(QMainWindow):
         
         # 初始化全局快捷键
         config_hotkeys.init_global_hotkeys(self)
+        
+        # 初始化神器提示模块
+        self.artifact_notifier = ArtifactNotifier(self)
         
          # 启动游戏检查线程
         self.game_check_thread = threading.Thread(target=self._run_async_game_scheduler, args=(self.progress_signal,), daemon=True)
@@ -364,7 +369,6 @@ class TimerWindow(QMainWindow):
             # 在下拉框中查找并选择地图
             map_name = data[1]
             self.logger.info(f'收到地图更新信号: {map_name}')
-
             # 如果是新游戏开始，强制更新地图
             index = self.combo_box.findText(map_name)
             if index >= 0:
@@ -387,10 +391,16 @@ class TimerWindow(QMainWindow):
             # 清除全局状态中的种族和突变因子
             game_state_service.state.enemy_race = None
             game_state_service.state.active_mutators = None
+            self._last_dispatch_game_second = None
             
             # 清空自定义倒计时
             if hasattr(self, 'countdown_manager') and self.countdown_manager:
                 self.countdown_manager.clear_all_countdowns()
+            
+            # 清理神器自动识别残留
+            if hasattr(self, 'artifact_notifier') and self.artifact_notifier:
+                self.artifact_notifier.reset()
+
             
             # 清除所有残留的 Toast（包括地图事件）
             if hasattr(self, 'toast_manager') and self.toast_manager:
@@ -582,7 +592,11 @@ class TimerWindow(QMainWindow):
             if hasattr(self, 'mutator_and_enemy_race_recognizer') and self.mutator_and_enemy_race_recognizer:
                 self.mutator_and_enemy_race_recognizer.shutdown()
                 self.logger.info("突变因子和种族识别器已关闭。")
-
+            
+            #清理神器自动识别
+            if hasattr(self, 'artifact_notifier') and self.artifact_notifier:
+                self.artifact_notifier.shutdown()
+                self.logger.info("ArtifactNotifier 已关闭。")
             #3.设置全局标志位，通知所有 asyncio 循环停止
             game_state_service.state.app_closing = True
 
@@ -612,6 +626,11 @@ class TimerWindow(QMainWindow):
             if hasattr(self, 'global_listener') and self.global_listener:
                 self.global_listener.stop_listening()
                 self.logger.info("按键监听已关闭。")
+                
+            #清理神器自动识别
+            if hasattr(self, 'artifact_notifier') and self.artifact_notifier:
+                self.artifact_notifier.shutdown()
+                self.logger.info("ArtifactNotifier 已关闭。")
 
             # 清理全局快捷键
             config_hotkeys.unhook_global_hotkeys(self)
