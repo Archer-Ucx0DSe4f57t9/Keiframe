@@ -15,6 +15,15 @@ class SettingsTabsBuilder:
         layout = QFormLayout()
         
         parent.add_row(layout, "当前游戏语言 (Game Language):", 'current_game_language', 'combo', items=['zh', 'en'])
+
+        gb_window = QGroupBox("窗口与表格显示 (Window & Table Display)")
+        gw = QFormLayout(gb_window)
+        parent.add_row(gw, "主窗口位置:", 'MAIN_WINDOW_POS', 'point')
+        parent.add_row(gw, "主窗口宽度:", 'MAIN_WINDOW_WIDTH', 'spin', max=2000)
+        parent.add_row(gw, "背景颜色:", 'MAIN_WINDOW_BG_COLOR', 'color')
+        parent.add_row(gw, "表格字体大小:", 'TABLE_FONT_SIZE', 'spin', min=8, max=72)
+        parent.add_row(gw, "表格高度:", 'TABLE_HEIGHT', 'spin', max=1000)
+        layout.addRow(gb_window)
         
         gb = QGroupBox("日志与调试设置 (Logging & Debugging)")
         gl = QFormLayout(gb)
@@ -37,12 +46,30 @@ class SettingsTabsBuilder:
     def create_interface_tab(parent):
         tab = QWidget()
         layout = QFormLayout()
-        
-        parent.add_row(layout, "主窗口位置:", 'MAIN_WINDOW_POS', 'point')
-        parent.add_row(layout, "主窗口宽度:", 'MAIN_WINDOW_WIDTH', 'spin', max=2000)
-        parent.add_row(layout, "背景颜色:", 'MAIN_WINDOW_BG_COLOR', 'color')
-        parent.add_row(layout, "表格字体大小:", 'TABLE_FONT_SIZE', 'spin', min=8, max=72)
-        parent.add_row(layout, "表格高度:", 'TABLE_HEIGHT', 'spin', max=1000)
+
+        gb_artifact = QGroupBox("神器提醒设置 (Artifact Alert Settings)")
+        ga = QFormLayout(gb_artifact)
+        hint1 = QLabel("神器提醒周期只在110-180秒时生效。提醒周期不生效时会单纯按照顶部神器指示变成绿色时提示神器，有明显延迟\
+                       \n生效时会在顶部神器指示器变灰后固定时间后自动提醒，而不是等到顶部识别到有神器时提醒。也不会提醒第一个神器。")
+        hint1.setStyleSheet("color: gray; font-size: 10pt; font-style: italic;")
+        ga.addRow(hint1)
+        parent.add_row(ga, "神器提醒周期触发秒数:", 'ARTIFACT_TIMED_TRIGGER_SECONDS', 'spin', min=0, max=300)
+        hint2 = QLabel("游戏画面左上角为基准点(0,0),数字越大越靠近右/下")
+        hint2.setStyleSheet("color: gray; font-size: 10pt; font-style: italic;")
+        ga.addRow(hint2)
+        SettingsTabsBuilder._add_compact_row(parent, ga, "坐标偏移:", [
+            ("左侧 (X):", 'ARTIFACT_ALERT_OFFSET_X', 'spin', {'max': 3000}),
+            ("顶部 (Y):", 'ARTIFACT_ALERT_OFFSET_Y', 'spin', {'max': 2000})
+        ])
+        SettingsTabsBuilder._add_compact_row(parent, ga, "显示样式:", [
+            ("高度:", 'ARTIFACT_ALERT_HEIGHT', 'spin', {'max': 500}),
+            ("字号:", 'ARTIFACT_ALERT_FONT_SIZE', 'spin', {'min': 8, 'max': 100}),
+            ("文字垂直偏移:", 'ARTIFACT_ALERT_VERTICAL_OFFSET', 'spin', {'min': -100, 'max': 100})
+        ])
+        parent.add_row(ga, "提示文本:", 'ARTIFACT_ALERT_TEXT', 'line')
+        parent.add_row(ga, "文字颜色:", 'ARTIFACT_ALERT_COLOR', 'color')
+        parent.add_row(ga, "提示音文件:", 'ARTIFACT_ALERT_SOUND', 'line')
+        layout.addRow(gb_artifact)
 
         mb = QGroupBox("笔记 (Memo) 设置")
         ml = QFormLayout(mb)
@@ -63,7 +90,7 @@ class SettingsTabsBuilder:
         layout.addRow(gb_cd)
 
         tab.setLayout(layout)
-        parent.tabs.addTab(tab, "界面显示")
+        parent.tabs.addTab(tab, "通用提示")
     
     @staticmethod
     def create_data_management_tab(parent):

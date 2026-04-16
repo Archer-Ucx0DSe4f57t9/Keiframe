@@ -2,10 +2,12 @@ import math
 
 from PyQt5.QtCore import Qt
 
+from src import config
 from src.game_state_service import state
 from src.output.message_presenter import MessagePresenter
 from src.utils.logging_util import get_logger
 from src.utils.window_utils import is_game_active, get_sc2_window_geometry
+from src.utils.fileutil import get_resources_dir
 
 
 class ArtifactNotifier:
@@ -55,6 +57,7 @@ class ArtifactNotifier:
     STATE_WAITING = "waiting_new_game"
     STATE_VALIDATING = "validating_idle_window"
     STATE_MONITORING = "monitoring"
+    STATE_TIMED_WAITING = "timed_waiting_after_idle_anchor"
     STATE_READY_DETECTED = "ready_detected"
     STATE_COOLDOWN = "cooldown"
     STATE_DISABLED = "disabled_until_new_game"
@@ -121,21 +124,41 @@ class ArtifactNotifier:
     ARTIFACT_READY_TOLERANCE = 38
     ARTIFACT_READY_RATIO_THRESHOLD = 0.25
 
+    ARTIFACT_RUNTIME_CONFIG_KEYS = (
+        "ARTIFACT_TIMED_TRIGGER_SECONDS",
+        "ARTIFACT_ALERT_OFFSET_X",
+        "ARTIFACT_ALERT_OFFSET_Y",
+        "ARTIFACT_ALERT_HEIGHT",
+        "ARTIFACT_ALERT_FONT_SIZE",
+        "ARTIFACT_ALERT_VERTICAL_OFFSET",
+        "ARTIFACT_ALERT_TEXT",
+        "ARTIFACT_ALERT_COLOR",
+        "ARTIFACT_ALERT_SOUND",
+    )
+
     def __init__(self, parent=None):
         self.parent = parent
         self.logger = get_logger(__name__)
 
         self.message_presenter = MessagePresenter(
             parent,
-            icon_path='AggressiveDeployment.png'
+            icon_path=get_resources_dir('icons','artifact.jpg')
         )
         self.message_presenter.setAttribute(Qt.WA_TransparentForMouseEvents, True)
 
+        self._refresh_runtime_config()
         self.reset()
+
+    def _refresh_runtime_config(self):
+        """从 config 模块同步可配置的神器提醒参数。"""
+        for key in self.ARTIFACT_RUNTIME_CONFIG_KEYS:
+            default_value = getattr(self.__class__, key, None)
+            setattr(self, key, getattr(config, key, default_value))
 
     def reset(self):
         """新游戏开始时调用。"""
-        self.logger.warning("ArtifactNotifier 状态已重置。")
+        self._refresh_runtime_config()
+        self.logger.info("ArtifactNotifier 状态已重置。")
         self._state = self.STATE_VALIDATING
         self._last_checked_second = -1
         self._cooldown_start_time = None
@@ -157,6 +180,9 @@ class ArtifactNotifier:
         # 记录上一秒 idle 状态，用于检测状态转换
         self._last_is_idle = None
 
+        # 定时模式下：提示触发后，是否已经见过一次 post-alert non-idle
+        self._timed_ready_seen_non_idle = False
+
         self._hide_message()
 
     def shutdown(self):
@@ -175,6 +201,8 @@ class ArtifactNotifier:
             current_second = int(float(game_time_seconds))
         except Exception:
             return
+
+        self._refresh_runtime_config()
 
         # 同一游戏秒只处理一次
         if current_second == self._last_checked_second:
@@ -224,58 +252,76 @@ class ArtifactNotifier:
 
         # ===== 正式监控阶段 =====
         if self._state == self.STATE_MONITORING:
-            # 仅在验证通过后，按需做 ready 对比调试
-            if self.ARTIFACT_ENABLE_READY_DEBUG_COMPARE:
+            # ===== 定时模式 =====
+            if self._is_timed_trigger_mode_enabled():
+                # 定时模式下，正式监控阶段只负责等待 not idle -> idle 的进入点
+                self._update_idle_transition_tracking(current_second, is_idle)
+
+                self.logger.debug(
+                    f"[定时监控] current_second={current_second}, is_idle={is_idle}, "
+                    f"idle_anchor_second={self._idle_anchor_second}, state={self._state}"
+                )
+
+                self._last_is_idle = is_idle
+                return
+
+            # ===== 默认模式 =====
+            if (self.ARTIFACT_ENABLE_READY_DEBUG_COMPARE and
+                    not self._should_skip_ready_region_recognition(current_second)):
                 is_ready = self._is_ready_by_region()
 
-            # 先记录 idle / not idle 转换
-            self._update_idle_transition_tracking(current_second, is_idle)
-
-            self.logger.warning(
+            self.logger.debug(
                 f"[对比用] current_second={current_second}, is_idle={is_idle}, "
                 f"is_ready={is_ready}, not_idle_streak={self._not_idle_streak_seconds}, "
                 f"idle_anchor_second={self._idle_anchor_second}"
             )
 
-            # ===== 定时模式 =====
-            if self._is_timed_trigger_mode_enabled():
-                if self._should_trigger_by_idle_anchor_time(current_second):
-                    self.logger.warning(
-                        f"定时模式触发：距离最近一次 not idle -> idle 已达到 "
-                        f"{self.ARTIFACT_TIMED_TRIGGER_SECONDS} 秒，直接触发神器提示。"
-                    )
-                    self._show_ready_message()
-                    self._last_ready_notify_second = current_second
-                    self._state = self.STATE_READY_DETECTED
-                    self._last_is_idle = is_idle
-                    return
+            self._update_not_idle_streak(current_second, is_idle)
 
-            # ===== 默认模式 =====
-            else:
-                self._update_not_idle_streak(current_second, is_idle)
+            if self._not_idle_streak_seconds >= self.ARTIFACT_NOT_IDLE_TRIGGER_SECONDS:
+                self.logger.debug(
+                    f"检测到 not idle 已连续 {self.ARTIFACT_NOT_IDLE_TRIGGER_SECONDS} 个游戏秒，触发神器提示。"
+                )
+                self._show_ready_message()
+                self._last_ready_notify_second = current_second
+                self._state = self.STATE_READY_DETECTED
+                self._last_is_idle = is_idle
+                return
 
-                if self._not_idle_streak_seconds >= self.ARTIFACT_NOT_IDLE_TRIGGER_SECONDS:
-                    self.logger.warning(
-                        f"检测到 not idle 已连续 {self.ARTIFACT_NOT_IDLE_TRIGGER_SECONDS} 个游戏秒，触发神器提示。"
-                    )
-                    self._show_ready_message()
-                    self._last_ready_notify_second = current_second
-                    self._state = self.STATE_READY_DETECTED
-                    self._last_is_idle = is_idle
-                    return
+            self._last_is_idle = is_idle
+            return
 
+        # ===== 定时模式等待阶段 =====
+        if self._state == self.STATE_TIMED_WAITING:
+            # 等待阶段不取消、不重置，只按时间到点直接触发。
+            # 这里仍然只看基础 idle 状态，不做 ready 区域识别。
+            if self._should_trigger_by_idle_anchor_time(current_second):
+                self.logger.info(
+                    f"定时模式触发：距离最近一次 not idle -> idle 已达到 "
+                    f"{self.ARTIFACT_TIMED_TRIGGER_SECONDS} 秒，直接触发神器提示。"
+                )
+                self._show_ready_message()
+                self._last_ready_notify_second = current_second
+                # 若触发当下已经是 non-idle，则视为“已看到过 non-idle”，
+                # 后续只需等待再次回到 idle 即可隐藏提示。
+                self._timed_ready_seen_non_idle = (not is_idle)
+                self._state = self.STATE_READY_DETECTED
+                self._last_is_idle = is_idle
+                return
+
+            self.logger.debug(
+                f"[定时等待] current_second={current_second}, is_idle={is_idle}, "
+                f"idle_anchor_second={self._idle_anchor_second}"
+            )
             self._last_is_idle = is_idle
             return
 
         # ===== 已触发神器提示 =====
         if self._state == self.STATE_READY_DETECTED:
-            # 无论默认模式还是定时模式，
-            # 只要当前重新回到 idle，就隐藏提示
-            if is_idle:
-                self._hide_message()
-
-                # 默认模式：隐藏后进入冷却
-                if not self._is_timed_trigger_mode_enabled():
+            # 默认模式：只要重新回到 idle，就隐藏并开始冷却
+            if not self._is_timed_trigger_mode_enabled():
+                if is_idle:
+                    self._hide_message()
                     self._cooldown_start_time = current_second
                     self._state = self.STATE_COOLDOWN
 
@@ -283,22 +329,37 @@ class ArtifactNotifier:
                     self._last_not_idle_second = None
                     self._idle_anchor_second = None
 
-                    self.logger.warning(
+                    self.logger.info(
                         f"神器区域已恢复为 idle，开始冷却 {self.ARTIFACT_RECOGNITION_COOLDOWN_SECONDS} 秒，"
                         f"cooldown_start={self._cooldown_start_time}"
                     )
 
-                # 定时模式：隐藏后直接回到 MONITORING，等待下一轮 anchor
-                else:
-                    self._state = self.STATE_MONITORING
+                self._last_is_idle = is_idle
+                return
 
-                    self._not_idle_streak_seconds = 0
-                    self._last_not_idle_second = None
-                    self._idle_anchor_second = None
-
-                    self.logger.warning(
-                        "定时模式下检测到重新回到 idle，隐藏神器提示，返回 MONITORING。"
+            # 定时模式：
+            # 1) 提示触发后，如果还一直 idle，则持续显示
+            # 2) 必须先看到一次 non-idle
+            # 3) 之后在 non-idle -> idle 时，才隐藏提示并重新开始等待
+            if not self._timed_ready_seen_non_idle:
+                if not is_idle:
+                    self._timed_ready_seen_non_idle = True
+                    self.logger.info(
+                        "定时模式下，提示后首次检测到 non-idle；继续保持提示，等待再次回到 idle。"
                     )
+
+                self._last_is_idle = is_idle
+                return
+
+            if self._timed_ready_seen_non_idle and is_idle:
+                self._hide_message()
+                self._idle_anchor_second = current_second
+                self._state = self.STATE_TIMED_WAITING
+                self._timed_ready_seen_non_idle = False
+
+                self.logger.info(
+                    "定时模式下检测到提示后的 non-idle -> idle，隐藏提示并重新进入等待。"
+                )
 
             self._last_is_idle = is_idle
             return
@@ -312,6 +373,13 @@ class ArtifactNotifier:
             return False
         return 110 <= int(self.ARTIFACT_TIMED_TRIGGER_SECONDS) <= 180
 
+    @staticmethod
+    def _should_skip_ready_region_recognition(current_second):
+        """
+        当游戏时间 <= 239 秒时，只做紫蓝色（idle）判定，不做 ready 区域识别。
+        """
+        return current_second <= 239
+
     def _init_validation_start_second_if_needed(self, current_second):
         """按当前游戏时间动态确定紫蓝色验证起点。"""
         if self._validation_start_second is not None:
@@ -322,7 +390,7 @@ class ArtifactNotifier:
         else:
             self._validation_start_second = current_second
 
-        self.logger.warning(
+        self.logger.info(
             f"ArtifactNotifier 验证起始秒已设定为 {self._validation_start_second} "
             f"(当前游戏时间={current_second})"
         )
@@ -335,7 +403,7 @@ class ArtifactNotifier:
         if is_idle:
             self._not_idle_streak_seconds = 0
             self._last_not_idle_second = None
-            self.logger.warning("ArtifactNotifier 当前为 idle，not idle 连续秒数已清零。")
+            self.logger.info("ArtifactNotifier 当前为 idle，not idle 连续秒数已清零。")
             return
 
         if self._last_not_idle_second is None:
@@ -347,7 +415,7 @@ class ArtifactNotifier:
 
         self._last_not_idle_second = current_second
 
-        self.logger.warning(
+        self.logger.debug(
             f"ArtifactNotifier not idle 连续秒数 = {self._not_idle_streak_seconds}"
         )
 
@@ -358,7 +426,7 @@ class ArtifactNotifier:
         重点：
         - 只在 MONITORING 阶段使用
         - 检测到 not idle -> idle 时，记录一个“idle 锚点”
-        - 定时模式将基于这个锚点计时
+        - 定时模式将切换到等待阶段，基于这个锚点计时
         """
         if self._last_is_idle is None:
             self._last_is_idle = is_idle
@@ -367,8 +435,10 @@ class ArtifactNotifier:
         # 检测到 not idle -> idle
         if self._last_is_idle is False and is_idle is True:
             self._idle_anchor_second = current_second
-            self.logger.warning(
-                f"检测到 not idle -> idle，记录 idle_anchor_second = {self._idle_anchor_second}"
+            self._state = self.STATE_TIMED_WAITING
+            self.logger.info(
+                f"检测到 not idle -> idle，记录 idle_anchor_second = {self._idle_anchor_second}，"
+                f"进入 {self.STATE_TIMED_WAITING}。"
             )
 
     def _should_trigger_by_idle_anchor_time(self, current_second):
@@ -408,19 +478,19 @@ class ArtifactNotifier:
 
         if is_idle:
             self._idle_seen_count += 1
-            self.logger.warning(
+            self.logger.debug(
                 f"ArtifactNotifier 验证阶段检测到紫蓝色，第 {self._idle_seen_count} 次。"
             )
 
             if self._idle_seen_count >= self.ARTIFACT_REQUIRED_IDLE_HITS:
                 self._state = self.STATE_MONITORING
-                self.logger.warning("ArtifactNotifier 验证通过，进入正式监控。")
+                self.logger.info("ArtifactNotifier 验证通过，进入正式监控。")
             return
 
         if self._idle_seen_count < self.ARTIFACT_REQUIRED_IDLE_HITS:
             self._validation_locked = True
             self._state = self.STATE_DISABLED
-            self.logger.warning(
+            self.logger.info(
                 "ArtifactNotifier 验证失败：未达到 3 次紫蓝色检测，本局在 reset 前不启用。"
             )
 
@@ -474,7 +544,7 @@ class ArtifactNotifier:
         msg_w = sc2_width
         msg_h = self.ARTIFACT_ALERT_HEIGHT
 
-        self.logger.warning(
+        self.logger.debug(
             f"ArtifactNotifier 显示位置 x={msg_x}, y={msg_y}, w={msg_w}, h={msg_h}"
         )
 
@@ -503,7 +573,7 @@ class ArtifactNotifier:
             self.message_presenter.show()
             self.message_presenter.raise_()
 
-            self.logger.warning(
+            self.logger.debug(
                 f"message_presenter visible={self.message_presenter.isVisible()}, "
                 f"pos=({self.message_presenter.x()}, {self.message_presenter.y()}), "
                 f"size=({self.message_presenter.width()}x{self.message_presenter.height()})"
@@ -572,7 +642,7 @@ class ArtifactNotifier:
         total_count = int(ready_mask.size)
         ratio = hit_count / total_count if total_count > 0 else 0.0
 
-        self.logger.warning(
+        self.logger.debug(
             f"Artifact ready ROI hit_count={hit_count}, total={total_count}, ratio={ratio:.2f}"
         )
         return ratio

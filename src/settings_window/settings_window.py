@@ -355,6 +355,8 @@ class SettingsWindow(QDialog):
             # 5. 执行物理保存
             success, msg = self.data_handler.save_all(new_values, keywords)
             if success:
+                for k, v in new_values.items():
+                    setattr(config, k, v)
                 QMessageBox.information(self, "保存成功", msg)
                 self.settings_saved.emit(new_values)
                 self.accept() # 只有成功保存才关闭
