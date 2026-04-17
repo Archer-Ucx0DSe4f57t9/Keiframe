@@ -7,38 +7,38 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
                              QFormLayout, QScrollArea, QDialog, QComboBox, QGroupBox,
                              QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog)
 from src import config
+from src.settings_window.widgets import ColorInput
     # --- TABS ---
 class SettingsTabsBuilder:
     @staticmethod
     def create_general_tab(parent):
         tab = QWidget()
         layout = QFormLayout()
-        
+
         parent.add_row(layout, "当前游戏语言 (Game Language):", 'current_game_language', 'combo', items=['zh', 'en'])
 
-        gb_window = QGroupBox("窗口与表格显示 (Window & Table Display)")
-        gw = QFormLayout(gb_window)
-        parent.add_row(gw, "主窗口位置:", 'MAIN_WINDOW_POS', 'point')
-        parent.add_row(gw, "主窗口宽度:", 'MAIN_WINDOW_WIDTH', 'spin', max=2000)
-        parent.add_row(gw, "背景颜色:", 'MAIN_WINDOW_BG_COLOR', 'color')
-        parent.add_row(gw, "表格字体大小:", 'TABLE_FONT_SIZE', 'spin', min=8, max=72)
-        parent.add_row(gw, "表格高度:", 'TABLE_HEIGHT', 'spin', max=1000)
+        gb_window = QGroupBox("窗口与表格设置 (Window & Table)")
+        gl_window = QFormLayout(gb_window)
+        parent.add_row(gl_window, "主窗口位置:", 'MAIN_WINDOW_POS', 'point')
+        parent.add_row(gl_window, "主窗口宽度:", 'MAIN_WINDOW_WIDTH', 'spin', max=2000)
+        parent.add_row(gl_window, "背景颜色:", 'MAIN_WINDOW_BG_COLOR', 'color')
+        parent.add_row(gl_window, "表格字体大小:", 'TABLE_FONT_SIZE', 'spin', min=8, max=72)
+        parent.add_row(gl_window, "表格高度:", 'TABLE_HEIGHT', 'spin', max=1000)
         layout.addRow(gb_window)
-        
+
         gb = QGroupBox("日志与调试设置 (Logging & Debugging)")
         gl = QFormLayout(gb)
         parent.add_row(gl, "日志等级:", 'LOG_LEVEL', 'combo', items=['DEBUG', 'INFO', 'WARNING', 'ERROR'])
         parent.add_row(gl, "调试模式:", 'debug_mode', 'bool')
         parent.add_row(gl, "调试倍率:", 'debug_time_factor', 'double', min=0.1, max=20.0)
         layout.addRow(gb)
-        
-        # 声音配置整合在此或地图配置中，此处放入通用区域
+
         sb = QGroupBox("提示声音设置(Alert Sound Settings)")
         sl = QFormLayout(sb)
         parent.add_row(sl, "音量 (0-100):", 'ALERT_SOUND_VOLUME', 'spin', max=100)
         parent.add_row(sl, "同名警告冷却 (秒):", 'ALERT_SOUND_COOLDOWN', 'spin', max=60)
         layout.addRow(sb)
-        
+
         tab.setLayout(layout)
         parent.tabs.addTab(tab, "常规设置")
   
@@ -47,45 +47,61 @@ class SettingsTabsBuilder:
         tab = QWidget()
         layout = QFormLayout()
 
-        gb_artifact = QGroupBox("神器提醒设置 (Artifact Alert Settings)")
-        ga = QFormLayout(gb_artifact)
+        # 1. 神器提醒设置
+        gb_artifact = QGroupBox("神器提醒设置 (Artifact Alert)")
+        gl_artifact = QFormLayout(gb_artifact)
+
         hint1 = QLabel("神器提醒周期只在110-180秒时生效。提醒周期不生效时会单纯按照顶部神器指示变成绿色时提示神器，有明显延迟\
-                       \n生效时会在顶部神器指示器变灰后固定时间后自动提醒，而不是等到顶部识别到有神器时提醒。也不会提醒第一个神器。")
-        hint1.setStyleSheet("color: gray; font-size: 10pt; font-style: italic;")
-        ga.addRow(hint1)
-        parent.add_row(ga, "神器提醒周期触发秒数:", 'ARTIFACT_TIMED_TRIGGER_SECONDS', 'spin', min=0, max=300)
+                       \n生效时会在顶部神器指示器变灰后固定时间后自动提醒，而不是等到顶部识别到有神器时提醒。也不会提醒第一个神器。\
+                           \n此时既不会提醒第一个神器，在捡完最后一个神器后下个周期到时时，神器提醒会依旧保持到无神器发现（即指示器一直没变绿色）超时前。")
+        hint1.setStyleSheet("color: gray; font-size: 10pt;")
+        gl_artifact.addRow(hint1)
+
+        SettingsTabsBuilder._add_compact_row(parent, gl_artifact, "定时参数:", [
+            ("触发秒数:", 'ARTIFACT_TIMED_TRIGGER_SECONDS', 'spin', {'max': 300}),
+            ("无神器超发现时:", 'ARTIFACT_TIMED_TRIGGER_NO_NOT_IDLE_TIMEOUT_SECONDS', 'spin', {'max': 300}),
+        ])
         hint2 = QLabel("游戏画面左上角为基准点(0,0),数字越大越靠近右/下")
         hint2.setStyleSheet("color: gray; font-size: 10pt; font-style: italic;")
-        ga.addRow(hint2)
-        SettingsTabsBuilder._add_compact_row(parent, ga, "坐标偏移:", [
+        gl_artifact.addRow(hint2)
+
+        SettingsTabsBuilder._add_compact_row(parent, gl_artifact, "坐标偏移:", [
             ("左侧 (X):", 'ARTIFACT_ALERT_OFFSET_X', 'spin', {'max': 3000}),
-            ("顶部 (Y):", 'ARTIFACT_ALERT_OFFSET_Y', 'spin', {'max': 2000})
+            ("顶部 (Y):", 'ARTIFACT_ALERT_OFFSET_Y', 'spin', {'max': 2000}),
         ])
-        SettingsTabsBuilder._add_compact_row(parent, ga, "显示样式:", [
-            ("高度:", 'ARTIFACT_ALERT_HEIGHT', 'spin', {'max': 500}),
-            ("字号:", 'ARTIFACT_ALERT_FONT_SIZE', 'spin', {'min': 8, 'max': 100}),
-            ("文字垂直偏移:", 'ARTIFACT_ALERT_VERTICAL_OFFSET', 'spin', {'min': -100, 'max': 100})
+
+        SettingsTabsBuilder._add_compact_row(parent, gl_artifact, "字体布局:", [
+            ("高度:", 'ARTIFACT_ALERT_HEIGHT', 'spin', {'max': 300}),
+            ("字号:", 'ARTIFACT_ALERT_FONT_SIZE', 'spin', {'max': 100}),
+            ("文字垂直偏移:", 'ARTIFACT_ALERT_VERTICAL_OFFSET', 'spin', {'min': -100, 'max': 100}),
         ])
-        parent.add_row(ga, "提示文本:", 'ARTIFACT_ALERT_TEXT', 'line')
-        parent.add_row(ga, "文字颜色:", 'ARTIFACT_ALERT_COLOR', 'color')
-        parent.add_row(ga, "提示音文件:", 'ARTIFACT_ALERT_SOUND', 'line')
+
+        parent.add_row(gl_artifact, "提示文本:", 'ARTIFACT_ALERT_TEXT', 'line')
+        parent.add_row(gl_artifact, "提示颜色:", 'ARTIFACT_ALERT_COLOR', 'color')
+        parent.add_row(gl_artifact, "提示音频:", 'ARTIFACT_ALERT_SOUND', 'line')
         layout.addRow(gb_artifact)
 
+        # 2. Memo 设置
         mb = QGroupBox("笔记 (Memo) 设置")
         ml = QFormLayout(mb)
         parent.add_row(ml, "透明度 (0-1):", 'MEMO_OPACITY', 'double', step=0.1)
-        parent.add_row(ml, "持续时间 (ms):", 'MEMO_DURATION', 'spin', max=60000)
-        parent.add_row(ml, "淡出时间 (ms):", 'MEMO_FADE_TIME', 'spin', max=5000)
+
+        SettingsTabsBuilder._add_compact_row(parent, ml, "时长设置:", [
+            ("持续时间 (ms):", 'MEMO_DURATION', 'spin', {'max': 60000}),
+            ("淡出时间 (ms):", 'MEMO_FADE_TIME', 'spin', {'max': 5000}),
+        ])
         layout.addRow(mb)
-        
-        # 4. 自定义倒计时配置
+
+        # 3. 自定义倒计时
         gb_cd = QGroupBox("自定义倒计时 (Custom Countdown)")
         gl_cd = QFormLayout(gb_cd)
         parent.add_row(gl_cd, "最大同时存在数量:", 'COUNTDOWN_MAX_CONCURRENT', 'spin', min=1, max=10)
-        parent.add_row(gl_cd, "警告时间 (秒):", 'COUNTDOWN_WARNING_THRESHOLD_SECONDS', 'spin')
-        parent.add_row(gl_cd, "显示颜色:", 'COUNTDOWN_DISPLAY_COLOR', 'color')
-        
-        # 使用新的倒计时列表编辑器
+
+        SettingsTabsBuilder._add_compact_row(parent, gl_cd, "显示设置:", [
+            ("警告时间 (秒):", 'COUNTDOWN_WARNING_THRESHOLD_SECONDS', 'spin', {'max': 9999}),
+            ("显示颜色:", 'COUNTDOWN_DISPLAY_COLOR', 'color', {}),
+        ])
+
         parent.add_row(gl_cd, "倒计时选项列表:", 'COUNTDOWN_OPTIONS', 'countdown_list')
         layout.addRow(gb_cd)
 
@@ -383,22 +399,28 @@ class SettingsTabsBuilder:
         """内部工具：仅创建并注册控件，不添加到布局，供组合行使用"""
         val = parent.current_config.get(key)
         widget = None
-        
+
         if widget_type == 'spin':
             widget = QSpinBox()
             widget.setRange(kwargs.get('min', 0), kwargs.get('max', 9999))
             widget.setValue(int(val) if val is not None else 0)
+
         elif widget_type == 'double':
             widget = QDoubleSpinBox()
             widget.setRange(kwargs.get('min', 0.0), kwargs.get('max', 1.0))
             widget.setSingleStep(kwargs.get('step', 0.01))
             widget.setValue(float(val) if val is not None else 0.0)
-        
+
+        elif widget_type == 'color':
+            widget = ColorInput(str(val) if val is not None else "")
+
         if widget:
-            # 禁用滚轮并注册到主窗口的 widgets 字典，确保保存逻辑生效
-            widget.setFocusPolicy(QtCore.Qt.StrongFocus)
-            widget.installEventFilter(parent)
+            if isinstance(widget, (QSpinBox, QDoubleSpinBox)):
+                widget.setFocusPolicy(QtCore.Qt.StrongFocus)
+                widget.installEventFilter(parent)
+
             parent.widgets[key] = {'widget': widget, 'type': widget_type, 'label': label_text}
+
         return widget
 
     @staticmethod
