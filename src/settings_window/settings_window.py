@@ -160,8 +160,10 @@ class SettingsWindow(QDialog):
         self._setup_window_shell()
 
         self.setWindowTitle("系统设置 / Settings")
-        self.resize(900, 700)
-        self.setMinimumSize(780, 620)
+        self.resize(1000, 980)
+        self.setMinimumSize(920, 820)
+
+        self._first_show_layout_fixed = False
 
         self.init_ui()
         self.apply_dark_theme()
@@ -179,7 +181,7 @@ class SettingsWindow(QDialog):
         self.setStyleSheet("""
         QWidget {
             color: #e8e8e8;
-            font-size: 10pt;
+            font-size: 12pt;
         }
 
         QDialog {
@@ -198,7 +200,7 @@ class SettingsWindow(QDialog):
         }
 
         QLabel#titleLabel {
-            font-size: 10pt;
+            font-size: 12pt;
             font-weight: 600;
             color: #f7f7f7;
             background: transparent;
@@ -214,7 +216,7 @@ class SettingsWindow(QDialog):
 
         QTabWidget::pane {
             border: 1px solid rgba(255, 255, 255, 18);
-            background-color: rgba(10, 10, 10, 130);
+            background-color: rgba(10, 10, 10, 139);
             border-radius: 8px;
             top: -1px;
         }
@@ -404,7 +406,8 @@ class SettingsWindow(QDialog):
             color: #f4f4f4;
             border: 1px solid rgba(255, 255, 255, 24);
             border-radius: 5px;
-            padding: 7px 14px;
+            padding: 6px 14px;
+            min-height: 30px;
         }
 
         QPushButton:hover {
@@ -427,6 +430,7 @@ class SettingsWindow(QDialog):
             );
             border: 1px solid rgba(170, 205, 255, 100);
             font-weight: 600;
+            min-height: 32px;
         }
 
         QPushButton#accentButton:hover {
@@ -448,6 +452,7 @@ class SettingsWindow(QDialog):
             border: 1px solid rgba(220, 230, 255, 70);
             border-radius: 3px;
             padding: 0px;
+            min-height: 20px;
             font-size: 10pt;
             font-weight: bold;
         }
@@ -475,6 +480,7 @@ class SettingsWindow(QDialog):
             border: 1px solid rgba(255, 245, 240, 95);
             border-radius: 3px;
             padding: 0px;
+            min-height: 20px;
             font-size: 10pt;
             font-weight: bold;
         }
@@ -654,7 +660,7 @@ class SettingsWindow(QDialog):
         if event.type() == QtCore.QEvent.Wheel and isinstance(source, (QSpinBox, QDoubleSpinBox)):
             return True
         return super().eventFilter(source, event)
-
+    
     def init_ui(self):
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(12, 12, 12, 12)
@@ -724,6 +730,148 @@ class SettingsWindow(QDialog):
         btn_layout.addWidget(cancel_btn)
 
         content_layout.addWidget(bottom_bar)
+
+        # 关键：初始化后、切换页签后都强制刷新一次布局
+        self.tabs.currentChanged.connect(
+            lambda _: QtCore.QTimer.singleShot(0, self._refresh_current_tab_layout)
+        )
+        QtCore.QTimer.singleShot(0, self._refresh_current_tab_layout)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+
+        QtCore.QTimer.singleShot(0, self._refresh_current_tab_layout)
+
+        if not self._first_show_layout_fixed:
+            self._first_show_layout_fixed = True
+            QtCore.QTimer.singleShot(0, self._finalize_first_show_layout)
+            QtCore.QTimer.singleShot(30, self._finalize_first_show_layout)
+
+    def _finalize_first_show_layout(self):
+        """
+        首次显示后，等待 Qt/Windows 把最终几何尺寸稳定下来，
+        然后主动补一次布局刷新 + 轻微 resize 事件，避免用户手动拖一下窗口才正常。
+        """
+        self._refresh_current_tab_layout()
+
+        # 取当前窗口和内容实际需要尺寸中的较大值
+        hint_w = max(
+            self.minimumWidth(),
+            self.minimumSizeHint().width(),
+            self.sizeHint().width(),
+            self.width()
+        )
+        hint_h = max(
+            self.minimumHeight(),
+            self.minimumSizeHint().height(),
+            self.sizeHint().height(),
+            self.height()
+        )
+
+        # 给一点余量，避免边框/阴影/字体放大后刚好卡边
+        target_w = max(1000, hint_w)
+        target_h = max(980, hint_h + 8)
+
+        if self.width() != target_w or self.height() != target_h:
+            self.resize(target_w, target_h)
+
+        # 关键：程序自己制造一次很小的 resize 往返，等价于“手动拖一下”
+        self._force_fake_resize_event()
+        self._refresh_current_tab_layout()
+
+    def _force_fake_resize_event(self):
+        """
+        某些复杂页（尤其 QTableWidget 所在页）在首次 show 后，
+        只有收到一次明确 resize event 才会完全铺开。
+        """
+        w = self.width()
+        h = self.height()
+
+        self.resize(w, h + 1)
+        self.resize(w, h)
+
+    def _refresh_current_tab_layout(self):
+        """强制刷新当前页签布局，解决首次显示时表格区未正确撑开的情况"""
+        if not hasattr(self, "tabs") or self.tabs is None:
+            return
+
+        current = self.tabs.currentWidget()
+        if current is None:
+            return
+
+        self._activate_layout_recursively(current)
+
+        for area in current.findChildren(QScrollArea):
+            inner = area.widget()
+            if inner is not None:
+                self._activate_layout_recursively(inner)
+
+        for table in current.findChildren(QTableWidget):
+            table.updateGeometry()
+            table.viewport().update()
+            table.repaint()
+
+        self.tabs.updateGeometry()
+        self.content_area.updateGeometry()
+        self.window_frame.updateGeometry()
+
+        frame_layout = self._safe_get_qt_layout(self.window_frame)
+        if frame_layout is not None:
+            frame_layout.invalidate()
+            frame_layout.activate()
+
+        self.updateGeometry()
+        self.repaint()
+
+    def _safe_get_qt_layout(self, widget):
+        """
+        安全获取 QWidget 的 Qt layout，避免被实例属性 self.layout 覆盖后，
+        直接调用 widget.layout() 触发 TypeError。
+        """
+        if widget is None:
+            return None
+
+        try:
+            return QWidget.layout(widget)
+        except Exception:
+            return None
+
+    def _activate_layout_recursively(self, widget):
+        if widget is None:
+            return
+
+        layout = self._safe_get_qt_layout(widget)
+        if layout is not None:
+            layout.invalidate()
+            layout.activate()
+
+        widget.updateGeometry()
+
+        for child in widget.findChildren(QWidget):
+            child_layout = self._safe_get_qt_layout(child)
+            if child_layout is not None:
+                child_layout.invalidate()
+                child_layout.activate()
+            child.updateGeometry()
+
+    def _activate_layout_recursively(self, widget):
+        if widget is None:
+            return
+
+        layout = self._safe_get_qt_layout(widget)
+        if layout is not None:
+            layout.invalidate()
+            layout.activate()
+
+        widget.updateGeometry()
+
+        for child in widget.findChildren(QWidget):
+            child_layout = self._safe_get_qt_layout(child)
+            if child_layout is not None:
+                child_layout.invalidate()
+                child_layout.activate()
+            child.updateGeometry()
+
     
     def _collect_roi_data(self):
         """
@@ -837,7 +985,7 @@ class SettingsWindow(QDialog):
                 cfg[yk] = y
 
     def create_point_widget(self, x, y, show_get_btn=False):
-        """修改位置组件：增加获取当前位置按钮"""
+        """位置组件：增加获取当前位置按钮"""
         box = QWidget()
         h = QHBoxLayout(box)
         h.setContentsMargins(0, 0, 0, 0)
@@ -864,6 +1012,7 @@ class SettingsWindow(QDialog):
         if show_get_btn:
             btn_get_pos = QPushButton("获取当前位置")
             btn_get_pos.setToolTip("读取主窗口当前在屏幕上的坐标")
+            btn_get_pos.setMinimumHeight(32)
 
             def update_to_current():
                 if self.main_window:

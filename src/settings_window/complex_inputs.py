@@ -5,6 +5,11 @@ from src.utils.fileutil import get_resources_dir
 import os
 import re
 
+class NoWheelComboBox(QComboBox):
+    """禁用鼠标滚轮切换，避免误操作"""
+    def wheelEvent(self, event):
+        event.ignore()
+
 class DictTable(QTableWidget):
     """字典编辑器表格 - 第二列改为下拉选择"""
     def __init__(self, data_dict, map_list, parent=None):
@@ -36,7 +41,7 @@ class DictTable(QTableWidget):
         self.setItem(row, 0, QTableWidgetItem(key_text))
         
         # 第二列：下拉选择地图全名
-        combo = QComboBox()
+        combo = NoWheelComboBox()
         combo.addItems(self.map_list)
         if value_text in self.map_list:
             combo.setCurrentText(value_text)
@@ -129,7 +134,7 @@ class CountdownOptionsTable(QTableWidget):
         self.setItem(row, 1, QTableWidgetItem(str(label_text)))
         
         # 3. 声音 (下拉框)
-        combo = QComboBox()
+        combo = NoWheelComboBox()
         # 添加一个空选项，代表无声音
         combo.addItem("")
         combo.addItems(self.sound_files)
