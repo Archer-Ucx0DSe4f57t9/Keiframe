@@ -44,25 +44,38 @@ class SettingsTabsBuilder:
   
     @staticmethod
     def create_interface_tab(parent):
-        tab = QWidget()
-        layout = QFormLayout()
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+
+        content = QWidget()
+        layout = QFormLayout(content)
+        layout.setContentsMargins(8, 8, 12, 12)
+        layout.setVerticalSpacing(14)
+        layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         # 1. 神器提醒设置
         gb_artifact = QGroupBox("神器提醒设置 (Artifact Alert)")
         gl_artifact = QFormLayout(gb_artifact)
+        gl_artifact.setVerticalSpacing(10)
+        gl_artifact.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
-        hint1 = QLabel("神器提醒周期只在110-180秒时生效。提醒周期不生效时会单纯按照顶部神器指示变成绿色时提示神器，有明显延迟\
-                       \n生效时会在顶部神器指示器变灰后固定时间后自动提醒，而不是等到顶部识别到有神器时提醒。也不会提醒第一个神器。\
-                           \n此时既不会提醒第一个神器，在捡完最后一个神器后下个周期到时时，神器提醒会依旧保持到无神器发现（即指示器一直没变绿色）超时前。")
-        hint1.setStyleSheet("color: gray; font-size: 10pt;")
+        hint1 = QLabel(
+            "神器提醒周期只在110-180秒时生效。提醒周期不生效时会单纯按照顶部神器指示变成绿色时提示神器，有明显延迟。\n"
+            "生效时会在顶部神器指示器变灰后固定时间后自动提醒，而不是等到顶部识别到有神器时提醒。也不会提醒第一个神器。\n"
+            "此时既不会提醒第一个神器，在捡完最后一个神器后下个周期到时时，神器提醒会依旧保持到无神器发现（即指示器一直没变绿色）超时前。"
+        )
+        hint1.setWordWrap(True)
+        hint1.setStyleSheet("color: #b8b8b8; font-size: 10pt;")
         gl_artifact.addRow(hint1)
 
         SettingsTabsBuilder._add_compact_row(parent, gl_artifact, "定时参数:", [
             ("触发秒数:", 'ARTIFACT_TIMED_TRIGGER_SECONDS', 'spin', {'max': 300}),
             ("无神器超发现时:", 'ARTIFACT_TIMED_TRIGGER_NO_NOT_IDLE_TIMEOUT_SECONDS', 'spin', {'max': 300}),
         ])
-        hint2 = QLabel("游戏画面左上角为基准点(0,0),数字越大越靠近右/下")
-        hint2.setStyleSheet("color: gray; font-size: 10pt; font-style: italic;")
+
+        hint2 = QLabel("游戏画面左上角为基准点(0,0)，数字越大越靠近右/下")
+        hint2.setWordWrap(True)
+        hint2.setStyleSheet("color: #a8a8a8; font-size: 10pt; font-style: italic;")
         gl_artifact.addRow(hint2)
 
         SettingsTabsBuilder._add_compact_row(parent, gl_artifact, "坐标偏移:", [
@@ -82,31 +95,34 @@ class SettingsTabsBuilder:
         layout.addRow(gb_artifact)
 
         # 2. Memo 设置
-        mb = QGroupBox("笔记 (Memo) 设置")
-        ml = QFormLayout(mb)
-        parent.add_row(ml, "透明度 (0-1):", 'MEMO_OPACITY', 'double', step=0.1)
+        gb_memo = QGroupBox("笔记 (Memo) 设置")
+        gl_memo = QFormLayout(gb_memo)
+        gl_memo.setVerticalSpacing(10)
+        gl_memo.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
-        SettingsTabsBuilder._add_compact_row(parent, ml, "时长设置:", [
+        parent.add_row(gl_memo, "透明度 (0-1):", 'MEMO_OPACITY', 'double', step=0.1)
+        SettingsTabsBuilder._add_compact_row(parent, gl_memo, "时长设置:", [
             ("持续时间 (ms):", 'MEMO_DURATION', 'spin', {'max': 60000}),
             ("淡出时间 (ms):", 'MEMO_FADE_TIME', 'spin', {'max': 5000}),
         ])
-        layout.addRow(mb)
+        layout.addRow(gb_memo)
 
         # 3. 自定义倒计时
         gb_cd = QGroupBox("自定义倒计时 (Custom Countdown)")
         gl_cd = QFormLayout(gb_cd)
-        parent.add_row(gl_cd, "最大同时存在数量:", 'COUNTDOWN_MAX_CONCURRENT', 'spin', min=1, max=10)
+        gl_cd.setVerticalSpacing(10)
+        gl_cd.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
+        parent.add_row(gl_cd, "最大同时存在数量:", 'COUNTDOWN_MAX_CONCURRENT', 'spin', min=1, max=10)
         SettingsTabsBuilder._add_compact_row(parent, gl_cd, "显示设置:", [
             ("警告时间 (秒):", 'COUNTDOWN_WARNING_THRESHOLD_SECONDS', 'spin', {'max': 9999}),
             ("显示颜色:", 'COUNTDOWN_DISPLAY_COLOR', 'color', {}),
         ])
-
         parent.add_row(gl_cd, "倒计时选项列表:", 'COUNTDOWN_OPTIONS', 'countdown_list')
         layout.addRow(gb_cd)
 
-        tab.setLayout(layout)
-        parent.tabs.addTab(tab, "通用提示")
+        scroll.setWidget(content)
+        parent.tabs.addTab(scroll, "通用提示")
     
     @staticmethod
     def create_data_management_tab(parent):

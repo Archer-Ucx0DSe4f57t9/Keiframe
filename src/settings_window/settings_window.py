@@ -1,33 +1,137 @@
-#settings_window.py
+# settings_window.py
 import json
-import os, sys
+import os
+import sys
 import copy
 import re
-from PyQt5 import QtCore 
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, 
-                             QLabel, QLineEdit, QSpinBox, QDoubleSpinBox, 
-                             QCheckBox, QPushButton, QColorDialog, QMessageBox, 
-                             QFormLayout, QScrollArea, QDialog, QComboBox, QGroupBox,
-                             QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog)
-from PyQt5.QtCore import Qt, pyqtSignal
+
+from PyQt5 import QtCore
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
+    QLabel, QLineEdit, QSpinBox, QDoubleSpinBox,
+    QCheckBox, QPushButton, QColorDialog, QMessageBox,
+    QFormLayout, QScrollArea, QDialog, QComboBox, QGroupBox,
+    QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog,
+    QFrame, QGraphicsDropShadowEffect
+)
+from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QRect
 from PyQt5.QtGui import QKeyEvent, QColor, QKeySequence
 
-from src import config  # 导入你现有的 config.py 作为默认值
+from src import config
 from src.utils.logging_util import get_logger
 from src.utils.fileutil import get_resources_dir, get_project_root
 from src.utils.excel_utils import ExcelUtil
 from src.utils.data_validator import DataValidator
 from src.db import map_daos, mutator_daos
 from src.settings_window.widgets import HotkeyInput, ColorInput
-from src.settings_window.complex_inputs import DictInput, DictTable, CountdownOptionsInput, CountdownOptionsInput  
+from src.settings_window.complex_inputs import DictInput, DictTable, CountdownOptionsInput
 from src.settings_window.tabs import SettingsTabsBuilder
 from src.settings_window.setting_data_handler import SettingsHandler
 
-      
-      
-# ==========================================
-# 2. 设置窗口主类
-# ==========================================
+class AeroTitleBar(QWidget):
+    """Royale Noir / Aero Black 风格标题栏"""
+    def __init__(self, parent_window, title=""):
+        super().__init__(parent_window)
+        self.parent_window = parent_window
+        self._dragging = False
+        self._drag_pos = QPoint()
+
+        self.setObjectName("titleBar")
+        self.setFixedHeight(32)
+        self.setMouseTracking(True)
+        self.setAutoFillBackground(False)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(10, 0, 6, 0)
+        layout.setSpacing(4)
+
+        self.title_label = QLabel(title)
+        self.title_label.setObjectName("titleLabel")
+        self.title_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+
+        layout.addWidget(self.title_label)
+        layout.addStretch()
+
+        self.min_btn = QPushButton("—")
+        self.min_btn.setObjectName("titleMinButton")
+        self.min_btn.setFixedSize(26, 20)
+        self.min_btn.clicked.connect(self.parent_window.showMinimized)
+
+        self.close_btn = QPushButton("✕")
+        self.close_btn.setObjectName("titleCloseButton")
+        self.close_btn.setFixedSize(26, 20)
+        self.close_btn.clicked.connect(self.parent_window.close)
+
+        layout.addWidget(self.min_btn)
+        layout.addWidget(self.close_btn)
+
+    def set_title(self, title):
+        self.title_label.setText(title)
+
+    def paintEvent(self, event):
+        from PyQt5.QtGui import QPainter, QLinearGradient, QColor, QPen, QPainterPath
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+
+        rect = self.rect().adjusted(0, 0, -1, -1)
+        radius = 10
+
+        path = QPainterPath()
+        path.moveTo(rect.left(), rect.bottom())
+        path.lineTo(rect.left(), rect.top() + radius)
+        path.quadTo(rect.left(), rect.top(), rect.left() + radius, rect.top())
+        path.lineTo(rect.right() - radius, rect.top())
+        path.quadTo(rect.right(), rect.top(), rect.right(), rect.top() + radius)
+        path.lineTo(rect.right(), rect.bottom())
+        path.closeSubpath()
+
+        # 主体深色渐变：更接近 Royale Noir，而不是 XP 纯黑条
+        grad = QLinearGradient(rect.topLeft(), rect.bottomLeft())
+        grad.setColorAt(0.00, QColor(78, 92, 124, 220))
+        grad.setColorAt(0.16, QColor(36, 43, 58, 228))
+        grad.setColorAt(0.55, QColor(12, 14, 20, 234))
+        grad.setColorAt(1.00, QColor(3, 4, 6, 240))
+        painter.fillPath(path, grad)
+
+        # 顶部冷色高光
+        gloss_rect = rect.adjusted(1, 1, -1, -rect.height() // 2)
+        gloss = QLinearGradient(gloss_rect.topLeft(), gloss_rect.bottomLeft())
+        gloss.setColorAt(0.0, QColor(255, 255, 255, 70))
+        gloss.setColorAt(0.35, QColor(180, 205, 255, 32))
+        gloss.setColorAt(1.0, QColor(255, 255, 255, 0))
+        painter.fillRect(gloss_rect, gloss)
+
+        # 顶边亮线
+        painter.setPen(QPen(QColor(235, 245, 255, 60), 1))
+        painter.drawLine(rect.left() + radius, rect.top(), rect.right() - radius, rect.top())
+
+        # 底部分隔线
+        painter.setPen(QPen(QColor(120, 150, 205, 45), 1))
+        painter.drawLine(rect.left() + 1, rect.bottom(), rect.right() - 1, rect.bottom())
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._dragging = True
+            self._drag_pos = event.globalPos() - self.parent_window.frameGeometry().topLeft()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._dragging and event.buttons() & Qt.LeftButton:
+            self.parent_window.move(event.globalPos() - self._drag_pos)
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._dragging = False
+        super().mouseReleaseEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        event.accept()
+
 class SettingsWindow(QDialog):
     settings_saved = pyqtSignal(dict)
 
@@ -36,64 +140,591 @@ class SettingsWindow(QDialog):
         self.settings_file = os.path.join(get_project_root(), 'settings.json')
         self.data_handler = SettingsHandler(
             self.settings_file,
-            maps_db=parent.maps_db if parent else None, 
-            mutators_db=parent.mutators_db if parent else None)
+            maps_db=parent.maps_db if parent else None,
+            mutators_db=parent.mutators_db if parent else None
+        )
         self.main_window = parent
-        self.setWindowTitle("系统设置 / Settings")
-        self.resize(900, 700)
-        
+
         self.logger = get_logger("setting window")
-        
         self.current_config = self.data_handler.load_config()
         self.original_config = copy.deepcopy(self.current_config)
         self.widgets = {}
 
+        # 无边框 / 半透明 / 自定义缩放参数
+        self._resize_margin = 8
+        self._resizing = False
+        self._resize_edges = set()
+        self._resize_start_pos = QPoint()
+        self._resize_start_geom = QRect()
+
+        self._setup_window_shell()
+
+        self.setWindowTitle("系统设置 / Settings")
+        self.resize(900, 700)
+        self.setMinimumSize(780, 620)
+
         self.init_ui()
+        self.apply_dark_theme()
         self.disable_all_spinbox_wheels()
 
+    # =========================
+    # 窗口外壳
+    # =========================
+    def _setup_window_shell(self):
+        self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setMouseTracking(True)
+
+    def apply_dark_theme(self):
+        self.setStyleSheet("""
+        QWidget {
+            color: #e8e8e8;
+            font-size: 10pt;
+        }
+
+        QDialog {
+            background: transparent;
+        }
+
+        QFrame#windowFrame {
+            background-color: rgba(8, 8, 8, 138);
+            border: 1px solid rgba(255, 255, 255, 26);
+            border-radius: 10px;
+        }
+
+        QWidget#titleBar {
+            background: transparent;
+            border: none;
+        }
+
+        QLabel#titleLabel {
+            font-size: 10pt;
+            font-weight: 600;
+            color: #f7f7f7;
+            background: transparent;
+            padding-left: 2px;
+        }
+
+        QFrame#contentArea {
+            background: transparent;
+            border: none;
+            border-bottom-left-radius: 10px;
+            border-bottom-right-radius: 10px;
+        }
+
+        QTabWidget::pane {
+            border: 1px solid rgba(255, 255, 255, 18);
+            background-color: rgba(10, 10, 10, 130);
+            border-radius: 8px;
+            top: -1px;
+        }
+
+        QTabBar::tab {
+            background: qlineargradient(
+                x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(70, 74, 84, 165),
+                stop:0.45 rgba(28, 30, 36, 170),
+                stop:1 rgba(12, 12, 14, 178)
+            );
+            color: #d7dbe5;
+            border: 1px solid rgba(255, 255, 255, 20);
+            padding: 5px 10px;
+            min-width: 48px;
+            max-width: 88px;
+            min-height: 18px;
+            border-top-left-radius: 5px;
+            border-top-right-radius: 5px;
+            margin-right: 2px;
+        }
+
+        QTabBar::tab:selected {
+            background: qlineargradient(
+                x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(110, 126, 160, 182),
+                stop:0.22 rgba(54, 60, 74, 186),
+                stop:1 rgba(18, 18, 24, 190)
+            );
+            color: #ffffff;
+            border-bottom-color: rgba(135, 180, 245, 120);
+        }
+
+        QTabBar::tab:hover:!selected {
+            background: qlineargradient(
+                x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(86, 92, 108, 175),
+                stop:1 rgba(24, 24, 30, 182)
+            );
+        }
+
+        QTabBar QToolButton {
+            background-color: rgba(18, 18, 18, 175);
+            color: #f0f0f0;
+            border: 1px solid rgba(255, 255, 255, 18);
+            border-radius: 3px;
+            width: 18px;
+            height: 18px;
+            margin-top: 2px;
+            margin-bottom: 2px;
+            padding: 0px;
+        }
+
+        QTabBar QToolButton:hover {
+            background-color: rgba(68, 92, 136, 190);
+        }
+
+        QScrollArea {
+            border: none;
+            background: transparent;
+        }
+
+        QScrollArea > QWidget > QWidget {
+            background: transparent;
+        }
+
+        QGroupBox {
+            background-color: rgba(20, 20, 20, 116);
+            border: 1px solid rgba(255, 255, 255, 18);
+            border-radius: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            font-weight: 600;
+        }
+
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            left: 12px;
+            padding: 0 6px 0 6px;
+            color: #ededed;
+            background: transparent;
+        }
+
+        QLabel {
+            background: transparent;
+        }
+
+        QLineEdit,
+        QSpinBox,
+        QDoubleSpinBox,
+        QComboBox,
+        QTableWidget,
+        QHeaderView::section {
+            background-color: rgba(32, 32, 32, 168);
+            color: #f0f0f0;
+        }
+
+        QLineEdit,
+        QSpinBox,
+        QDoubleSpinBox,
+        QComboBox {
+            border: 1px solid rgba(255, 255, 255, 22);
+            border-radius: 5px;
+            padding: 4px 6px 4px 8px;
+            min-height: 18px;
+            selection-background-color: rgba(95, 145, 220, 150);
+        }
+
+        QLineEdit:focus,
+        QSpinBox:focus,
+        QDoubleSpinBox:focus,
+        QComboBox:focus,
+        QTableWidget:focus {
+            border: 1px solid rgba(120, 175, 245, 155);
+        }
+
+        QComboBox::drop-down {
+            border: none;
+            width: 18px;
+            background: transparent;
+        }
+
+        QSpinBox::up-button,
+        QSpinBox::down-button,
+        QDoubleSpinBox::up-button,
+        QDoubleSpinBox::down-button {
+            border: none;
+            width: 14px;
+            background: transparent;
+        }
+
+        QComboBox QAbstractItemView {
+            background-color: rgba(22, 22, 22, 225);
+            color: #f0f0f0;
+            border: 1px solid rgba(255, 255, 255, 20);
+            selection-background-color: rgba(86, 130, 190, 160);
+            selection-color: white;
+        }
+
+        QCheckBox {
+            spacing: 8px;
+        }
+
+        QCheckBox::indicator {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            border: 1px solid rgba(255, 255, 255, 30);
+            background: rgba(30, 30, 30, 150);
+        }
+
+        QCheckBox::indicator:checked {
+            background: rgba(88, 132, 198, 185);
+            border: 1px solid rgba(140, 185, 245, 200);
+        }
+
+        QTableWidget {
+            border: 1px solid rgba(255, 255, 255, 18);
+            border-radius: 6px;
+            gridline-color: rgba(255, 255, 255, 16);
+            selection-background-color: rgba(75, 118, 180, 145);
+            alternate-background-color: rgba(46, 46, 46, 120);
+        }
+
+        QHeaderView::section {
+            border: none;
+            border-right: 1px solid rgba(255, 255, 255, 16);
+            border-bottom: 1px solid rgba(255, 255, 255, 16);
+            padding: 7px;
+            font-weight: 600;
+            background-color: rgba(40, 40, 40, 172);
+        }
+
+        QTableCornerButton::section {
+            background-color: rgba(40, 40, 40, 172);
+            border: none;
+            border-right: 1px solid rgba(255, 255, 255, 16);
+            border-bottom: 1px solid rgba(255, 255, 255, 16);
+        }
+
+        QPushButton {
+            background: qlineargradient(
+                x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(68, 68, 68, 190),
+                stop:1 rgba(28, 28, 28, 198)
+            );
+            color: #f4f4f4;
+            border: 1px solid rgba(255, 255, 255, 24);
+            border-radius: 5px;
+            padding: 7px 14px;
+        }
+
+        QPushButton:hover {
+            background: qlineargradient(
+                x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(88, 88, 88, 205),
+                stop:1 rgba(34, 34, 34, 210)
+            );
+        }
+
+        QPushButton:pressed {
+            background-color: rgba(20, 20, 20, 220);
+        }
+
+        QPushButton#accentButton {
+            background: qlineargradient(
+                x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(96, 138, 202, 210),
+                stop:1 rgba(54, 88, 148, 215)
+            );
+            border: 1px solid rgba(170, 205, 255, 100);
+            font-weight: 600;
+        }
+
+        QPushButton#accentButton:hover {
+            background: qlineargradient(
+                x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(110, 150, 215, 225),
+                stop:1 rgba(60, 97, 158, 228)
+            );
+        }
+
+        QPushButton#titleMinButton {
+            background: qlineargradient(
+                x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(78, 82, 92, 235),
+                stop:0.5 rgba(36, 38, 44, 240),
+                stop:1 rgba(18, 18, 20, 242)
+            );
+            color: white;
+            border: 1px solid rgba(220, 230, 255, 70);
+            border-radius: 3px;
+            padding: 0px;
+            font-size: 10pt;
+            font-weight: bold;
+        }
+
+        QPushButton#titleMinButton:hover {
+            background: qlineargradient(
+                x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(102, 108, 122, 245),
+                stop:1 rgba(28, 28, 34, 245)
+            );
+        }
+
+        QPushButton#titleMinButton:pressed {
+            background: rgba(20, 20, 24, 245);
+        }
+
+        QPushButton#titleCloseButton {
+            background: qlineargradient(
+                x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(255, 146, 104, 248),
+                stop:0.45 rgba(222, 82, 40, 248),
+                stop:1 rgba(170, 36, 16, 248)
+            );
+            color: white;
+            border: 1px solid rgba(255, 245, 240, 95);
+            border-radius: 3px;
+            padding: 0px;
+            font-size: 10pt;
+            font-weight: bold;
+        }
+
+        QPushButton#titleCloseButton:hover {
+            background: qlineargradient(
+                x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(255, 170, 128, 252),
+                stop:0.45 rgba(240, 96, 52, 252),
+                stop:1 rgba(188, 42, 18, 252)
+            );
+        }
+
+        QPushButton#titleCloseButton:pressed {
+            background: rgba(150, 28, 12, 252);
+        }
+
+        QFrame#bottomBar {
+            background: transparent;
+            border: none;
+        }
+
+        QScrollBar:vertical {
+            background: rgba(18, 18, 18, 110);
+            width: 10px;
+            margin: 2px;
+            border-radius: 5px;
+        }
+
+        QScrollBar::handle:vertical {
+            background: rgba(126, 126, 126, 155);
+            min-height: 24px;
+            border-radius: 5px;
+        }
+
+        QScrollBar::handle:vertical:hover {
+            background: rgba(158, 158, 158, 180);
+        }
+
+        QScrollBar::add-line:vertical,
+        QScrollBar::sub-line:vertical {
+            height: 0px;
+        }
+
+        QScrollBar:horizontal {
+            background: rgba(18, 18, 18, 110);
+            height: 10px;
+            margin: 2px;
+            border-radius: 5px;
+        }
+
+        QScrollBar::handle:horizontal {
+            background: rgba(126, 126, 126, 155);
+            min-width: 24px;
+            border-radius: 5px;
+        }
+
+        QScrollBar::handle:horizontal:hover {
+            background: rgba(158, 158, 158, 180);
+        }
+
+        QScrollBar::add-line:horizontal,
+        QScrollBar::sub-line:horizontal {
+            width: 0px;
+        }
+
+        QToolTip {
+            background-color: rgba(20, 20, 20, 230);
+            color: #f2f2f2;
+            border: 1px solid rgba(255, 255, 255, 18);
+            padding: 5px;
+        }
+        """)
+
+    # =========================
+    # 窗口缩放
+    # =========================
+    def _hit_test_edges(self, pos):
+        rect = self.rect()
+        m = self._resize_margin
+        edges = set()
+
+        if pos.x() <= m:
+            edges.add("left")
+        elif pos.x() >= rect.width() - m:
+            edges.add("right")
+
+        if pos.y() <= m:
+            edges.add("top")
+        elif pos.y() >= rect.height() - m:
+            edges.add("bottom")
+
+        return edges
+
+    def _update_resize_cursor(self, edges):
+        if not edges:
+            self.setCursor(Qt.ArrowCursor)
+            return
+
+        if ("left" in edges and "top" in edges) or ("right" in edges and "bottom" in edges):
+            self.setCursor(Qt.SizeFDiagCursor)
+        elif ("right" in edges and "top" in edges) or ("left" in edges and "bottom" in edges):
+            self.setCursor(Qt.SizeBDiagCursor)
+        elif "left" in edges or "right" in edges:
+            self.setCursor(Qt.SizeHorCursor)
+        elif "top" in edges or "bottom" in edges:
+            self.setCursor(Qt.SizeVerCursor)
+        else:
+            self.setCursor(Qt.ArrowCursor)
+
+    def _perform_resize(self, global_pos):
+        start = self._resize_start_geom
+        delta = global_pos - self._resize_start_pos
+
+        left = start.left()
+        right = start.right()
+        top = start.top()
+        bottom = start.bottom()
+
+        min_w = self.minimumWidth()
+        min_h = self.minimumHeight()
+
+        if "left" in self._resize_edges:
+            left = min(start.left() + delta.x(), start.right() - min_w + 1)
+        if "right" in self._resize_edges:
+            right = max(start.right() + delta.x(), start.left() + min_w - 1)
+        if "top" in self._resize_edges:
+            top = min(start.top() + delta.y(), start.bottom() - min_h + 1)
+        if "bottom" in self._resize_edges:
+            bottom = max(start.bottom() + delta.y(), start.top() + min_h - 1)
+
+        self.setGeometry(QRect(QPoint(left, top), QPoint(right, bottom)))
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            edges = self._hit_test_edges(event.pos())
+            if edges:
+                self._resizing = True
+                self._resize_edges = edges
+                self._resize_start_pos = event.globalPos()
+                self._resize_start_geom = self.geometry()
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._resizing:
+            self._perform_resize(event.globalPos())
+            event.accept()
+            return
+
+        self._update_resize_cursor(self._hit_test_edges(event.pos()))
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._resizing = False
+        self._resize_edges = set()
+        self.setCursor(Qt.ArrowCursor)
+        super().mouseReleaseEvent(event)
+
+    def leaveEvent(self, event):
+        if not self._resizing:
+            self.setCursor(Qt.ArrowCursor)
+        super().leaveEvent(event)
+
+    # =========================
+    # 原有 UI 初始化
+    # =========================
     def disable_all_spinbox_wheels(self):
         """遍历并禁用所有 SpinBox 的滚轮事件防止误操作"""
         for spin in self.findChildren((QSpinBox, QDoubleSpinBox)):
-            spin.setFocusPolicy(Qt.StrongFocus) # 只有点击后才能输入
-            spin.installEventFilter(self) # 安装过滤器
-    
+            spin.setFocusPolicy(Qt.StrongFocus)
+            spin.installEventFilter(self)
+
     def eventFilter(self, source, event):
         """拦截滚轮事件"""
         if event.type() == QtCore.QEvent.Wheel and isinstance(source, (QSpinBox, QDoubleSpinBox)):
-            return True # 拦截事件，不向下传递
+            return True
         return super().eventFilter(source, event)
 
     def init_ui(self):
-        main_layout = QVBoxLayout()
-        self.tabs = QTabWidget()
-        
-        builder = SettingsTabsBuilder()
-        builder.create_general_tab(self)       # 1. 常规设置
-        builder.create_data_management_tab(self) # 2.背板信息管理
-        builder.create_interface_tab(self)     # 3. 界面与显示
-        builder.create_map_settings_tab(self)  # 4. 地图提醒 (Map Config)
-        builder.create_mutation_settings_tab(self) # 5. 因子提示配置 (Mutation Config)
-        builder.create_hotkey_tab(self)        # 6. 快捷键
-        builder.create_general_rec_tab(self)   # 7. 图像ocr设置
-        
-        main_layout.addWidget(self.tabs)
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(12, 12, 12, 12)
+        outer_layout.setSpacing(0)
 
-        btn_layout = QHBoxLayout()
+        self.window_frame = QFrame()
+        self.window_frame.setObjectName("windowFrame")
+        self.window_frame.setMouseTracking(True)
+
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(34)
+        shadow.setOffset(0, 8)
+        shadow.setColor(QColor(0, 0, 0, 135))
+        self.window_frame.setGraphicsEffect(shadow)
+
+        outer_layout.addWidget(self.window_frame)
+
+        frame_layout = QVBoxLayout(self.window_frame)
+        frame_layout.setContentsMargins(1, 1, 1, 1)
+        frame_layout.setSpacing(0)
+
+        self.title_bar = AeroTitleBar(self, "系统设置 / Settings")
+        frame_layout.addWidget(self.title_bar)
+
+        self.content_area = QFrame()
+        self.content_area.setObjectName("contentArea")
+        frame_layout.addWidget(self.content_area)
+
+        content_layout = QVBoxLayout(self.content_area)
+        content_layout.setContentsMargins(16, 14, 16, 16)
+        content_layout.setSpacing(12)
+
+        self.tabs = QTabWidget()
+        self.tabs.setUsesScrollButtons(True)
+        self.tabs.setDocumentMode(True)
+        self.tabs.setElideMode(Qt.ElideRight)
+        self.tabs.tabBar().setExpanding(False)
+        self.tabs.tabBar().setDrawBase(False)
+        self.tabs.tabBar().setUsesScrollButtons(True)
+
+        builder = SettingsTabsBuilder()
+        builder.create_general_tab(self)
+        builder.create_data_management_tab(self)
+        builder.create_interface_tab(self)
+        builder.create_map_settings_tab(self)
+        builder.create_mutation_settings_tab(self)
+        builder.create_hotkey_tab(self)
+        builder.create_general_rec_tab(self)
+
+        content_layout.addWidget(self.tabs)
+
+        bottom_bar = QFrame()
+        bottom_bar.setObjectName("bottomBar")
+        btn_layout = QHBoxLayout(bottom_bar)
+        btn_layout.setContentsMargins(0, 4, 0, 0)
+        btn_layout.setSpacing(10)
+
         save_btn = QPushButton("保存 (Save)")
+        save_btn.setObjectName("accentButton")
         save_btn.clicked.connect(self.on_save)
+
         cancel_btn = QPushButton("取消 (Cancel)")
         cancel_btn.clicked.connect(self.reject)
-        
-        save_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px;")
-        cancel_btn.setStyleSheet("padding: 8px;")
 
         btn_layout.addStretch()
         btn_layout.addWidget(save_btn)
         btn_layout.addWidget(cancel_btn)
-        
-        main_layout.addLayout(btn_layout)
-        self.setLayout(main_layout)
 
+        content_layout.addWidget(bottom_bar)
+    
     def _collect_roi_data(self):
         """
         遍历存储在 self.roi_widgets 中的 QSpinBox，
@@ -102,22 +733,19 @@ class SettingsWindow(QDialog):
         nested_roi = {}
         for lang in ['zh', 'en']:
             nested_roi[lang] = {}
-            # self.roi_widgets 在 tabs.py 的 create_roi_tabs 中被初始化
             if lang in self.roi_widgets:
                 for region, spins in self.roi_widgets[lang].items():
-                    # spins 是 [QSpinBox(x1), QSpinBox(y1), QSpinBox(x2), QSpinBox(y2)]
                     nested_roi[lang][region] = (
-                        (spins[0].value(), spins[1].value()), 
+                        (spins[0].value(), spins[1].value()),
                         (spins[2].value(), spins[3].value())
                     )
         return nested_roi
 
-
     def add_row(self, layout, label_text, key, widget_type, **kwargs):
         val = self.current_config.get(key)
-        if val is None and widget_type != 'dict': # dict可能为空字典
-             self.logger.warning(f"配置项 '{key}' 未初始化，跳过显示")
-             return
+        if val is None and widget_type != 'dict':
+            self.logger.warning(f"配置项 '{key}' 未初始化，跳过显示")
+            return
 
         widget = None
         if widget_type == 'line':
@@ -173,63 +801,71 @@ class SettingsWindow(QDialog):
             self.widgets[key] = {'widget': widget, 'type': widget_type, 'label': label_text}
             layout.addRow(label_text, widget)
 
-        
     def create_roi_widget(self, x1, y1, x2, y2):
         box = QWidget()
         h = QHBoxLayout(box)
         h.setContentsMargins(0, 0, 0, 0)
-        
+        h.setSpacing(6)
+
         def spin(v):
             sb = QSpinBox()
             sb.setRange(0, 10000)
             sb.setValue(int(v))
-            sb.setFixedWidth(65)
+            sb.setFixedWidth(96)
+            sb.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            sb.setFocusPolicy(Qt.StrongFocus)
+            sb.installEventFilter(self)
             return sb
-        
+
         h.addWidget(QLabel("左上:"))
         spins = [spin(x1), spin(y1), spin(x2), spin(y2)]
-        h.addWidget(spins[0]); h.addWidget(spins[1])
+        h.addWidget(spins[0])
+        h.addWidget(spins[1])
+        h.addSpacing(8)
         h.addWidget(QLabel("右下:"))
-        h.addWidget(spins[2]); h.addWidget(spins[3])
+        h.addWidget(spins[2])
+        h.addWidget(spins[3])
         h.addStretch()
         return {'box': box, 'spins': spins}
-
+    
     def normalize_config(self, cfg: dict):
         point_map = {'MAIN_WINDOW_POS': ('MAIN_WINDOW_X', 'MAIN_WINDOW_Y')}
         for k, (xk, yk) in point_map.items():
             if k in cfg:
                 x, y = cfg.pop(k)
-                cfg[xk] = x; cfg[yk] = y
+                cfg[xk] = x
+                cfg[yk] = y
 
-    def create_point_widget(self, x, y,show_get_btn = False):
+    def create_point_widget(self, x, y, show_get_btn=False):
         """修改位置组件：增加获取当前位置按钮"""
         box = QWidget()
         h = QHBoxLayout(box)
         h.setContentsMargins(0, 0, 0, 0)
-        
+        h.setSpacing(6)
+
         def create_spin(v):
             sb = QSpinBox()
             sb.setRange(-10000, 10000)
             sb.setValue(int(v))
-            sb.setFixedWidth(70)
-            # 同样禁用滚轮
+            sb.setFixedWidth(96)
+            sb.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
             sb.setFocusPolicy(Qt.StrongFocus)
             sb.installEventFilter(self)
             return sb
-          
+
         spin_x = create_spin(x)
         spin_y = create_spin(y)
-        
-        h.addWidget(QLabel("X:")); h.addWidget(spin_x)
-        h.addWidget(QLabel("Y:")); h.addWidget(spin_y)
-        
-        # 只有需要显示按钮时才进入此逻辑
+
+        h.addWidget(QLabel("X:"))
+        h.addWidget(spin_x)
+        h.addWidget(QLabel("Y:"))
+        h.addWidget(spin_y)
+
         if show_get_btn:
             btn_get_pos = QPushButton("获取当前位置")
             btn_get_pos.setToolTip("读取主窗口当前在屏幕上的坐标")
-            
+
             def update_to_current():
-                # 此时 self.main_window 已经在 __init__ 中定义
                 if self.main_window:
                     curr_x = self.main_window.x()
                     curr_y = self.main_window.y()
@@ -249,9 +885,9 @@ class SettingsWindow(QDialog):
         for key, item in self.widgets.items():
             widget = item['widget']
             w_type = item['type']
-            
+
             val = None
-            if w_type == 'line' or w_type == 'hotkey' or w_type == 'color':
+            if w_type in ('line', 'hotkey', 'color'):
                 val = widget.text()
             elif w_type == 'spin':
                 val = widget.value()
@@ -266,103 +902,98 @@ class SettingsWindow(QDialog):
             elif w_type == 'point':
                 val = list(sb.value() for sb in widget)
             elif w_type == 'dict':
-                val = widget.value() 
-            elif w_type == 'countdown_list': # [新增]
                 val = widget.value()
-            
+            elif w_type == 'countdown_list':
+                val = widget.value()
+
             new_values[key] = val
         return new_values
 
     def on_import_excel(self, config_type):
         """导入 Excel 配置，调用 SettingsHandler 进行验证和处理"""
-        # 1. 弹出警告确认
         reply = QMessageBox.warning(
             self, "确认导入",
             "导入 Excel 将会【完全覆盖】并【删除】数据库中对应地图/因子的现有配置！\n"
             "建议仅在批量迁移数据时使用导入功能。\n\n是否继续？",
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
-        if reply == QMessageBox.No: return
-        
-        path, _ = QFileDialog.getOpenFileName(self, "选择 Excel 文件", "", "Excel Files (*.xlsx)")
-        if not path: return
+        if reply == QMessageBox.No:
+            return
 
-        # 调用 handler 的验证导入逻辑
+        path, _ = QFileDialog.getOpenFileName(self, "选择 Excel 文件", "", "Excel Files (*.xlsx)")
+        if not path:
+            return
+
         success, result = self.data_handler.validate_and_import(path, config_type)
 
         if success:
             QMessageBox.information(self, "导入成功", result)
         else:
-            # 如果验证失败，弹出详细的错误列表
-            error_msg = "\n".join(result[:15]) # 最多显示15条错误
+            error_msg = "\n".join(result[:15])
             if len(result) > 15:
-                error_msg += f"\n... 以及其他 {len(result)-15} 个错误"
-            
+                error_msg += f"\n... 以及其他 {len(result) - 15} 个错误"
+
             QMessageBox.warning(self, "导入校验失败", f"发现数据问题，请修正：\n\n{error_msg}")
 
     def on_export_data(self, config_type):
         """将数据库中的配置导出为 Excel"""
-        path, _ = QFileDialog.getSaveFileName(self, "选择保存位置", f"export_{config_type}.xlsx", "Excel Files (*.xlsx)")
-        if not path: return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "选择保存位置", f"export_{config_type}.xlsx", "Excel Files (*.xlsx)"
+        )
+        if not path:
+            return
 
         try:
-            # 1. 调用 Handler 获取格式化后的全量数据
             all_data = self.data_handler.get_all_configs_for_export(config_type)
-            
+
             if not all_data:
                 QMessageBox.warning(self, "警告", "数据库中没有找到任何可导出的数据。")
                 return
 
-            # 2. 执行文件写入
             ExcelUtil.export_configs(all_data, path, config_type)
             QMessageBox.information(self, "成功", f"数据已成功导出至: {path}")
         except Exception as e:
             QMessageBox.critical(self, "错误", f"导出失败: {str(e)}")
 
-    
     def on_save(self):
         """保存配置：修复了数据分流顺序以及窗口驻留逻辑"""
-        # 强制清除表格焦点，确保正在编辑的单元格内容被提交
         if self.focusWidget():
             self.focusWidget().clearFocus()
 
-        # 1. 收集 UI 上的完整数据包
         new_values = self.get_ui_values()
-        new_values['MALWARFARE_ROI'] = self._collect_roi_data() 
-        
-        # 2. 生成报告（此时 new_values 包含 MAP_SEARCH_KEYWORDS，对比才有效）
+        new_values['MALWARFARE_ROI'] = self._collect_roi_data()
+
         changes = self._generate_changes_report(new_values)
 
         if not changes:
             QMessageBox.information(self, "提示", "没有检测到任何修改，请修改后再保存或点击取消。")
-            return # 【修复】不再调用 self.accept()，窗口保持打开
+            return
 
-        # 3. 弹出确认框
-        reply = QMessageBox.question(self, "确认修改", 
-                                    "检测到以下修改，确认保存吗？\n\n" + "\n".join(changes[:10]) + 
-                                    ("\n..." if len(changes)>10 else ""), 
-                                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        reply = QMessageBox.question(
+            self,
+            "确认修改",
+            "检测到以下修改，确认保存吗？\n\n" + "\n".join(changes[:10]) + ("\n..." if len(changes) > 10 else ""),
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
 
         if reply == QMessageBox.Yes:
-            # 4. 【数据分流】：分出关键词交给数据库，剩下的进 JSON
             keywords = None
             if 'MAP_SEARCH_KEYWORDS' in new_values:
                 keywords = new_values.pop('MAP_SEARCH_KEYWORDS')
 
-            # 坐标项拆分 (X/Y 处理)
             self.normalize_config(new_values)
-            
-            # 5. 执行物理保存
+
             success, msg = self.data_handler.save_all(new_values, keywords)
             if success:
                 for k, v in new_values.items():
                     setattr(config, k, v)
                 QMessageBox.information(self, "保存成功", msg)
                 self.settings_saved.emit(new_values)
-                self.accept() # 只有成功保存才关闭
+                self.accept()
             else:
                 QMessageBox.critical(self, "保存失败", msg)
-                    
+
     def _normalize_data(self, data):
         """递归将所有元组转换为列表，确保对比基准一致"""
         if isinstance(data, tuple):
@@ -372,61 +1003,61 @@ class SettingsWindow(QDialog):
         if isinstance(data, dict):
             return {k: self._normalize_data(v) for k, v in data.items()}
         return data
-    
+
     def _generate_changes_report(self, new_cfg):
-            """对比配置变动，支持 ROI 和 关键词字典的深度详细对比"""
-            from src import config 
-            report = []
-            
-            lang_map = {'zh': '中文', 'en': '英文'}
-            region_map = {'purified_count': '净化节点', 'time': '时间', 'paused': '暂停标识'}
+        """对比配置变动，支持 ROI 和 关键词字典的深度详细对比"""
+        from src import config
+        report = []
 
-            for key, new_value in new_cfg.items():
-                # 获取旧值（优先从 original_config 拿，拿不到去 config.py 捞）
-                old_value = self.original_config.get(key)
-                if old_value is None:
-                    old_value = getattr(config, key, None)
-                
-                # 标准化数据进行对比，消除 [[]] 和 (()) 的差异
-                norm_old = self._normalize_data(old_value)
-                norm_new = self._normalize_data(new_value)
-                
-                if norm_old != norm_new:
-                    # --- 情况 1：处理 ROI 嵌套字典的细分报告 ---
-                    if key == 'MALWARFARE_ROI':
-                        old_roi = old_value if isinstance(old_value, dict) else {}
-                        new_roi = new_value if isinstance(new_value, dict) else {}
-                        for lang in ['zh', 'en']:
-                            o_lang = old_roi.get(lang, {})
-                            n_lang = new_roi.get(lang, {})
-                            for reg, label in region_map.items():
-                                # 内部对比也需标准化
-                                if self._normalize_data(o_lang.get(reg)) != self._normalize_data(n_lang.get(reg)):
-                                    l_name = lang_map.get(lang, lang)
-                                    report.append(f"【ROI-{l_name}】{label}: {o_lang.get(reg)} -> {n_lang.get(reg)}")
+        lang_map = {'zh': '中文', 'en': '英文'}
+        region_map = {'purified_count': '净化节点', 'time': '时间', 'paused': '暂停标识'}
 
-                    # --- 情况 2：【重点】详细处理别名映射的字典变动 ---
-                    elif key == 'MAP_SEARCH_KEYWORDS':
-                        added = set(norm_new.keys()) - set(norm_old.keys())
-                        removed = set(norm_old.keys()) - set(norm_new.keys())
-                        common = set(norm_old.keys()) & set(norm_new.keys())
-                        
-                        if added: report.append(f"【别名映射】新增: {list(added)}")
-                        if removed: report.append(f"【别名映射】删除: {list(removed)}")
-                        for k in common:
-                            if norm_old[k] != norm_new[k]:
-                                report.append(f"【别名映射】修改 '{k}': {norm_old[k]} -> {norm_new[k]}")
+        for key, new_value in new_cfg.items():
+            old_value = self.original_config.get(key)
+            if old_value is None:
+                old_value = getattr(config, key, None)
 
-                    # --- 情况 3：处理所有其他普通配置项 ---
-                    else:
-                        label = self.widgets.get(key, {}).get('label', key)
-                        report.append(f"【{label}】: {old_value} -> {new_value}")
+            norm_old = self._normalize_data(old_value)
+            norm_new = self._normalize_data(new_value)
 
-            return report
-# 独立运行测试
+            if norm_old != norm_new:
+                if key == 'MALWARFARE_ROI':
+                    old_roi = old_value if isinstance(old_value, dict) else {}
+                    new_roi = new_value if isinstance(new_value, dict) else {}
+                    for lang in ['zh', 'en']:
+                        o_lang = old_roi.get(lang, {})
+                        n_lang = new_roi.get(lang, {})
+                        for reg, label in region_map.items():
+                            if self._normalize_data(o_lang.get(reg)) != self._normalize_data(n_lang.get(reg)):
+                                l_name = lang_map.get(lang, lang)
+                                report.append(f"【ROI-{l_name}】{label}: {o_lang.get(reg)} -> {n_lang.get(reg)}")
+
+                elif key == 'MAP_SEARCH_KEYWORDS':
+                    old_keys = norm_old.keys() if isinstance(norm_old, dict) else set()
+                    new_keys = norm_new.keys() if isinstance(norm_new, dict) else set()
+
+                    added = set(new_keys) - set(old_keys)
+                    removed = set(old_keys) - set(new_keys)
+                    common = set(old_keys) & set(new_keys)
+
+                    if added:
+                        report.append(f"【别名映射】新增: {list(added)}")
+                    if removed:
+                        report.append(f"【别名映射】删除: {list(removed)}")
+                    for k in common:
+                        if norm_old[k] != norm_new[k]:
+                            report.append(f"【别名映射】修改 '{k}': {norm_old[k]} -> {norm_new[k]}")
+
+                else:
+                    label = self.widgets.get(key, {}).get('label', key)
+                    report.append(f"【{label}】: {old_value} -> {new_value}")
+
+        return report
+
+
 if __name__ == '__main__':
-    import sys
     from PyQt5.QtWidgets import QApplication
+
     app = QApplication(sys.argv)
     win = SettingsWindow()
     win.show()
