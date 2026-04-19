@@ -1,5 +1,5 @@
 {
-    "current_game_language": "zh",
+    "current_game_language": "en",
     "MAIN_WINDOW_WIDTH": 250,
     "MAIN_WINDOW_BG_COLOR": "rgba(43, 43, 43, 200)",
     "TABLE_FONT_SIZE": 12,
@@ -9,7 +9,8 @@
     "debug_time_factor": 5.0,
     "ALERT_SOUND_VOLUME": 90,
     "ALERT_SOUND_COOLDOWN": 10,
-    "ARTIFACT_TIMED_TRIGGER_SECONDS": 0,
+    "ARTIFACT_TIMED_TRIGGER_SECONDS": 129,
+    "ARTIFACT_TIMED_TRIGGER_NO_NOT_IDLE_TIMEOUT_SECONDS": 61,
     "ARTIFACT_ALERT_OFFSET_X": 800,
     "ARTIFACT_ALERT_OFFSET_Y": 120,
     "ARTIFACT_ALERT_HEIGHT": 40,

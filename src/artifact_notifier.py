@@ -164,7 +164,7 @@ class ArtifactNotifier:
     def reset(self):
         """新游戏开始时调用。"""
         self._refresh_runtime_config()
-        self.logger.warning("ArtifactNotifier 状态已重置。")
+        self.logger.info("ArtifactNotifier 状态已重置。")
         self._state = self.STATE_VALIDATING
         self._last_checked_second = -1
         self._cooldown_start_time = None
@@ -305,7 +305,7 @@ class ArtifactNotifier:
             # 等待阶段不取消、不重置，只按时间到点直接触发。
             # 这里仍然只看基础 idle 状态，不做 ready 区域识别。
             if self._should_trigger_by_idle_anchor_time(current_second):
-                self.logger.warning(
+                self.logger.info(
                     f"定时模式触发：距离最近一次 not idle -> idle 已达到 "
                     f"{self.ARTIFACT_TIMED_TRIGGER_SECONDS} 秒，直接触发神器提示。"
                 )
@@ -364,7 +364,7 @@ class ArtifactNotifier:
                     self._timed_ready_seen_non_idle = False
                     self._timed_ready_alert_start_second = None
 
-                    self.logger.warning(
+                    self.logger.info(
                         f"定时模式下，提示触发后 {timeout_seconds} 秒内仍未出现 non-idle，"
                         f"关闭提示，并在 reset 前不再触发定时提醒。"
                     )
@@ -374,7 +374,7 @@ class ArtifactNotifier:
 
                 if not is_idle:
                     self._timed_ready_seen_non_idle = True
-                    self.logger.warning(
+                    self.logger.info(
                         "定时模式下，提示后首次检测到 non-idle；继续保持提示，等待再次回到 idle。"
                     )
 
@@ -388,7 +388,7 @@ class ArtifactNotifier:
                 self._timed_ready_seen_non_idle = False
                 self._timed_ready_alert_start_second = None
 
-                self.logger.warning(
+                self.logger.info(
                     "定时模式下检测到提示后的 non-idle -> idle，隐藏提示并重新进入等待。"
                 )
 
