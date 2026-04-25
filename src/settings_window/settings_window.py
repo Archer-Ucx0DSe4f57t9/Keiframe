@@ -4,6 +4,7 @@ import os
 import sys
 import copy
 import re
+import tempfile
 
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import (
@@ -12,10 +13,10 @@ from PyQt5.QtWidgets import (
     QCheckBox, QPushButton, QColorDialog, QMessageBox,
     QFormLayout, QScrollArea, QDialog, QComboBox, QGroupBox,
     QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog,
-    QFrame, QGraphicsDropShadowEffect
+    QFrame, QGraphicsDropShadowEffect, QProxyStyle, QStyle
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QRect
-from PyQt5.QtGui import QKeyEvent, QColor, QKeySequence
+from PyQt5.QtGui import QKeyEvent, QColor, QKeySequence, QPolygon, QPixmap, QPainter
 
 from src import config
 from src.utils.logging_util import get_logger
@@ -27,6 +28,72 @@ from src.settings_window.widgets import HotkeyInput, ColorInput
 from src.settings_window.complex_inputs import DictInput, DictTable, CountdownOptionsInput
 from src.settings_window.tabs import SettingsTabsBuilder
 from src.settings_window.setting_data_handler import SettingsHandler
+
+class DarkArrowProxyStyle(QProxyStyle):
+    """为深色主题强制绘制清晰可见的箭头"""
+    def __init__(self, base_style=None):
+        super().__init__(base_style)
+
+    def drawPrimitive(self, element, option, painter, widget=None):
+        arrow_elements = {
+            QStyle.PE_IndicatorArrowUp,
+            QStyle.PE_IndicatorArrowDown,
+            QStyle.PE_IndicatorArrowLeft,
+            QStyle.PE_IndicatorArrowRight,
+        }
+
+        if element in arrow_elements:
+            rect = option.rect.adjusted(1, 1, -1, -1)
+            if rect.width() <= 0 or rect.height() <= 0:
+                return
+
+            cx = rect.center().x()
+            cy = rect.center().y()
+
+            size = max(4, min(rect.width(), rect.height()) // 2)
+
+            if element == QStyle.PE_IndicatorArrowDown:
+                points = [
+                    QPoint(cx - size, cy - size // 2),
+                    QPoint(cx + size, cy - size // 2),
+                    QPoint(cx, cy + size),
+                ]
+            elif element == QStyle.PE_IndicatorArrowUp:
+                points = [
+                    QPoint(cx - size, cy + size // 2),
+                    QPoint(cx + size, cy + size // 2),
+                    QPoint(cx, cy - size),
+                ]
+            elif element == QStyle.PE_IndicatorArrowLeft:
+                points = [
+                    QPoint(cx + size // 2, cy - size),
+                    QPoint(cx + size // 2, cy + size),
+                    QPoint(cx - size, cy),
+                ]
+            else:  # QStyle.PE_IndicatorArrowRight
+                points = [
+                    QPoint(cx - size // 2, cy - size),
+                    QPoint(cx - size // 2, cy + size),
+                    QPoint(cx + size, cy),
+                ]
+
+            painter.save()
+            painter.setRenderHint(painter.Antialiasing, True)
+
+            # 先画一层深色阴影，避免白箭头贴在浅背景时发虚
+            shadow_offset = QPoint(0, 1)
+            shadow_poly = QPolygon([p + shadow_offset for p in points])
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QColor(0, 0, 0, 170))
+            painter.drawPolygon(shadow_poly)
+
+            # 再画主箭头
+            painter.setBrush(QColor(245, 245, 245, 245))
+            painter.drawPolygon(QPolygon(points))
+            painter.restore()
+            return
+
+        super().drawPrimitive(element, option, painter, widget)
 
 class AeroTitleBar(QWidget):
     """Royale Noir / Aero Black 风格标题栏"""
@@ -135,6 +202,9 @@ class AeroTitleBar(QWidget):
 class SettingsWindow(QDialog):
     settings_saved = pyqtSignal(dict)
 
+class SettingsWindow(QDialog):
+    settings_saved = pyqtSignal(dict)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.settings_file = os.path.join(get_project_root(), 'settings.json')
@@ -157,6 +227,7 @@ class SettingsWindow(QDialog):
         self._resize_start_pos = QPoint()
         self._resize_start_geom = QRect()
 
+        self._arrow_icon_paths = {}
         self._setup_window_shell()
 
         self.setWindowTitle("系统设置 / Settings")
@@ -166,6 +237,7 @@ class SettingsWindow(QDialog):
         self._first_show_layout_fixed = False
 
         self.init_ui()
+        self._ensure_arrow_icons()
         self.apply_dark_theme()
         self.disable_all_spinbox_wheels()
 
@@ -176,6 +248,61 @@ class SettingsWindow(QDialog):
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setMouseTracking(True)
+    
+    def _ensure_arrow_icons(self):
+        """生成深色主题下可见的白色箭头 PNG，供 QSS 显式引用"""
+        cache_dir = os.path.join(tempfile.gettempdir(), "sc2timer_ui_icons")
+        os.makedirs(cache_dir, exist_ok=True)
+
+        down_path = os.path.join(cache_dir, "arrow_down_white.png")
+        up_path = os.path.join(cache_dir, "arrow_up_white.png")
+
+        if not os.path.exists(down_path):
+            self._create_arrow_icon(down_path, "down")
+        if not os.path.exists(up_path):
+            self._create_arrow_icon(up_path, "up")
+
+        self._arrow_icon_paths = {
+            "down": down_path.replace("\\", "/"),
+            "up": up_path.replace("\\", "/"),
+        }
+
+    def _create_arrow_icon(self, save_path, direction="down", size=14):
+        pix = QPixmap(size, size)
+        pix.fill(Qt.transparent)
+
+        painter = QPainter(pix)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setPen(Qt.NoPen)
+
+        cx = size // 2
+        cy = size // 2
+        s = max(4, size // 3)
+
+        if direction == "down":
+            points = [
+                QPoint(cx - s, cy - 1),
+                QPoint(cx + s, cy - 1),
+                QPoint(cx, cy + s),
+            ]
+        else:  # up
+            points = [
+                QPoint(cx - s, cy + 1),
+                QPoint(cx + s, cy + 1),
+                QPoint(cx, cy - s),
+            ]
+
+        # 阴影
+        shadow_points = [QPoint(p.x(), p.y() + 1) for p in points]
+        painter.setBrush(QColor(0, 0, 0, 170))
+        painter.drawPolygon(QPolygon(shadow_points))
+
+        # 主箭头
+        painter.setBrush(QColor(248, 248, 248, 255))
+        painter.drawPolygon(QPolygon(points))
+
+        painter.end()
+        pix.save(save_path, "PNG")
 
     def apply_dark_theme(self):
         self.setStyleSheet("""
@@ -318,7 +445,7 @@ class SettingsWindow(QDialog):
         QSpinBox,
         QDoubleSpinBox,
         QComboBox {
-            border: 1px solid rgba(255, 255, 255, 22);
+            border: 1px solid rgba(255, 255, 255, 28);
             border-radius: 5px;
             padding: 4px 6px 4px 8px;
             min-height: 18px;
@@ -334,18 +461,68 @@ class SettingsWindow(QDialog):
         }
 
         QComboBox::drop-down {
-            border: none;
-            width: 18px;
-            background: transparent;
+            subcontrol-origin: padding;
+            subcontrol-position: top right;
+            width: 24px;
+            border-left: 1px solid rgba(255, 255, 255, 26);
+            background: qlineargradient(
+                x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(70, 74, 84, 205),
+                stop:1 rgba(28, 30, 36, 215)
+            );
+            border-top-right-radius: 5px;
+            border-bottom-right-radius: 5px;
+        }
+
+        QComboBox::drop-down:hover {
+            background: qlineargradient(
+                x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(96, 110, 138, 220),
+                stop:1 rgba(42, 48, 62, 228)
+            );
+        }
+
+        QSpinBox,
+        QDoubleSpinBox {
+            padding-right: 20px;
         }
 
         QSpinBox::up-button,
         QSpinBox::down-button,
         QDoubleSpinBox::up-button,
         QDoubleSpinBox::down-button {
-            border: none;
-            width: 14px;
-            background: transparent;
+            subcontrol-origin: border;
+            width: 18px;
+            border-left: 1px solid rgba(255, 255, 255, 24);
+            background: qlineargradient(
+                x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(72, 76, 86, 205),
+                stop:1 rgba(28, 30, 36, 218)
+            );
+        }
+
+        QSpinBox::up-button,
+        QDoubleSpinBox::up-button {
+            subcontrol-position: top right;
+            border-top-right-radius: 5px;
+            border-bottom: 1px solid rgba(255, 255, 255, 18);
+        }
+
+        QSpinBox::down-button,
+        QDoubleSpinBox::down-button {
+            subcontrol-position: bottom right;
+            border-bottom-right-radius: 5px;
+        }
+
+        QSpinBox::up-button:hover,
+        QSpinBox::down-button:hover,
+        QDoubleSpinBox::up-button:hover,
+        QDoubleSpinBox::down-button:hover {
+            background: qlineargradient(
+                x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(102, 114, 142, 222),
+                stop:1 rgba(40, 46, 60, 228)
+            );
         }
 
         QComboBox QAbstractItemView {
@@ -554,6 +731,34 @@ class SettingsWindow(QDialog):
             padding: 5px;
         }
         """)
+
+        down_icon = self._arrow_icon_paths.get("down", "")
+        up_icon = self._arrow_icon_paths.get("up", "")
+
+        self.setStyleSheet(
+            self.styleSheet() +
+            f"""
+            QComboBox::down-arrow {{
+                image: url("{down_icon}");
+                width: 12px;
+                height: 12px;
+            }}
+
+            QSpinBox::up-arrow,
+            QDoubleSpinBox::up-arrow {{
+                image: url("{up_icon}");
+                width: 10px;
+                height: 10px;
+            }}
+
+            QSpinBox::down-arrow,
+            QDoubleSpinBox::down-arrow {{
+                image: url("{down_icon}");
+                width: 10px;
+                height: 10px;
+            }}
+            """
+        )
 
     # =========================
     # 窗口缩放
