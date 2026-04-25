@@ -27,17 +27,11 @@ class AeroTitleBar(QWidget):
         layout.addWidget(self.title_label)
         layout.addStretch()
 
-        self.min_btn = QPushButton("—")
-        self.min_btn.setObjectName("titleMinButton")
-        self.min_btn.setFixedSize(26, 20)
-        self.min_btn.clicked.connect(self.parent_window.showMinimized)
-
         self.close_btn = QPushButton("✕")
         self.close_btn.setObjectName("titleCloseButton")
         self.close_btn.setFixedSize(26, 20)
         self.close_btn.clicked.connect(self.parent_window.close)
 
-        layout.addWidget(self.min_btn)
         layout.addWidget(self.close_btn)
 
     def set_title(self, title):

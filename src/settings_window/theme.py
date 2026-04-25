@@ -309,21 +309,23 @@ def build_settings_qss(font_pt=12):
         border: none;
     }}
 
-    QScrollBar:vertical {{
-        background: rgba(18, 18, 18, 110);
-        width: 10px;
-        margin: 2px;
-        border-radius: 5px;
+        QScrollBar:vertical {{
+        background: rgba(10, 10, 10, 185);
+        width: 14px;
+        margin: 2px 2px 2px 2px;
+        border: 1px solid rgba(255, 255, 255, 18);
+        border-radius: 6px;
     }}
 
     QScrollBar::handle:vertical {{
-        background: rgba(126, 126, 126, 155);
-        min-height: 24px;
+        background: rgba(190, 190, 190, 210);
+        min-height: 36px;
         border-radius: 5px;
+        border: 1px solid rgba(255, 255, 255, 35);
     }}
 
     QScrollBar::handle:vertical:hover {{
-        background: rgba(158, 158, 158, 180);
+        background: rgba(220, 220, 220, 230);
     }}
 
     QScrollBar::add-line:vertical,
@@ -331,26 +333,38 @@ def build_settings_qss(font_pt=12):
         height: 0px;
     }}
 
+    QScrollBar::add-page:vertical,
+    QScrollBar::sub-page:vertical {{
+        background: transparent;
+    }}
+
     QScrollBar:horizontal {{
-        background: rgba(18, 18, 18, 110);
-        height: 10px;
-        margin: 2px;
-        border-radius: 5px;
+        background: rgba(10, 10, 10, 185);
+        height: 14px;
+        margin: 2px 2px 2px 2px;
+        border: 1px solid rgba(255, 255, 255, 18);
+        border-radius: 6px;
     }}
 
     QScrollBar::handle:horizontal {{
-        background: rgba(126, 126, 126, 155);
-        min-width: 24px;
+        background: rgba(190, 190, 190, 210);
+        min-width: 36px;
         border-radius: 5px;
+        border: 1px solid rgba(255, 255, 255, 35);
     }}
 
     QScrollBar::handle:horizontal:hover {{
-        background: rgba(158, 158, 158, 180);
+        background: rgba(220, 220, 220, 230);
     }}
 
     QScrollBar::add-line:horizontal,
     QScrollBar::sub-line:horizontal {{
         width: 0px;
+    }}
+
+    QScrollBar::add-page:horizontal,
+    QScrollBar::sub-page:horizontal {{
+        background: transparent;
     }}
 
     QToolTip {{
