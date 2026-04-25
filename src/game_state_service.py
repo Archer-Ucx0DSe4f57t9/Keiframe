@@ -50,8 +50,8 @@ class GlobalState:
 # 创建一个唯一的全局状态实例
 state = GlobalState()
 
-port_game_status  = "http://localhost:6119/game/"
-port_game_screen_for_check_in_game = "http://localhost:6119/ui/"
+port_game_status  = "http://127.0.0.1:6119/game/"
+port_game_screen_for_check_in_game = "http://127.0.0.1:6119/ui/"
 troop = None
 BASE_RESOLUTION_WIDTH = 1920.0
 
@@ -268,4 +268,4 @@ async def check_for_new_game_scheduler(progress_callback: QtCore.pyqtSignal) -> 
         while not state.app_closing:
             # 每 0.2秒创建一个非阻塞任务更新游戏状态
             asyncio.create_task(process_game_data(session, progress_callback))
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(0.1)  # 0.1秒的调度间隔，确保足够频繁但不至于过载
