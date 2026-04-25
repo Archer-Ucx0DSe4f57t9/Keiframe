@@ -24,7 +24,10 @@ from src.utils.fileutil import get_resources_dir, get_project_root
 from src.utils.excel_utils import ExcelUtil
 from src.utils.data_validator import DataValidator
 from src.db import map_daos, mutator_daos
-from src.settings_window.widgets import HotkeyInput, ColorInput
+from src.settings_window.widgets import (
+    HotkeyInput, ColorInput,
+    ThemedComboBox, ThemedSpinBox, ThemedDoubleSpinBox
+)
 from src.settings_window.complex_inputs import DictInput, DictTable, CountdownOptionsInput
 from src.settings_window.tabs import SettingsTabsBuilder
 from src.settings_window.setting_data_handler import SettingsHandler
@@ -199,8 +202,6 @@ class AeroTitleBar(QWidget):
     def mouseDoubleClickEvent(self, event):
         event.accept()
 
-class SettingsWindow(QDialog):
-    settings_saved = pyqtSignal(dict)
 
 class SettingsWindow(QDialog):
     settings_saved = pyqtSignal(dict)
@@ -227,7 +228,6 @@ class SettingsWindow(QDialog):
         self._resize_start_pos = QPoint()
         self._resize_start_geom = QRect()
 
-        self._arrow_icon_paths = {}
         self._setup_window_shell()
 
         self.setWindowTitle("系统设置 / Settings")
@@ -237,7 +237,6 @@ class SettingsWindow(QDialog):
         self._first_show_layout_fixed = False
 
         self.init_ui()
-        self._ensure_arrow_icons()
         self.apply_dark_theme()
         self.disable_all_spinbox_wheels()
 
@@ -248,61 +247,7 @@ class SettingsWindow(QDialog):
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setMouseTracking(True)
-    
-    def _ensure_arrow_icons(self):
-        """生成深色主题下可见的白色箭头 PNG，供 QSS 显式引用"""
-        cache_dir = os.path.join(tempfile.gettempdir(), "sc2timer_ui_icons")
-        os.makedirs(cache_dir, exist_ok=True)
 
-        down_path = os.path.join(cache_dir, "arrow_down_white.png")
-        up_path = os.path.join(cache_dir, "arrow_up_white.png")
-
-        if not os.path.exists(down_path):
-            self._create_arrow_icon(down_path, "down")
-        if not os.path.exists(up_path):
-            self._create_arrow_icon(up_path, "up")
-
-        self._arrow_icon_paths = {
-            "down": down_path.replace("\\", "/"),
-            "up": up_path.replace("\\", "/"),
-        }
-
-    def _create_arrow_icon(self, save_path, direction="down", size=14):
-        pix = QPixmap(size, size)
-        pix.fill(Qt.transparent)
-
-        painter = QPainter(pix)
-        painter.setRenderHint(QPainter.Antialiasing, True)
-        painter.setPen(Qt.NoPen)
-
-        cx = size // 2
-        cy = size // 2
-        s = max(4, size // 3)
-
-        if direction == "down":
-            points = [
-                QPoint(cx - s, cy - 1),
-                QPoint(cx + s, cy - 1),
-                QPoint(cx, cy + s),
-            ]
-        else:  # up
-            points = [
-                QPoint(cx - s, cy + 1),
-                QPoint(cx + s, cy + 1),
-                QPoint(cx, cy - s),
-            ]
-
-        # 阴影
-        shadow_points = [QPoint(p.x(), p.y() + 1) for p in points]
-        painter.setBrush(QColor(0, 0, 0, 170))
-        painter.drawPolygon(QPolygon(shadow_points))
-
-        # 主箭头
-        painter.setBrush(QColor(248, 248, 248, 255))
-        painter.drawPolygon(QPolygon(points))
-
-        painter.end()
-        pix.save(save_path, "PNG")
 
     def apply_dark_theme(self):
         self.setStyleSheet("""
@@ -447,7 +392,7 @@ class SettingsWindow(QDialog):
         QComboBox {
             border: 1px solid rgba(255, 255, 255, 28);
             border-radius: 5px;
-            padding: 4px 6px 4px 8px;
+            padding: 4px 8px 4px 8px;
             min-height: 18px;
             selection-background-color: rgba(95, 145, 220, 150);
         }
@@ -458,71 +403,6 @@ class SettingsWindow(QDialog):
         QComboBox:focus,
         QTableWidget:focus {
             border: 1px solid rgba(120, 175, 245, 155);
-        }
-
-        QComboBox::drop-down {
-            subcontrol-origin: padding;
-            subcontrol-position: top right;
-            width: 24px;
-            border-left: 1px solid rgba(255, 255, 255, 26);
-            background: qlineargradient(
-                x1:0, y1:0, x2:0, y2:1,
-                stop:0 rgba(70, 74, 84, 205),
-                stop:1 rgba(28, 30, 36, 215)
-            );
-            border-top-right-radius: 5px;
-            border-bottom-right-radius: 5px;
-        }
-
-        QComboBox::drop-down:hover {
-            background: qlineargradient(
-                x1:0, y1:0, x2:0, y2:1,
-                stop:0 rgba(96, 110, 138, 220),
-                stop:1 rgba(42, 48, 62, 228)
-            );
-        }
-
-        QSpinBox,
-        QDoubleSpinBox {
-            padding-right: 20px;
-        }
-
-        QSpinBox::up-button,
-        QSpinBox::down-button,
-        QDoubleSpinBox::up-button,
-        QDoubleSpinBox::down-button {
-            subcontrol-origin: border;
-            width: 18px;
-            border-left: 1px solid rgba(255, 255, 255, 24);
-            background: qlineargradient(
-                x1:0, y1:0, x2:0, y2:1,
-                stop:0 rgba(72, 76, 86, 205),
-                stop:1 rgba(28, 30, 36, 218)
-            );
-        }
-
-        QSpinBox::up-button,
-        QDoubleSpinBox::up-button {
-            subcontrol-position: top right;
-            border-top-right-radius: 5px;
-            border-bottom: 1px solid rgba(255, 255, 255, 18);
-        }
-
-        QSpinBox::down-button,
-        QDoubleSpinBox::down-button {
-            subcontrol-position: bottom right;
-            border-bottom-right-radius: 5px;
-        }
-
-        QSpinBox::up-button:hover,
-        QSpinBox::down-button:hover,
-        QDoubleSpinBox::up-button:hover,
-        QDoubleSpinBox::down-button:hover {
-            background: qlineargradient(
-                x1:0, y1:0, x2:0, y2:1,
-                stop:0 rgba(102, 114, 142, 222),
-                stop:1 rgba(40, 46, 60, 228)
-            );
         }
 
         QComboBox QAbstractItemView {
@@ -731,34 +611,7 @@ class SettingsWindow(QDialog):
             padding: 5px;
         }
         """)
-
-        down_icon = self._arrow_icon_paths.get("down", "")
-        up_icon = self._arrow_icon_paths.get("up", "")
-
-        self.setStyleSheet(
-            self.styleSheet() +
-            f"""
-            QComboBox::down-arrow {{
-                image: url("{down_icon}");
-                width: 12px;
-                height: 12px;
-            }}
-
-            QSpinBox::up-arrow,
-            QDoubleSpinBox::up-arrow {{
-                image: url("{up_icon}");
-                width: 10px;
-                height: 10px;
-            }}
-
-            QSpinBox::down-arrow,
-            QDoubleSpinBox::down-arrow {{
-                image: url("{down_icon}");
-                width: 10px;
-                height: 10px;
-            }}
-            """
-        )
+    
 
     # =========================
     # 窗口缩放
@@ -1059,24 +912,6 @@ class SettingsWindow(QDialog):
                 child_layout.activate()
             child.updateGeometry()
 
-    def _activate_layout_recursively(self, widget):
-        if widget is None:
-            return
-
-        layout = self._safe_get_qt_layout(widget)
-        if layout is not None:
-            layout.invalidate()
-            layout.activate()
-
-        widget.updateGeometry()
-
-        for child in widget.findChildren(QWidget):
-            child_layout = self._safe_get_qt_layout(child)
-            if child_layout is not None:
-                child_layout.invalidate()
-                child_layout.activate()
-            child.updateGeometry()
-
     
     def _collect_roi_data(self):
         """
@@ -1104,11 +939,11 @@ class SettingsWindow(QDialog):
         if widget_type == 'line':
             widget = QLineEdit(str(val))
         elif widget_type == 'spin':
-            widget = QSpinBox()
+            widget = ThemedSpinBox()
             widget.setRange(kwargs.get('min', 0), kwargs.get('max', 9999))
             widget.setValue(int(val))
         elif widget_type == 'double':
-            widget = QDoubleSpinBox()
+            widget = ThemedDoubleSpinBox()
             widget.setRange(kwargs.get('min', 0.0), kwargs.get('max', 1.0))
             widget.setSingleStep(kwargs.get('step', 0.01))
             widget.setValue(float(val))
@@ -1116,7 +951,7 @@ class SettingsWindow(QDialog):
             widget = QCheckBox()
             widget.setChecked(bool(val))
         elif widget_type == 'combo':
-            widget = QComboBox()
+            widget = ThemedComboBox()
             widget.addItems(kwargs.get('items', []))
             widget.setCurrentText(str(val))
         elif widget_type == 'hotkey':
@@ -1161,7 +996,7 @@ class SettingsWindow(QDialog):
         h.setSpacing(6)
 
         def spin(v):
-            sb = QSpinBox()
+            sb = ThemedSpinBox()
             sb.setRange(0, 10000)
             sb.setValue(int(v))
             sb.setFixedWidth(96)
@@ -1197,7 +1032,7 @@ class SettingsWindow(QDialog):
         h.setSpacing(6)
 
         def create_spin(v):
-            sb = QSpinBox()
+            sb = ThemedSpinBox()
             sb.setRange(-10000, 10000)
             sb.setValue(int(v))
             sb.setFixedWidth(96)

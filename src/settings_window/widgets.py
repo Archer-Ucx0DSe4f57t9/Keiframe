@@ -1,14 +1,44 @@
 # widgets.py
-# 这个文件定义了设置界面中使用的自定义控件，如快捷键输入框和颜色选择器
-from PyQt5.QtWidgets import QLineEdit, QWidget, QHBoxLayout, QPushButton, QColorDialog
-from PyQt5.QtGui import QKeyEvent, QColor,QKeySequence
+# 这个文件定义了设置界面中使用的自定义控件，如快捷键输入框、颜色选择器和主题控件
+from PyQt5.QtWidgets import (
+    QLineEdit, QWidget, QHBoxLayout, QPushButton, QColorDialog,
+    QComboBox, QSpinBox, QDoubleSpinBox, QStyleFactory
+)
+from PyQt5.QtGui import QKeyEvent, QColor, QKeySequence
 from PyQt5.QtCore import Qt
 import re
 
-# ==========================================
-# 1. 自定义控件
-# ==========================================
 
+class ThemedComboBox(QComboBox):
+    """安全版主题下拉框：不做自绘，只切到 Fusion 风格"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        style = QStyleFactory.create("Fusion")
+        if style is not None:
+            self.setStyle(style)
+
+
+class ThemedSpinBox(QSpinBox):
+    """安全版主题整数输入框：不做自绘，只切到 Fusion 风格"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        style = QStyleFactory.create("Fusion")
+        if style is not None:
+            self.setStyle(style)
+
+
+class ThemedDoubleSpinBox(QDoubleSpinBox):
+    """安全版主题浮点输入框：不做自绘，只切到 Fusion 风格"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        style = QStyleFactory.create("Fusion")
+        if style is not None:
+            self.setStyle(style)
+
+
+# ==========================================
+# 快捷键录制控件
+# ==========================================
 class HotkeyInput(QLineEdit):
     """快捷键录制控件"""
     def __init__(self, parent=None):
@@ -16,23 +46,29 @@ class HotkeyInput(QLineEdit):
         self.setPlaceholderText("点击此处按下快捷键...")
         self.setReadOnly(True)
         self.current_keys = []
-        
+
     def keyPressEvent(self, event: QKeyEvent):
         key = event.key()
         modifiers = event.modifiers()
         if key in [Qt.Key_Control, Qt.Key_Shift, Qt.Key_Alt, Qt.Key_Meta]:
             return
+
         keys = []
-        if modifiers & Qt.ControlModifier: keys.append('ctrl')
-        if modifiers & Qt.ShiftModifier: keys.append('shift')
-        if modifiers & Qt.AltModifier: keys.append('alt')
-        
+        if modifiers & Qt.ControlModifier:
+            keys.append('ctrl')
+        if modifiers & Qt.ShiftModifier:
+            keys.append('shift')
+        if modifiers & Qt.AltModifier:
+            keys.append('alt')
+
         key_text = QKeySequence(key).toString().lower()
-        # 特殊符号映射
         key_map = {
-            Qt.Key_BracketLeft: '[', Qt.Key_BracketRight: ']', 
-            Qt.Key_Backslash: '\\', Qt.Key_Minus: '-', 
-            Qt.Key_Equal: '=', Qt.Key_QuoteLeft: '`'
+            Qt.Key_BracketLeft: '[',
+            Qt.Key_BracketRight: ']',
+            Qt.Key_Backslash: '\\',
+            Qt.Key_Minus: '-',
+            Qt.Key_Equal: '=',
+            Qt.Key_QuoteLeft: '`'
         }
         if key in key_map:
             key_text = key_map[key]
@@ -40,18 +76,25 @@ class HotkeyInput(QLineEdit):
         keys.append(key_text)
         self.setText(" + ".join(keys))
 
+
+# ==========================================
+# 颜色选择控件
+# ==========================================
 class ColorInput(QWidget):
     """颜色选择控件 (文本框 + 选择按钮)"""
     def __init__(self, color_str, parent=None):
         super().__init__(parent)
         self.layout = QHBoxLayout(self)
-        self.layout.setContentsMargins(0,0,0,0)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+
         self.line = QLineEdit(str(color_str))
         self.btn = QPushButton("选择")
         self.btn.setFixedWidth(50)
         self.btn.clicked.connect(self.pick_color)
+
         self.layout.addWidget(self.line)
         self.layout.addWidget(self.btn)
+
         self.update_btn_style()
         self.line.textChanged.connect(self.update_btn_style)
 
@@ -76,10 +119,9 @@ class ColorInput(QWidget):
     def update_btn_style(self):
         c = self.parse_color(self.line.text())
         if c.isValid():
-             # 使用 border 使得白色也能看清
-             self.btn.setStyleSheet(f"background-color: {c.name(QColor.HexArgb)}; border: 1px solid gray;")
-    
+            self.btn.setStyleSheet(
+                f"background-color: {c.name(QColor.HexArgb)}; border: 1px solid gray;"
+            )
+
     def text(self):
         return self.line.text()
-      
-

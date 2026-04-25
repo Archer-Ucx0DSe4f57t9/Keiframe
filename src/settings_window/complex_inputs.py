@@ -1,11 +1,12 @@
 #complex_inputs.py
 # 这个文件定义了设置界面中使用的复杂输入控件，如快捷键输入框和颜色选择器
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QPushButton, QComboBox, QSpinBox, QHeaderView
+from src.settings_window.widgets import ThemedComboBox, ThemedSpinBox
 from src.utils.fileutil import get_resources_dir
 import os
 import re
 
-class NoWheelComboBox(QComboBox):
+class NoWheelComboBox(ThemedComboBox):
     """禁用鼠标滚轮切换，避免误操作"""
     def wheelEvent(self, event):
         event.ignore()
@@ -125,7 +126,7 @@ class CountdownOptionsTable(QTableWidget):
         self.insertRow(row)
         
         # 1. 时间 (SpinBox)
-        sb = QSpinBox()
+        sb = ThemedSpinBox()
         sb.setRange(1, 9999)
         sb.setValue(int(time_val))
         self.setCellWidget(row, 0, sb)
