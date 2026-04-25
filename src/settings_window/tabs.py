@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
                              QFormLayout, QScrollArea, QDialog, QComboBox, QGroupBox,
                              QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog)
 from src import config
-from src.settings_window.widgets import ColorInput
+from src.settings_window.widgets import ColorInput, ThemedSpinBox, ThemedDoubleSpinBox
     # --- TABS ---
 class SettingsTabsBuilder:
     @staticmethod
@@ -418,7 +418,6 @@ class SettingsTabsBuilder:
             roi_tab_widget.addTab(page, "中文 (ZH)" if lang == 'zh' else "英文 (EN)")
         return roi_tab_widget
 
-
     ''''辅助函数合集'''
     @staticmethod
     def _create_widget_only(parent, key, widget_type, label_text, **kwargs):
@@ -427,18 +426,21 @@ class SettingsTabsBuilder:
         widget = None
 
         if widget_type == 'spin':
-            widget = QSpinBox()
+            widget = ThemedSpinBox()
             widget.setRange(kwargs.get('min', 0), kwargs.get('max', 9999))
             widget.setValue(int(val) if val is not None else 0)
+            widget.setMinimumWidth(88)
 
         elif widget_type == 'double':
-            widget = QDoubleSpinBox()
+            widget = ThemedDoubleSpinBox()
             widget.setRange(kwargs.get('min', 0.0), kwargs.get('max', 1.0))
             widget.setSingleStep(kwargs.get('step', 0.01))
             widget.setValue(float(val) if val is not None else 0.0)
+            widget.setMinimumWidth(96)
 
         elif widget_type == 'color':
             widget = ColorInput(str(val) if val is not None else "")
+            widget.setMinimumWidth(120)
 
         if widget:
             if isinstance(widget, (QSpinBox, QDoubleSpinBox)):
@@ -455,13 +457,13 @@ class SettingsTabsBuilder:
         container = QWidget()
         h_layout = QHBoxLayout(container)
         h_layout.setContentsMargins(0, 0, 0, 0)
-        h_layout.setSpacing(10)
+        h_layout.setSpacing(12)
 
         for label, key, w_type, kwargs in items:
             h_layout.addWidget(QLabel(label))
             widget = SettingsTabsBuilder._create_widget_only(parent, key, w_type, label, **kwargs)
             if widget:
                 h_layout.addWidget(widget)
-        
+
         h_layout.addStretch()
         layout.addRow(row_label, container)

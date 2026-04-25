@@ -2,38 +2,124 @@
 # 这个文件定义了设置界面中使用的自定义控件，如快捷键输入框、颜色选择器和主题控件
 from PyQt5.QtWidgets import (
     QLineEdit, QWidget, QHBoxLayout, QPushButton, QColorDialog,
-    QComboBox, QSpinBox, QDoubleSpinBox, QStyleFactory
+    QComboBox, QSpinBox, QDoubleSpinBox, QStyleFactory,
+    QToolButton, QAbstractSpinBox
 )
 from PyQt5.QtGui import QKeyEvent, QColor, QKeySequence
 from PyQt5.QtCore import Qt
 import re
 
-
 class ThemedComboBox(QComboBox):
-    """安全版主题下拉框：不做自绘，只切到 Fusion 风格"""
+    """安全版主题下拉框：使用 Fusion 风格"""
     def __init__(self, parent=None):
         super().__init__(parent)
         style = QStyleFactory.create("Fusion")
         if style is not None:
             self.setStyle(style)
-
 
 class ThemedSpinBox(QSpinBox):
-    """安全版主题整数输入框：不做自绘，只切到 Fusion 风格"""
+    """安全版主题整数输入框：隐藏原生按钮，改用两个子按钮"""
     def __init__(self, parent=None):
         super().__init__(parent)
         style = QStyleFactory.create("Fusion")
         if style is not None:
             self.setStyle(style)
+
+        self.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self._btn_w = 14
+
+        self.up_btn = QToolButton(self)
+        self.down_btn = QToolButton(self)
+
+        for btn, text in ((self.up_btn, "▲"), (self.down_btn, "▼")):
+            btn.setText(text)
+            btn.setCursor(Qt.ArrowCursor)
+            btn.setFocusPolicy(Qt.NoFocus)
+            btn.setStyleSheet("""
+                QToolButton {
+                    color: #f2f2f2;
+                    background: rgba(70, 74, 84, 205);
+                    border: 1px solid rgba(255, 255, 255, 26);
+                    font-size: 8pt;
+                    font-weight: 700;
+                    padding: 0px;
+                }
+                QToolButton:hover {
+                    background: rgba(96, 110, 138, 220);
+                }
+                QToolButton:pressed {
+                    background: rgba(45, 50, 62, 230);
+                }
+            """)
+
+        self.up_btn.clicked.connect(self.stepUp)
+        self.down_btn.clicked.connect(self.stepDown)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+
+        h = self.height()
+        half = h // 2
+        x = self.width() - self._btn_w
+
+        self.up_btn.setGeometry(x, 0, self._btn_w, half)
+        self.down_btn.setGeometry(x, half, self._btn_w, h - half)
+
+        if self.lineEdit():
+            self.lineEdit().setTextMargins(0, 0, self._btn_w + 2, 0)
 
 
 class ThemedDoubleSpinBox(QDoubleSpinBox):
-    """安全版主题浮点输入框：不做自绘，只切到 Fusion 风格"""
+    """安全版主题浮点输入框：隐藏原生按钮，改用两个子按钮"""
     def __init__(self, parent=None):
         super().__init__(parent)
         style = QStyleFactory.create("Fusion")
         if style is not None:
             self.setStyle(style)
+
+        self.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self._btn_w = 14
+
+        self.up_btn = QToolButton(self)
+        self.down_btn = QToolButton(self)
+
+        for btn, text in ((self.up_btn, "▲"), (self.down_btn, "▼")):
+            btn.setText(text)
+            btn.setCursor(Qt.ArrowCursor)
+            btn.setFocusPolicy(Qt.NoFocus)
+            btn.setStyleSheet("""
+                QToolButton {
+                    color: #f2f2f2;
+                    background: rgba(70, 74, 84, 205);
+                    border: 1px solid rgba(255, 255, 255, 26);
+                    font-size: 8pt;
+                    font-weight: 700;
+                    padding: 0px;
+                }
+                QToolButton:hover {
+                    background: rgba(96, 110, 138, 220);
+                }
+                QToolButton:pressed {
+                    background: rgba(45, 50, 62, 230);
+                }
+            """)
+
+        self.up_btn.clicked.connect(self.stepUp)
+        self.down_btn.clicked.connect(self.stepDown)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+
+        h = self.height()
+        half = h // 2
+        x = self.width() - self._btn_w
+
+        self.up_btn.setGeometry(x, 0, self._btn_w, half)
+        self.down_btn.setGeometry(x, half, self._btn_w, h - half)
+
+        if self.lineEdit():
+            self.lineEdit().setTextMargins(0, 0, self._btn_w + 2, 0)
+
 
 
 # ==========================================
