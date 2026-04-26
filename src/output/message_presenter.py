@@ -252,6 +252,13 @@ class MessagePresenter(QLabel):
     def update_message(self, message, color, x=None, y=None, width=None, height=None, 
                        font_size=16, sound_filename:str = None, vertical_offset=0):
 
+        #更新状态为已触发过消息播报，用于在结束游戏时可以重置状态
+        try:
+            from src import game_state_service
+            game_state_service.state.message_presenter_triggered = True
+        except Exception:
+            pass
+        
         # 仅在发生变化时设置 text / style（OutlinedLabel 会缓存渲染）
         if message != self._last_message or color != self._last_color:
             # 如果外部指定了 height，告诉 text_label 期望的行高（像素）

@@ -42,6 +42,9 @@ class GlobalState:
         self.scale_factor = 1.0        # 基于1920宽度的缩放比例
         self.screenshot_lock = threading.Lock() # 用于保护截图数据的读写安全
         
+        # 消息播报状态
+        self.message_presenter_triggered = False
+        
         #暂时没用
         self.player_names = []
         self.app_closing = False
@@ -167,13 +170,21 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
             show_fence.detect_troop(troop_detection_callback)
             '''
     # 更新地图相关
+    # 获取activeScreens数组，如果数组不为空表示在匹配界面，为空表示在游戏中
     active_screens = game_screen_for_check_in_game_data.get('activeScreens', [])
-    # 获取activeScreens数组
-    # 判断界面状态：数组不为空表示在匹配界面，为空表示在游戏中
-    if active_screens:
-        state.is_in_game = False
-    else:
-        state.is_in_game = True
+    
+    # 判断游戏状态变化
+    previous_is_in_game = state.is_in_game
+    #如果activeScreens非空，说明在菜单界面，不在游戏中；如果activeScreens为空，说明在游戏中
+    new_is_in_game = not bool(active_screens)
+    state.is_in_game = new_is_in_game
+
+    # 从游戏内切换到非游戏内时，如果本局触发过 message_presenter，则重置一次
+    if previous_is_in_game is True and new_is_in_game is False:
+        if state.message_presenter_triggered:
+            logger.info('检测到离开游戏，且本局触发过消息播报，执行 reset_game_info')
+            progress_callback.emit(['reset_game_info'])
+            state.message_presenter_triggered = False
         
 def _capture_game_screen(sct):
     """
