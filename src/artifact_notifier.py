@@ -202,7 +202,7 @@ class ArtifactNotifier:
         - 清空定时模式、force recovery、提示显示等所有运行时状态
         """
         self._refresh_runtime_config()
-        self.logger.warning("ArtifactNotifier 状态已重置。")
+        self.logger.info("ArtifactNotifier 状态已重置。")
 
         self._state = self.STATE_VALIDATING
         self._last_checked_second = -1
@@ -251,7 +251,7 @@ class ArtifactNotifier:
           这里只记录请求，真正切换到 force recovery 放到下一次 update_game_time 中执行
         """
         self._force_recovery_requested = True
-        self.logger.warning("ArtifactNotifier 已收到保底重置请求。")
+        self.logger.info("ArtifactNotifier 已收到保底重置请求。")
     
     def _start_force_recovery(self, current_second, is_idle):
         """
@@ -285,7 +285,7 @@ class ArtifactNotifier:
         if is_idle:
             self._show_force_recovery_notice(current_second)
 
-        self.logger.warning(
+        self.logger.info(
             f"ArtifactNotifier 已进入保底重置模式，起始游戏秒={current_second}，"
             f"当前 is_idle={is_idle}，waiting_for_idle_first={self._force_recovery_waiting_for_idle_first}"
         )
@@ -307,7 +307,7 @@ class ArtifactNotifier:
             kind="force_recovery_notice"
         )
 
-        self.logger.warning(
+        self.logger.info(
             f"显示 force recovery 恢复提示，持续到游戏秒 {self._force_recovery_notice_until_second}。"
         )
 
@@ -326,7 +326,7 @@ class ArtifactNotifier:
         if current_second >= self._force_recovery_notice_until_second:
             self._hide_message()
             self._force_recovery_notice_until_second = None
-            self.logger.warning("force recovery 恢复提示已自动隐藏。")
+            self.logger.info("force recovery 恢复提示已自动隐藏。")
 
 
     def update_game_time(self, game_time_seconds):
@@ -422,14 +422,14 @@ class ArtifactNotifier:
 
         if self._is_timed_trigger_mode_enabled():
             if not hero_gate_ok:
-                self.logger.warning(
+                self.logger.info(
                     f"[定时监控] sec={current_second} 未检测到英雄存活头像，暂停 idle 状态变化判断。"
                 )
                 self._last_is_idle = is_idle
                 return
 
             self._update_idle_transition_tracking(current_second, is_idle)
-            self.logger.warning(
+            self.logger.debug(
                 f"[定时监控] current_second={current_second}, is_idle={is_idle}, "
                 f"idle_anchor_second={self._idle_anchor_second}, state={self._state}"
             )
@@ -437,7 +437,7 @@ class ArtifactNotifier:
             return
 
         if not hero_gate_ok:
-            self.logger.warning(
+            self.logger.debug(
                 f"[图像监控] sec={current_second} 未检测到英雄存活头像，暂停 idle/not_idle 判断。"
             )
             self._last_is_idle = is_idle
@@ -446,7 +446,7 @@ class ArtifactNotifier:
         if self.ARTIFACT_ENABLE_READY_DEBUG_COMPARE and not self._should_skip_ready_region_recognition(current_second):
             is_ready = self._is_ready_by_region()
 
-        self.logger.warning(
+        self.logger.debug(
             f"[对比用] current_second={current_second}, is_idle={is_idle}, "
             f"is_ready={is_ready}, not_idle_streak={self._not_idle_streak_seconds}, "
             f"idle_anchor_second={self._idle_anchor_second}"
@@ -454,7 +454,7 @@ class ArtifactNotifier:
 
         self._update_not_idle_streak(current_second, is_idle)
         if self._not_idle_streak_seconds >= self.ARTIFACT_NOT_IDLE_TRIGGER_SECONDS:
-            self.logger.warning(
+            self.logger.info(
                 f"检测到 not idle 已连续 {self.ARTIFACT_NOT_IDLE_TRIGGER_SECONDS} 个游戏秒，触发神器提示。"
             )
             self._trigger_ready_alert(current_second, is_idle, trigger_source="image")
@@ -478,14 +478,14 @@ class ArtifactNotifier:
             return
 
         if remaining <= 0:
-            self.logger.warning(
+            self.logger.info(
                 f"定时模式触发：距离最近一次 not idle -> idle 已达到 "
                 f"{self.ARTIFACT_TIMED_TRIGGER_SECONDS} 秒，直接触发神器提示。"
             )
             self._trigger_ready_alert(current_second, is_idle, trigger_source="timed")
             return
 
-        self.logger.warning(
+        self.logger.info(
             f"[定时等待] current_second={current_second}, is_idle={is_idle}, "
             f"idle_anchor_second={self._idle_anchor_second}, remaining={remaining}"
         )
@@ -501,7 +501,7 @@ class ArtifactNotifier:
             return
 
         if remaining <= 0:
-            self.logger.warning("定时倒计时结束，直接触发神器提示。")
+            self.logger.info("定时倒计时结束，直接触发神器提示。")
             self._trigger_ready_alert(current_second, is_idle, trigger_source="timed")
             return
 
@@ -516,7 +516,7 @@ class ArtifactNotifier:
 
     def _handle_image_ready_detected_state(self, current_second, is_idle, hero_gate_ok):
         if not hero_gate_ok:
-            self.logger.warning(
+            self.logger.info(
                 f"[神器提示-图像模式] sec={current_second} 未检测到英雄存活头像，暂停关闭条件判断。"
             )
             self._last_is_idle = is_idle
@@ -536,12 +536,12 @@ class ArtifactNotifier:
         if self._is_timed_trigger_mode_enabled():
             self._idle_anchor_second = current_second
             self._state = self.STATE_TIMED_WAITING
-            self.logger.warning("图像触发的神器提示已回到 idle，切入定时模式等待下一轮。")
+            self.logger.info("图像触发的神器提示已回到 idle，切入定时模式等待下一轮。")
         else:
             self._cooldown_start_time = current_second
             self._state = self.STATE_COOLDOWN
             self._idle_anchor_second = None
-            self.logger.warning(
+            self.logger.info(
                 f"神器区域已恢复为 idle，开始冷却 {self.ARTIFACT_RECOGNITION_COOLDOWN_SECONDS} 秒，"
                 f"cooldown_start={self._cooldown_start_time}"
             )
@@ -563,7 +563,7 @@ class ArtifactNotifier:
                 self._timed_ready_seen_non_idle = False
                 self._timed_ready_alert_start_second = None
                 self._timed_countdown_last_remaining = None
-                self.logger.warning(
+                self.logger.info(
                     f"定时模式下，提示触发后 {timeout_seconds} 秒内仍未出现 non-idle，"
                     f"关闭提示，并在 reset 前不再触发定时提醒。"
                 )
@@ -571,7 +571,7 @@ class ArtifactNotifier:
                 return
 
             if not hero_gate_ok:
-                self.logger.warning(
+                self.logger.info(
                     f"[神器提示-定时模式] sec={current_second} 未检测到英雄存活头像，"
                     f"仅保留 30 秒超时检查，不判断 non-idle/idle 变化。"
                 )
@@ -580,7 +580,7 @@ class ArtifactNotifier:
 
             if not is_idle:
                 self._timed_ready_seen_non_idle = True
-                self.logger.warning(
+                self.logger.info(
                     "定时模式下，提示后首次检测到 non-idle；继续保持提示，等待再次回到 idle。"
                 )
 
@@ -588,7 +588,7 @@ class ArtifactNotifier:
             return
 
         if not hero_gate_ok:
-            self.logger.warning(
+            self.logger.debug(
                 f"[神器提示-定时模式] sec={current_second} 未检测到英雄存活头像，暂停关闭条件判断。"
             )
             self._last_is_idle = is_idle
@@ -601,7 +601,7 @@ class ArtifactNotifier:
             self._timed_ready_seen_non_idle = False
             self._timed_ready_alert_start_second = None
             self._timed_countdown_last_remaining = None
-            self.logger.warning(
+            self.logger.debug(
                 "定时模式下检测到提示后的 non-idle -> idle，隐藏提示并重新进入等待。"
             )
 
@@ -616,7 +616,7 @@ class ArtifactNotifier:
             self._state = self.STATE_FORCE_RECOVERY_DISABLED
             self._force_recovery_start_second = None
             self._force_recovery_waiting_for_idle_first = False
-            self.logger.warning(
+            self.logger.info(
                 f"保底重置模式在 {max_seconds} 游戏秒内未等到有效的 idle -> not_idle，"
                 f"本次保底检测结束。"
             )
@@ -624,7 +624,7 @@ class ArtifactNotifier:
             return
 
         if not hero_gate_ok:
-            self.logger.warning(
+            self.logger.info(
                 f"[保底模式] sec={current_second} 未检测到英雄存活头像，暂停 idle/not_idle 判断。"
             )
             self._last_is_idle = is_idle
@@ -634,7 +634,7 @@ class ArtifactNotifier:
             if is_idle:
                 self._force_recovery_waiting_for_idle_first = False
                 self._last_is_idle = True
-                self.logger.warning("保底模式：当前已重新回到 idle，开始等待下一次 idle -> not_idle。")
+                self.logger.info("保底模式：当前已重新回到 idle，开始等待下一次 idle -> not_idle。")
             else:
                 self._last_is_idle = False
             return
@@ -644,7 +644,7 @@ class ArtifactNotifier:
             return
 
         if self._last_is_idle is True and is_idle is False:
-            self.logger.warning("保底模式检测到首次有效 idle -> not_idle，触发神器提示。")
+            self.logger.info("保底模式检测到首次有效 idle -> not_idle，触发神器提示。")
             self._force_recovery_start_second = None
             self._trigger_ready_alert(current_second, is_idle, trigger_source="image")
             return
@@ -694,7 +694,7 @@ class ArtifactNotifier:
             sound_filename="",
             kind="timed_countdown",
         )
-        self.logger.warning(f"定时倒计时显示：{text}")
+        self.logger.info(f"定时倒计时显示：{text}")
 
     def _get_timed_remaining_seconds(self, current_second):
         if self._idle_anchor_second is None:
@@ -746,7 +746,7 @@ class ArtifactNotifier:
             self.logger.error(f"神器英雄头像模板加载失败：{template_path}")
             return False
 
-        self.logger.warning(f"神器英雄头像模板加载成功：{template_path}")
+        self.logger.debug(f"神器英雄头像模板加载成功：{template_path}")
         return True
 
     def _get_scaled_hero_icon_template(self, scale_factor):
@@ -828,7 +828,7 @@ class ArtifactNotifier:
 
         self._hero_icon_last_match = False
         if not self._hero_icon_missing_logged:
-            self.logger.warning(
+            self.logger.info(
                 f"未检测到英雄存活头像，best_score={best_score:.3f}, threshold={threshold:.3f}"
             )
             self._hero_icon_missing_logged = True
@@ -845,7 +845,7 @@ class ArtifactNotifier:
         else:
             self._validation_start_second = current_second
 
-        self.logger.warning(
+        self.logger.debug(
             f"ArtifactNotifier 验证起始秒已设定为 {self._validation_start_second} "
             f"(当前游戏时间={current_second})"
         )
@@ -858,7 +858,7 @@ class ArtifactNotifier:
         if is_idle:
             self._not_idle_streak_seconds = 0
             self._last_not_idle_second = None
-            self.logger.warning("ArtifactNotifier 当前为 idle，not idle 连续秒数已清零。")
+            self.logger.info("ArtifactNotifier 当前为 idle，not idle 连续秒数已清零。")
             return
 
         if self._last_not_idle_second is None:
@@ -869,7 +869,7 @@ class ArtifactNotifier:
             self._not_idle_streak_seconds = 1
 
         self._last_not_idle_second = current_second
-        self.logger.warning(f"ArtifactNotifier not idle 连续秒数 = {self._not_idle_streak_seconds}")
+        self.logger.info(f"ArtifactNotifier not idle 连续秒数 = {self._not_idle_streak_seconds}")
 
     def _update_idle_transition_tracking(self, current_second, is_idle):
         """
@@ -889,7 +889,7 @@ class ArtifactNotifier:
             self._idle_anchor_second = current_second
             self._state = self.STATE_TIMED_WAITING
             self._timed_countdown_last_remaining = None
-            self.logger.warning(
+            self.logger.info(
                 f"检测到 not idle -> idle，记录 idle_anchor_second = {self._idle_anchor_second}，"
                 f"进入 {self.STATE_TIMED_WAITING}。"
             )
@@ -904,19 +904,19 @@ class ArtifactNotifier:
 
         if is_idle:
             self._idle_seen_count += 1
-            self.logger.warning(
+            self.logger.info(
                 f"ArtifactNotifier 验证阶段检测到紫蓝色，第 {self._idle_seen_count} 次。"
             )
 
             if self._idle_seen_count >= self.ARTIFACT_REQUIRED_IDLE_HITS:
                 self._state = self.STATE_MONITORING
-                self.logger.warning("ArtifactNotifier 验证通过，进入正式监控。")
+                self.logger.info("ArtifactNotifier 验证通过，进入正式监控。")
             return
 
         if self._idle_seen_count < self.ARTIFACT_REQUIRED_IDLE_HITS:
             self._validation_locked = True
             self._state = self.STATE_DISABLED
-            self.logger.warning(
+            self.logger.info(
                 "ArtifactNotifier 验证失败：未达到 3 次紫蓝色检测，本局在 reset 前不启用。"
             )
 
@@ -970,7 +970,7 @@ class ArtifactNotifier:
         """
         sc2_rect = get_sc2_window_geometry()
         if not sc2_rect:
-            self.logger.warning("ArtifactNotifier 无法获取游戏窗口位置，跳过提示。")
+            self.logger.error("ArtifactNotifier 无法获取游戏窗口位置，跳过提示。")
             return
 
         sc2_x, sc2_y, sc2_width, _ = sc2_rect
@@ -979,7 +979,7 @@ class ArtifactNotifier:
         msg_w = sc2_width
         msg_h = int(self.ARTIFACT_ALERT_HEIGHT)
 
-        self.logger.warning(
+        self.logger.debug(
             f"ArtifactNotifier 显示位置 x={msg_x}, y={msg_y}, w={msg_w}, h={msg_h}, text={text}, kind={kind}"
         )
 
@@ -1075,7 +1075,7 @@ class ArtifactNotifier:
         hit_count = int(ready_mask.sum())
         total_count = int(ready_mask.size)
         ratio = hit_count / total_count if total_count > 0 else 0.0
-        self.logger.warning(
+        self.logger.debug(
             f"Artifact ready ROI hit_count={hit_count}, total={total_count}, ratio={ratio:.2f}"
         )
         return ratio

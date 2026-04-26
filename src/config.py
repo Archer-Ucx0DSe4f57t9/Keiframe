@@ -27,8 +27,8 @@ MEMO_TEMP_SHORTCUT = 'ctrl + shift + -'  # 临时显示快捷键
 MEMO_TOGGLE_SHORTCUT = 'ctrl + shift + backslash' # 持续开关快捷键
 # 倒计时快捷键
 COUNTDOWN_SHORTCUT = "ctrl + shift + `"
-# 强制恢复神器快捷键
-ARTIFACT_FORCE_RECOVERY_SHORTCUT = "ctrl + r"
+# 强制恢复神器检测快捷键
+ARTIFACT_FORCE_RECOVERY_SHORTCUT = "ctrl + r+ `"
 
 # 窗体设置项(主界面位置)
 MAIN_WINDOW_X = 1000
