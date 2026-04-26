@@ -71,6 +71,7 @@ class SettingsTabsBuilder:
         SettingsTabsBuilder._add_compact_row(parent, gl_artifact, "定时参数:", [
             ("神器提醒周期（秒）:", 'ARTIFACT_TIMED_TRIGGER_SECONDS', 'spin', {'max': 300}),
             ("无神器发现超时（秒）:", 'ARTIFACT_TIMED_TRIGGER_NO_NOT_IDLE_TIMEOUT_SECONDS', 'spin', {'max': 300}),
+            ("提前倒计时（秒）:", 'ARTIFACT_TIMED_COUNTDOWN_ADVANCE_SECONDS', 'spin', {'max': 120}),
         ])
 
         hint2 = QLabel("游戏画面左上角为基准点(0,0)，数字越大越靠近右/下")
@@ -89,7 +90,6 @@ class SettingsTabsBuilder:
             ("文字垂直偏移:", 'ARTIFACT_ALERT_VERTICAL_OFFSET', 'spin', {'min': -100, 'max': 100}),
         ])
 
-        parent.add_row(gl_artifact, "提示文本:", 'ARTIFACT_ALERT_TEXT', 'line')
         parent.add_row(gl_artifact, "提示颜色:", 'ARTIFACT_ALERT_COLOR', 'color')
         parent.add_row(gl_artifact, "提示音频:", 'ARTIFACT_ALERT_SOUND', 'line')
         layout.addRow(gb_artifact)
