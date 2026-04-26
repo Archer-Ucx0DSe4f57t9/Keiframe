@@ -17,7 +17,8 @@ def init_global_hotkeys(window):
         memo_temp_key = getattr(config, 'MEMO_TEMP_SHORTCUT', '`').replace(' ', '').lower()
         memo_toggle_key = getattr(config, 'MEMO_TOGGLE_SHORTCUT', 'backslash').replace(' ', '').lower()
         countdown_key = getattr(config, 'COUNTDOWN_SHORTCUT', 'F8').replace(' ', '').lower()
-        
+        force_recovery_key = getattr(config, 'ARTIFACT_FORCE_RECOVERY_SHORTCUT', 'ctrl+r').replace(' ', '').lower()
+
         def safe_emit(sig, *args):
             try:
                 if hasattr(window, sig):
@@ -40,6 +41,36 @@ def init_global_hotkeys(window):
                     window.logger.error("hotkey safe_emit failed: " + traceback.format_exc())
                 except Exception:
                     pass
+        
+        def safe_force_recovery():
+            try:
+                notifier = getattr(window, 'artifact_notifier', None)
+                if notifier and hasattr(notifier, 'request_force_recovery'):
+                    notifier.request_force_recovery()
+                    try:
+                        window.logger.info(f'检测到神器检测恢复快捷键组合: {getattr(config, "ARTIFACT_FORCE_RECOVERY_SHORTCUT", "ctrl + r")}')
+                    except Exception:
+                        pass
+                    return
+
+                if hasattr(window, 'request_force_recovery'):
+                    window.request_force_recovery()
+                    try:
+                        window.logger.info(f'检测到神器检测恢复快捷键组合: {getattr(config, "ARTIFACT_FORCE_RECOVERY_SHORTCUT", "ctrl + r")}')
+                    except Exception:
+                        pass
+                    return
+
+                try:
+                    window.logger.warning("未找到 artifact_notifier.request_force_recovery()，无法执行神器检测恢复。")
+                except Exception:
+                    pass
+            except Exception:
+                try:
+                    window.logger.error("force recovery hotkey failed: " + traceback.format_exc())
+                except Exception:
+                    pass
+
 
         if map_shortcut:
             keyboard.add_hotkey(map_shortcut, lambda: safe_emit('map_switch_signal'))
@@ -56,11 +87,17 @@ def init_global_hotkeys(window):
 
         if countdown_key:
             keyboard.add_hotkey(countdown_key, lambda: safe_emit('countdown_hotkey_signal'))
-
+        
+        if force_recovery_key:
+            keyboard.add_hotkey(force_recovery_key, safe_force_recovery)
+            
         # 记录成功
         try:
-            window.logger.info(
-                f'成功注册全局快捷键: {map_shortcut}, {lock_shortcut}, {memo_temp_key}, {memo_toggle_key},{countdown_key}')
+            wwindow.logger.info(
+                f'成功注册全局快捷键: '
+                f'{map_shortcut}, {lock_shortcut}, {memo_temp_key}, {memo_toggle_key}, '
+                f'{countdown_key}, {force_recovery_key}'
+            )
         except Exception:
             pass
 
