@@ -17,7 +17,7 @@ def init_global_hotkeys(window):
         memo_temp_key = getattr(config, 'MEMO_TEMP_SHORTCUT', '`').replace(' ', '').lower()
         memo_toggle_key = getattr(config, 'MEMO_TOGGLE_SHORTCUT', 'backslash').replace(' ', '').lower()
         countdown_key = getattr(config, 'COUNTDOWN_SHORTCUT', 'F8').replace(' ', '').lower()
-        force_recovery_key = getattr(config, 'ARTIFACT_FORCE_RECOVERY_SHORTCUT', 'ctrl+r').replace(' ', '').lower()
+        force_recovery_key = getattr(config, 'ARTIFACT_FORCE_RECOVERY_SHORTCUT', 'ctrl+r+`').replace(' ', '').lower()
 
         def safe_emit(sig, *args):
             try:
@@ -48,7 +48,7 @@ def init_global_hotkeys(window):
                 if notifier and hasattr(notifier, 'request_force_recovery'):
                     notifier.request_force_recovery()
                     try:
-                        window.logger.info(f'检测到神器检测恢复快捷键组合: {getattr(config, "ARTIFACT_FORCE_RECOVERY_SHORTCUT", "ctrl + r")}')
+                        window.logger.info(f'检测到神器检测重置快捷键组合: {getattr(config, "ARTIFACT_FORCE_RECOVERY_SHORTCUT", "ctrl + r")}')
                     except Exception:
                         pass
                     return
@@ -56,7 +56,7 @@ def init_global_hotkeys(window):
                 if hasattr(window, 'request_force_recovery'):
                     window.request_force_recovery()
                     try:
-                        window.logger.info(f'检测到神器检测恢复快捷键组合: {getattr(config, "ARTIFACT_FORCE_RECOVERY_SHORTCUT", "ctrl + r")}')
+                        window.logger.info(f'检测到神器检测重置快捷键组合: {getattr(config, "ARTIFACT_FORCE_RECOVERY_SHORTCUT", "ctrl + r")}')
                     except Exception:
                         pass
                     return

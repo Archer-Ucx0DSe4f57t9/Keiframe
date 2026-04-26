@@ -113,7 +113,7 @@ class ArtifactNotifier:
 
     # 若手动恢复时当前为 idle，则显示一条短提示
     ARTIFACT_FORCE_RECOVERY_NOTICE_SECONDS = 10
-    ARTIFACT_FORCE_RECOVERY_NOTICE_TEXT = "检测已恢复"
+    ARTIFACT_FORCE_RECOVERY_NOTICE_TEXT = "神器检测已经重置"
 
     # ===== 其他参数 =====
     ARTIFACT_RECOGNITION_COOLDOWN_SECONDS = 110

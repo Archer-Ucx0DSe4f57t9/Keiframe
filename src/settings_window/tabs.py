@@ -355,7 +355,7 @@ class SettingsTabsBuilder:
         parent.add_row(layout, "笔记临时显示:", 'MEMO_TEMP_SHORTCUT', 'hotkey')
         parent.add_row(layout, "笔记开关显示:", 'MEMO_TOGGLE_SHORTCUT', 'hotkey')
         parent.add_row(layout, "自定义倒计时菜单:", 'COUNTDOWN_SHORTCUT', 'hotkey')
-        parent.add_row(layout, "神器检测恢复:", 'ARTIFACT_FORCE_RECOVERY_SHORTCUT', 'hotkey')
+        parent.add_row(layout, "神器检测重置:", 'ARTIFACT_FORCE_RECOVERY_SHORTCUT', 'hotkey')
         tab.setLayout(layout)
         parent.tabs.addTab(tab, "快捷键")
 
