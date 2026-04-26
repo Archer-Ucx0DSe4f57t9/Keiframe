@@ -279,4 +279,4 @@ async def check_for_new_game_scheduler(progress_callback: QtCore.pyqtSignal) -> 
         while not state.app_closing:
             # 每 0.2秒创建一个非阻塞任务更新游戏状态
             asyncio.create_task(process_game_data(session, progress_callback))
-            await asyncio.sleep(0.1)  # 0.1秒的调度间隔，确保足够频繁但不至于过载
+            await asyncio.sleep(0.125)  # 0.125秒的调度间隔，确保足够频繁但不至于过载
