@@ -106,7 +106,12 @@ def update_game_time(window):
                 if is_new_game_second and hasattr(window, 'artifact_notifier'):
                     window.logger.debug(f'尝试推送到 ArtifactNotifier 时间 {current_seconds}')
                     window.artifact_notifier.update_game_time(current_seconds)
-
+                
+                # === 补给提醒相关 ===
+                if is_new_game_second and hasattr(window, 'supply_notifier'):
+                    window.logger.debug(f'尝试推送到 SupplyNotifier 时间 {current_seconds}')
+                    window.supply_notifier.update_game_time(current_seconds)
+                    
                 # === 倒计时模块相关 ===
                 if is_new_game_second and hasattr(window, 'countdown_manager'):
                     window.countdown_manager.update_game_time(

@@ -15,6 +15,7 @@ from src.mutaor_handlers.mutator_and_enemy_race_recognizer import Mutator_and_en
 from src.memo_overlay import MemoOverlay
 from src.artifact_notifier import ArtifactNotifier
 from src.countdown_manager import CountdownManager
+from src.supply_notifier.supply_notifier import SupplyNotifier
 
 from src.utils.fileutil import get_project_root
 from src.db.db_manager import DBManager
@@ -149,6 +150,9 @@ class TimerWindow(QMainWindow):
         
         # 初始化神器提示模块
         self.artifact_notifier = ArtifactNotifier(self)
+        
+        # 初始化补给提示模块
+        self.supply_notifier = SupplyNotifier(self)
         
          # 启动游戏检查线程
         self.game_check_thread = threading.Thread(target=self._run_async_game_scheduler, args=(self.progress_signal,), daemon=True)
@@ -401,7 +405,10 @@ class TimerWindow(QMainWindow):
             if hasattr(self, 'artifact_notifier') and self.artifact_notifier:
                 self.artifact_notifier.reset()
 
-            
+            # 清理补给自动识别残留
+            if hasattr(self, 'supply_notifier') and self.supply_notifier:
+                self.supply_notifier.reset()
+
             # 清除所有残留的 Toast（包括地图事件）
             if hasattr(self, 'toast_manager') and self.toast_manager:
                 self.toast_manager.clear_all_alerts()
@@ -597,6 +604,12 @@ class TimerWindow(QMainWindow):
             if hasattr(self, 'artifact_notifier') and self.artifact_notifier:
                 self.artifact_notifier.shutdown()
                 self.logger.info("ArtifactNotifier 已关闭。")
+                
+            #清理补给自动识别
+            if hasattr(self, 'supply_notifier') and self.supply_notifier:
+                self.supply_notifier.shutdown()
+                self.logger.info("SupplyNotifier 已关闭。")
+
             #3.设置全局标志位，通知所有 asyncio 循环停止
             game_state_service.state.app_closing = True
 
@@ -631,6 +644,11 @@ class TimerWindow(QMainWindow):
             if hasattr(self, 'artifact_notifier') and self.artifact_notifier:
                 self.artifact_notifier.shutdown()
                 self.logger.info("ArtifactNotifier 已关闭。")
+                
+            #清理补给自动识别
+            if hasattr(self, 'supply_notifier') and self.supply_notifier:
+                self.supply_notifier.shutdown()
+                self.logger.info("SupplyNotifier 已关闭。")
 
             # 清理全局快捷键
             config_hotkeys.unhook_global_hotkeys(self)

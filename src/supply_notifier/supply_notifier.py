@@ -5,7 +5,7 @@ SupplyNotifier
 
 用途：
 - 每个游戏秒读取右上角人口 current/max。
-- 当 max - current <= 3，且 max 不属于排除上限时，在人口 ROI 下方显示“更多补给”。
+- 当 max - current <= 5，且 max 不属于排除上限时，在人口 ROI 下方显示“更多补给”。
 - 消息颜色每 1 游戏秒在白色/红色之间切换。
 - 条件持续满足超过/达到配置秒数后，播放 notify_more_supplies.mp3。
 - 一旦识别失败或条件不满足，立即隐藏消息并重置播报状态。
@@ -25,7 +25,7 @@ from PyQt5.QtCore import Qt
 from src import config
 from src.game_state_service import state
 from src.output.message_presenter import MessagePresenter
-from src.recognizers.white_supply_recognizer import WhiteSupplyRecognizer
+from src.supply_notifier.white_supply_recognizer import WhiteSupplyRecognizer
 from src.utils.fileutil import get_resources_dir
 from src.utils.logging_util import get_logger
 from src.utils.window_utils import get_sc2_window_geometry, is_game_active
@@ -35,7 +35,7 @@ class SupplyNotifier:
     """人口不足提示模块。"""
 
     # ===== 触发规则 =====
-    SUPPLY_WARNING_REMAINING = 3 #持续处于 max - current <= 3 的条件下才提示，剩余人口超过这个值则不提示。
+    SUPPLY_WARNING_REMAINING = 5 #持续处于 max - current <= 5 的条件下才提示，剩余人口超过这个值则不提示。
     SUPPLY_EXCLUDED_MAX_VALUES = (100, 150) #不对这些上限值进行提示，允许配置为列表/逗号分隔字符串，如 "100,150"。
     SUPPLY_MAX_ALERT_LIMIT = 190 #当上限过大时不提示，避免误识别导致的骚扰。
 
@@ -60,8 +60,6 @@ class SupplyNotifier:
     # 若右对齐后仍然过界，用这个边距做窗口内限制。
     SUPPLY_ALERT_WINDOW_MARGIN = 8
 
-    # 可选图标；没有文件也不影响文字提示。
-    SUPPLY_ICON_FILENAME = "Supply.jpg"
 
     # 识别失败是否立即隐藏。按当前需求：中途一旦不满足/无法确认，就取消消息。
     SUPPLY_HIDE_ON_RECOGNITION_FAIL = True
@@ -81,7 +79,6 @@ class SupplyNotifier:
         "SUPPLY_ALERT_VERTICAL_OFFSET",
         "SUPPLY_ALERT_Y_OFFSET_BELOW_ROI",
         "SUPPLY_ALERT_WINDOW_MARGIN",
-        "SUPPLY_ICON_FILENAME",
         "SUPPLY_HIDE_ON_RECOGNITION_FAIL",
     )
 
@@ -91,8 +88,7 @@ class SupplyNotifier:
 
         self._refresh_runtime_config()
 
-        icon_path = self._get_icon_path()
-        self.message_presenter = MessagePresenter(parent, icon_path=icon_path)
+        self.message_presenter = MessagePresenter(parent)
         self.message_presenter.setAttribute(Qt.WA_TransparentForMouseEvents, True)
 
         self.recognizer = recognizer or WhiteSupplyRecognizer(debug=False)
@@ -128,13 +124,6 @@ class SupplyNotifier:
             return {int(v) for v in value}
         except Exception:
             return set()
-
-    def _get_icon_path(self) -> str:
-        filename = str(getattr(self, "SUPPLY_ICON_FILENAME", "") or "").strip()
-        if not filename:
-            return ""
-        path = get_resources_dir("icons", filename)
-        return path if os.path.exists(path) else ""
 
     def reset(self):
         self._refresh_runtime_config()
@@ -356,10 +345,6 @@ class SupplyNotifier:
 
             self.message_presenter.resize(msg_w, msg_h)
             self.message_presenter.setFixedHeight(msg_h)
-
-            icon_path = self._get_icon_path()
-            if hasattr(self.message_presenter, "icon_path"):
-                self.message_presenter.icon_path = icon_path
 
             self.message_presenter.update_message(
                 text,

@@ -146,6 +146,27 @@ ARTIFACT_FORCE_RECOVERY_NOTICE_TEXT = "检测已恢复"
 # - ready：检测到 ready 区域命中率满足阈值才算就绪，更准，但会有明显延迟
 ARTIFACT_READY_DETECTION_MODE = "not_idle"
 
+# ===== 人口提醒 =====
+SUPPLY_WARNING_REMAINING = 5
+SUPPLY_EXCLUDED_MAX_VALUES = (100, 150)
+SUPPLY_MAX_ALERT_LIMIT = 190
+
+SUPPLY_SOUND_AFTER_SECONDS = 3
+SUPPLY_ALERT_TEXT = "更多补给"
+SUPPLY_ALERT_COLOR_WHITE = "rgb(255,255,255)"
+SUPPLY_ALERT_COLOR_RED = "rgb(255,60,60)"
+SUPPLY_ALERT_SOUND = "notify_more_supplies.mp3"
+
+SUPPLY_ALERT_WIDTH = 180
+SUPPLY_ALERT_HEIGHT = 38
+SUPPLY_ALERT_FONT_SIZE = 26
+SUPPLY_ALERT_VERTICAL_OFFSET = -4
+SUPPLY_ALERT_Y_OFFSET_BELOW_ROI = 6
+SUPPLY_ALERT_WINDOW_MARGIN = 8
+SUPPLY_ICON_FILENAME = "Supply.jpg"
+SUPPLY_HIDE_ON_RECOGNITION_FAIL = True
+
+
 # 调试模式配置
 debug_mode = False  # 设置为True启用调试模式 / Set to True to enable debug mode
 debug_time_factor = 5.0  # 调试模式下的时间流速因子 / Time flow factor in debug mode
