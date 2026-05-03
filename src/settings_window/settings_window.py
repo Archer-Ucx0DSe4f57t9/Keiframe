@@ -420,9 +420,27 @@ class SettingsWindow(QDialog):
             widget = QCheckBox()
             widget.setChecked(bool(val))
         elif widget_type == 'combo':
-            widget = ThemedComboBox()
-            widget.addItems(kwargs.get('items', []))
-            widget.setCurrentText(str(val))
+            widget = QComboBox()
+            combo_items = kwargs.get('items', [])
+            current_val = val
+
+            for item in combo_items:
+                # 支持 [(显示文本, 保存值), ...]
+                if isinstance(item, (list, tuple)) and len(item) >= 2:
+                    display_text = str(item[0])
+                    data_value = item[1]
+                    widget.addItem(display_text, data_value)
+                else:
+                    # 兼容旧写法：["zh", "en"] 这种
+                    text = str(item)
+                    widget.addItem(text, text)
+
+            # 优先按 data 匹配当前配置值
+            idx = widget.findData(current_val)
+            if idx < 0:
+                idx = widget.findText(str(current_val))
+            if idx >= 0:
+                widget.setCurrentIndex(idx)
         elif widget_type == 'hotkey':
             widget = HotkeyInput()
             widget.setText(str(val))
@@ -554,7 +572,8 @@ class SettingsWindow(QDialog):
             elif w_type == 'bool':
                 val = widget.isChecked()
             elif w_type == 'combo':
-                val = widget.currentText()
+                data_val = widget.currentData()
+                val = data_val if data_val is not None else widget.currentText()
             elif w_type == 'roi':
                 val = list(sb.value() for sb in widget)
             elif w_type == 'point':

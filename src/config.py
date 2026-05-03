@@ -140,6 +140,12 @@ ARTIFACT_FORCE_RECOVERY_MAX_SECONDS = 180
 ARTIFACT_FORCE_RECOVERY_NOTICE_SECONDS = 10
 ARTIFACT_FORCE_RECOVERY_NOTICE_TEXT = "检测已恢复"
 
+
+# 非周期模式下，神器“已经就绪”的判定方式：
+# - not_idle：检测到进入 not_idle 就算就绪，时间更灵敏，但可能误判
+# - ready：检测到 ready 区域命中率满足阈值才算就绪，更准，但会有明显延迟
+ARTIFACT_READY_DETECTION_MODE = "not_idle"
+
 # 调试模式配置
 debug_mode = False  # 设置为True启用调试模式 / Set to True to enable debug mode
 debug_time_factor = 5.0  # 调试模式下的时间流速因子 / Time flow factor in debug mode

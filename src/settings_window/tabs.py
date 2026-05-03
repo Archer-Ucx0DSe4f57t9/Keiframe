@@ -59,6 +59,26 @@ class SettingsTabsBuilder:
         gl_artifact.setVerticalSpacing(10)
         gl_artifact.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
+        parent.add_row(
+            gl_artifact,
+            "神器就绪状态判定:",
+            'ARTIFACT_READY_DETECTION_MODE',
+            'combo',
+            items=[
+                ("指示器变得不是灰色时", "not_idle"),
+                ("指示器出现明显神器图标时", "ready"),
+            ]
+        )
+
+        hint_mode = QLabel(
+            "指示器变得不是灰色时：时间上更灵敏，但可能误判。\n"
+            "指示器出现明显神器图标时：判断神器已经就绪更准确，但会有明显延迟。\n"
+            "该设置会同时影响普通模式、周期模式和神器检测重置。"
+        )
+        hint_mode.setWordWrap(True)
+        hint_mode.setStyleSheet("color: #a8a8a8; font-size: 10pt;")
+        gl_artifact.addRow(hint_mode)
+        
         hint1 = QLabel(
             "神器提醒周期只在110-180秒时生效。提醒周期不生效时会单纯按照顶部神器指示变成绿色时提示神器，会有固定几秒钟延迟。\n"
             "生效时会在顶部神器指示器变灰后固定时间后自动提醒，而不是等到顶部识别到有神器时提醒。也不会提醒第一个神器。\n"
@@ -67,7 +87,6 @@ class SettingsTabsBuilder:
         hint1.setWordWrap(True)
         hint1.setStyleSheet("color: #b8b8b8; font-size: 10pt;")
         gl_artifact.addRow(hint1)
-
         SettingsTabsBuilder._add_compact_row(parent, gl_artifact, "定时参数:", [
             ("神器提醒周期（秒）:", 'ARTIFACT_TIMED_TRIGGER_SECONDS', 'spin', {'max': 300}),
             ("无神器发现超时（秒）:", 'ARTIFACT_TIMED_TRIGGER_NO_NOT_IDLE_TIMEOUT_SECONDS', 'spin', {'max': 300}),

@@ -24,31 +24,35 @@ class ArtifactNotifier:
        - 这一步【无视英雄头像】，只看 idle 颜色
        - 若激活失败，则本局禁用，直到再次 reset
 
-    2. 激活通过后的所有 idle / not_idle 判断
+    2. 激活通过后的所有状态判断
        - 无论是普通图像模式、定时模式、还是 force recovery
        - 都必须先检测到英雄存活头像（zeratul_alive.png）
-       - 若未检测到头像，则本秒跳过 idle / not_idle 状态判断
+       - 若未检测到头像，则本秒跳过相关状态判断
        - 下一个游戏秒再重新尝试检测头像
 
-    3. 普通图像模式
-       - 激活通过后，若未开启定时模式，则按 idle -> not_idle 变化触发
+    3. 神器就绪状态判定
+       - not_idle：指示器变得不是灰色时，判为“有效就绪态”
+       - ready：指示器出现明显神器图标时，判为“有效就绪态”
+
+    4. 普通图像模式
+       - 激活通过后，若未开启定时模式，则按“有效就绪态”触发神器提示
        - 提示显示后，重新回到 idle 时隐藏
        - 随后进入冷却
 
-    4. 定时模式
-       - 激活通过后，先等待一次 not_idle -> idle 作为锚点
+    5. 定时模式
+       - 激活通过后，先等待一次“有效就绪态 -> idle”作为锚点
        - 从锚点开始计时
        - 若配置了提前倒计时，则在到时前 N 秒显示“神器即将{time}”
        - 到时后显示“神器已经就绪”
-       - 若提示后 30 秒内仍未出现 not_idle，则关闭提示，并在 reset 前不再触发定时提醒
-       - 若提示后已出现 not_idle，则在再次回到 idle 时隐藏，并重新进入下一轮定时等待
+       - 若提示后 30 秒内仍未再次出现有效就绪态，则关闭提示，并在 reset 前不再触发定时提醒
+       - 若提示后已再次出现有效就绪态，则在再次回到 idle 时隐藏，并重新进入下一轮定时等待
 
-    5. force recovery（保底恢复）
+    6. force recovery（保底恢复）
        - 该接口供快捷键/UI 手动触发
        - 触发后无视初始激活结果，直接进入保底检测
        - 但【仍然受英雄头像门控限制】
        - 最多持续 180 游戏秒
-       - 若第一次有效 idle -> not_idle 出现，则触发第一轮神器提醒
+       - 若第一次检测到有效就绪态，则触发第一轮神器提醒
        - 第一轮触发后，关闭保底限时逻辑，并根据当前配置回到普通图像模式或定时模式
        - 若 180 游戏秒内始终未出现有效触发，则本次保底检测结束，直到再次手动触发
     """
@@ -81,6 +85,11 @@ class ArtifactNotifier:
     # ===== 普通图像模式参数 =====
     # 连续多少个游戏秒检测到 not idle 才触发
     ARTIFACT_NOT_IDLE_TRIGGER_SECONDS = 1
+
+    # 神器“已经就绪”的判定方式：
+    # - not_idle：进入 not_idle 就算就绪，时间更灵敏，但可能误判
+    # - ready：进入 ready 才算就绪，更准确，但会有明显延迟
+    ARTIFACT_READY_DETECTION_MODE = "not_idle"
 
     # ===== 定时模式参数 =====
     # 只有当该值位于 [110, 180] 内时，启用定时模式
@@ -170,6 +179,7 @@ class ArtifactNotifier:
         "ARTIFACT_ALERT_TEXT",
         "ARTIFACT_ALERT_COLOR",
         "ARTIFACT_ALERT_SOUND",
+        "ARTIFACT_READY_DETECTION_MODE",
     )
 
     def __init__(self, parent=None):
@@ -221,9 +231,12 @@ class ArtifactNotifier:
 
         # 记录上一秒 idle 状态，用于检测状态转换
         self._last_is_idle = None
+        
+        # 记录上一秒“有效就绪态”（not_idle 或 ready），用于周期锚点与保底恢复
+        self._last_effective_ready_state = None
 
         # 定时模式下：提示触发后，是否已经见过一次 post-alert non-idle
-        self._timed_ready_seen_non_idle = False
+        self._timed_ready_seen_effective_ready = False
 
         # 定时模式下：本次提示开始显示的游戏秒
         self._timed_ready_alert_start_second = None
@@ -260,8 +273,8 @@ class ArtifactNotifier:
         规则：
         - 无视初始激活结果，直接进入保底检测
         - 但仍受英雄头像门控限制
-        - 若进入时当前就是 not_idle，则不立即触发，
-          而是先等待其回到 idle，再等待下一次 idle -> not_idle
+        - 若进入时当前就是 READY_DETECTION_MODE，则不立即触发，
+          而是先等待其回到 idle，再等待下一次 idle -> READY_DETECTION_MODE
         - 若进入时当前为 idle，则在神器提示位置显示一条短提示，
           表示保底检测已恢复
         """
@@ -270,13 +283,16 @@ class ArtifactNotifier:
 
         self._state = self.STATE_FORCE_RECOVERY
         self._force_recovery_start_second = current_second
-        self._force_recovery_waiting_for_idle_first = (not is_idle)
+        
+        effective_ready_state = self._get_effective_ready_state(current_second, is_idle)
+        self._force_recovery_waiting_for_idle_first = bool(effective_ready_state)
+        self._last_effective_ready_state = effective_ready_state
 
         self._idle_anchor_second = None
         self._cooldown_start_time = None
         self._not_idle_streak_seconds = 0
         self._last_not_idle_second = None
-        self._timed_ready_seen_non_idle = False
+        self._timed_ready_seen_effective_ready = False
         self._timed_ready_alert_start_second = None
         self._timed_countdown_last_remaining = None
         self._last_trigger_source = None
@@ -418,24 +434,46 @@ class ArtifactNotifier:
             return
 
     def _handle_monitoring_state(self, current_second, is_idle, hero_gate_ok):
+        detection_mode = self._get_ready_detection_mode()
         is_ready = None
 
+        # ===== 周期模式 =====
         if self._is_timed_trigger_mode_enabled():
             if not hero_gate_ok:
                 self.logger.info(
-                    f"[定时监控] sec={current_second} 未检测到英雄存活头像，暂停 idle 状态变化判断。"
+                    f"[定时监控] sec={current_second} 未检测到英雄存活头像，暂停状态变化判断。"
                 )
                 self._last_is_idle = is_idle
                 return
 
-            self._update_idle_transition_tracking(current_second, is_idle)
+            if detection_mode == "ready":
+                if self._should_skip_ready_region_recognition(current_second):
+                    is_ready = False
+                else:
+                    is_ready = self._is_ready_by_region()
+
+            effective_ready_state = self._get_effective_ready_state(
+                current_second=current_second,
+                is_idle=is_idle,
+                is_ready=is_ready
+            )
+
+            self._update_idle_transition_tracking(
+                current_second=current_second,
+                effective_ready_state=effective_ready_state,
+                is_idle=is_idle
+            )
+
             self.logger.debug(
-                f"[定时监控] current_second={current_second}, is_idle={is_idle}, "
+                f"[定时监控] current_second={current_second}, mode={detection_mode}, "
+                f"is_idle={is_idle}, is_ready={is_ready}, "
+                f"effective_ready_state={effective_ready_state}, "
                 f"idle_anchor_second={self._idle_anchor_second}, state={self._state}"
             )
             self._last_is_idle = is_idle
             return
 
+        # ===== 非周期模式 =====
         if not hero_gate_ok:
             self.logger.debug(
                 f"[图像监控] sec={current_second} 未检测到英雄存活头像，暂停 idle/not_idle 判断。"
@@ -443,13 +481,38 @@ class ArtifactNotifier:
             self._last_is_idle = is_idle
             return
 
-        if self.ARTIFACT_ENABLE_READY_DEBUG_COMPARE and not self._should_skip_ready_region_recognition(current_second):
-            is_ready = self._is_ready_by_region()
+        if detection_mode == "ready":
+            if self._should_skip_ready_region_recognition(current_second):
+                self._last_effective_ready_state = False
+                self._last_is_idle = is_idle
+                return
 
+            is_ready = self._is_ready_by_region()
+            effective_ready_state = self._get_effective_ready_state(
+                current_second=current_second,
+                is_idle=is_idle,
+                is_ready=is_ready
+            )
+
+            self.logger.debug(
+                f"[图像监控] current_second={current_second}, mode=ready, "
+                f"is_idle={is_idle}, is_ready={is_ready}, "
+                f"effective_ready_state={effective_ready_state}"
+            )
+
+            if effective_ready_state:
+                self.logger.info("检测到 ready 区域命中阈值，触发神器提示。")
+                self._trigger_ready_alert(current_second, is_idle, trigger_source="image")
+                return
+
+            self._last_effective_ready_state = effective_ready_state
+            self._last_is_idle = is_idle
+            return
+
+        # ===== 非周期模式：not_idle =====
         self.logger.debug(
-            f"[对比用] current_second={current_second}, is_idle={is_idle}, "
-            f"is_ready={is_ready}, not_idle_streak={self._not_idle_streak_seconds}, "
-            f"idle_anchor_second={self._idle_anchor_second}"
+            f"[图像监控] current_second={current_second}, mode=not_idle, "
+            f"is_idle={is_idle}, not_idle_streak={self._not_idle_streak_seconds}"
         )
 
         self._update_not_idle_streak(current_second, is_idle)
@@ -460,8 +523,9 @@ class ArtifactNotifier:
             self._trigger_ready_alert(current_second, is_idle, trigger_source="image")
             return
 
+        self._last_effective_ready_state = (not is_idle)
         self._last_is_idle = is_idle
-
+    
     def _handle_timed_waiting_state(self, current_second, is_idle):
         remaining = self._get_timed_remaining_seconds(current_second)
         if remaining is None:
@@ -530,7 +594,7 @@ class ArtifactNotifier:
         self._not_idle_streak_seconds = 0
         self._last_not_idle_second = None
         self._timed_countdown_last_remaining = None
-        self._timed_ready_seen_non_idle = False
+        self._timed_ready_seen_effective_ready = False
         self._timed_ready_alert_start_second = None
 
         if self._is_timed_trigger_mode_enabled():
@@ -550,8 +614,10 @@ class ArtifactNotifier:
 
     def _handle_timed_ready_detected_state(self, current_second, is_idle, hero_gate_ok):
         timeout_seconds = int(self.ARTIFACT_TIMED_TRIGGER_NO_NOT_IDLE_TIMEOUT_SECONDS)
+        detection_mode = self._get_ready_detection_mode()
+        is_ready = None
 
-        if not self._timed_ready_seen_non_idle:
+        if not self._timed_ready_seen_effective_ready:
             if (
                 timeout_seconds > 0
                 and self._timed_ready_alert_start_second is not None
@@ -560,11 +626,11 @@ class ArtifactNotifier:
                 self._hide_message()
                 self._state = self.STATE_DISABLED
                 self._idle_anchor_second = None
-                self._timed_ready_seen_non_idle = False
+                self._timed_ready_seen_effective_ready = False
                 self._timed_ready_alert_start_second = None
                 self._timed_countdown_last_remaining = None
                 self.logger.info(
-                    f"定时模式下，提示触发后 {timeout_seconds} 秒内仍未出现 non-idle，"
+                    f"定时模式下，提示触发后 {timeout_seconds} 秒内仍未出现有效就绪态，"
                     f"关闭提示，并在 reset 前不再触发定时提醒。"
                 )
                 self._last_is_idle = is_idle
@@ -573,15 +639,28 @@ class ArtifactNotifier:
             if not hero_gate_ok:
                 self.logger.info(
                     f"[神器提示-定时模式] sec={current_second} 未检测到英雄存活头像，"
-                    f"仅保留 30 秒超时检查，不判断 non-idle/idle 变化。"
+                    f"仅保留超时检查，不判断有效就绪态/idle 变化。"
                 )
                 self._last_is_idle = is_idle
                 return
 
-            if not is_idle:
-                self._timed_ready_seen_non_idle = True
+            if detection_mode == "ready":
+                if self._should_skip_ready_region_recognition(current_second):
+                    is_ready = False
+                else:
+                    is_ready = self._is_ready_by_region()
+
+            effective_ready_state = self._get_effective_ready_state(
+                current_second=current_second,
+                is_idle=is_idle,
+                is_ready=is_ready
+            )
+
+            if effective_ready_state:
+                self._timed_ready_seen_effective_ready = True
                 self.logger.info(
-                    "定时模式下，提示后首次检测到 non-idle；继续保持提示，等待再次回到 idle。"
+                    f"定时模式下，提示后首次检测到有效就绪态（mode={detection_mode}）；"
+                    f"继续保持提示，等待再次回到 idle。"
                 )
 
             self._last_is_idle = is_idle
@@ -598,17 +677,20 @@ class ArtifactNotifier:
             self._hide_message()
             self._idle_anchor_second = current_second
             self._state = self.STATE_TIMED_WAITING
-            self._timed_ready_seen_non_idle = False
+            self._timed_ready_seen_effective_ready = False
             self._timed_ready_alert_start_second = None
             self._timed_countdown_last_remaining = None
             self.logger.debug(
-                "定时模式下检测到提示后的 non-idle -> idle，隐藏提示并重新进入等待。"
+                "定时模式下检测到有效就绪态 -> idle，隐藏提示并重新进入等待。"
             )
 
         self._last_is_idle = is_idle
-
+    
     def _handle_force_recovery_state(self, current_second, is_idle, hero_gate_ok):
         max_seconds = int(self.ARTIFACT_FORCE_RECOVERY_MAX_SECONDS)
+        detection_mode = self._get_ready_detection_mode()
+        is_ready = None
+
         if (
             self._force_recovery_start_second is not None
             and (current_second - self._force_recovery_start_second) >= max_seconds
@@ -617,7 +699,7 @@ class ArtifactNotifier:
             self._force_recovery_start_second = None
             self._force_recovery_waiting_for_idle_first = False
             self.logger.info(
-                f"保底重置模式在 {max_seconds} 游戏秒内未等到有效的 idle -> not_idle，"
+                f"保底重置模式在 {max_seconds} 游戏秒内未等到有效的就绪触发（mode={detection_mode}），"
                 f"本次保底检测结束。"
             )
             self._last_is_idle = is_idle
@@ -625,30 +707,46 @@ class ArtifactNotifier:
 
         if not hero_gate_ok:
             self.logger.info(
-                f"[保底模式] sec={current_second} 未检测到英雄存活头像，暂停 idle/not_idle 判断。"
+                f"[保底模式] sec={current_second} 未检测到英雄存活头像，暂停就绪判断。"
             )
             self._last_is_idle = is_idle
             return
+
+        if detection_mode == "ready":
+            if self._should_skip_ready_region_recognition(current_second):
+                is_ready = False
+            else:
+                is_ready = self._is_ready_by_region()
+
+        effective_ready_state = self._get_effective_ready_state(
+            current_second=current_second,
+            is_idle=is_idle,
+            is_ready=is_ready
+        )
 
         if self._force_recovery_waiting_for_idle_first:
             if is_idle:
                 self._force_recovery_waiting_for_idle_first = False
                 self._last_is_idle = True
-                self.logger.info("保底模式：当前已重新回到 idle，开始等待下一次 idle -> not_idle。")
+                self._last_effective_ready_state = False
+                self.logger.info("保底模式：当前已重新回到 idle，开始等待下一次有效就绪态。")
             else:
-                self._last_is_idle = False
+                self._last_effective_ready_state = effective_ready_state
+                self._last_is_idle = is_idle
             return
 
-        if self._last_is_idle is None:
+        if self._last_effective_ready_state is None:
+            self._last_effective_ready_state = effective_ready_state
             self._last_is_idle = is_idle
             return
 
-        if self._last_is_idle is True and is_idle is False:
-            self.logger.info("保底模式检测到首次有效 idle -> not_idle，触发神器提示。")
+        if (not self._last_effective_ready_state) and effective_ready_state:
+            self.logger.info(f"保底模式检测到首次有效就绪态（mode={detection_mode}），触发神器提示。")
             self._force_recovery_start_second = None
             self._trigger_ready_alert(current_second, is_idle, trigger_source="image")
             return
 
+        self._last_effective_ready_state = effective_ready_state
         self._last_is_idle = is_idle
 
     def _trigger_ready_alert(self, current_second, is_idle, trigger_source):
@@ -670,11 +768,24 @@ class ArtifactNotifier:
         self._timed_countdown_last_remaining = None
 
         if trigger_source == "timed":
+            is_ready = None
+            if self._get_ready_detection_mode() == "ready":
+                if self._should_skip_ready_region_recognition(current_second):
+                    is_ready = False
+                else:
+                    is_ready = self._is_ready_by_region()
+
+            effective_ready_state = self._get_effective_ready_state(
+                current_second=current_second,
+                is_idle=is_idle,
+                is_ready=is_ready
+            )
+
             self._timed_ready_alert_start_second = current_second
-            self._timed_ready_seen_non_idle = (not is_idle)
+            self._timed_ready_seen_effective_ready = bool(effective_ready_state)
         else:
             self._timed_ready_alert_start_second = None
-            self._timed_ready_seen_non_idle = False
+            self._timed_ready_seen_effective_ready = False
 
         self._last_is_idle = is_idle
 
@@ -703,6 +814,37 @@ class ArtifactNotifier:
         elapsed = current_second - self._idle_anchor_second
         return trigger_seconds - elapsed
 
+    def _get_ready_detection_mode(self):
+        """
+        获取当前神器就绪判定方式。
+
+        可选：
+        - not_idle：进入 not_idle 就算就绪
+        - ready：进入 ready 才算就绪
+        """
+        mode = str(getattr(self, "ARTIFACT_READY_DETECTION_MODE", "not_idle")).strip().lower()
+        if mode not in ("not_idle", "ready"):
+            return "not_idle"
+        return mode
+
+    def _get_effective_ready_state(self, current_second, is_idle, is_ready=None):
+        """
+        计算当前是否处于“有效就绪态”。
+
+        - not_idle 模式：有效就绪态 = not is_idle
+        - ready 模式：有效就绪态 = is_ready
+        """
+        mode = self._get_ready_detection_mode()
+
+        if mode == "ready":
+            if is_ready is None:
+                if self._should_skip_ready_region_recognition(current_second):
+                    return False
+                is_ready = self._is_ready_by_region()
+            return bool(is_ready)
+
+        return not is_idle
+    
     def _is_timed_trigger_mode_enabled(self):
         if self.ARTIFACT_TIMED_TRIGGER_SECONDS is None:
             return False
@@ -871,28 +1013,28 @@ class ArtifactNotifier:
         self._last_not_idle_second = current_second
         self.logger.info(f"ArtifactNotifier not idle 连续秒数 = {self._not_idle_streak_seconds}")
 
-    def _update_idle_transition_tracking(self, current_second, is_idle):
+    def _update_idle_transition_tracking(self, current_second, effective_ready_state, is_idle):
         """
-        记录 idle / not idle 状态转换。
+        记录周期模式的下一轮计时锚点。
 
-        重点：
-        - 只在 MONITORING 阶段使用
-        - 检测到 not idle -> idle 时，记录一个“idle 锚点”
-        - 定时模式将切换到等待阶段，基于这个锚点计时
+        规则：
+        - not_idle 模式：从 not_idle -> idle 记录锚点
+        - ready 模式：从 ready -> idle 记录锚点
         """
-        if self._last_is_idle is None:
-            self._last_is_idle = is_idle
+        if self._last_effective_ready_state is None:
+            self._last_effective_ready_state = effective_ready_state
             return
 
-        # 检测到 not idle -> idle
-        if self._last_is_idle is False and is_idle is True:
+        if self._last_effective_ready_state is True and is_idle is True:
             self._idle_anchor_second = current_second
             self._state = self.STATE_TIMED_WAITING
             self._timed_countdown_last_remaining = None
             self.logger.info(
-                f"检测到 not idle -> idle，记录 idle_anchor_second = {self._idle_anchor_second}，"
+                f"检测到有效就绪态 -> idle，记录 idle_anchor_second = {self._idle_anchor_second}，"
                 f"进入 {self.STATE_TIMED_WAITING}。"
             )
+
+        self._last_effective_ready_state = effective_ready_state
 
     def _handle_validating_state(self, current_second, is_idle):
         if self._validation_locked:
