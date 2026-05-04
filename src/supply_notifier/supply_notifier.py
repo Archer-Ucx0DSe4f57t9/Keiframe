@@ -5,19 +5,19 @@ SupplyNotifier
 
 用途：
 - 每个游戏秒读取右上角人口 current/max。
-- 当 max - current <= 5，且 max 不属于排除上限时，在人口 ROI 下方显示“更多补给”。
+- 4 分钟前，当 max - current <= 2，且 max 不属于排除上限时，在人口 ROI 下方显示“更多补给”。
+- 4 分钟后，当 max - current <= 4，且 max 不属于排除上限时，在人口 ROI 下方显示“更多补给”。
 - 消息颜色每 1 游戏秒在白色/红色之间切换。
 - 条件持续满足超过/达到配置秒数后，播放 notify_more_supplies.mp3。
 - 一旦识别失败或条件不满足，立即隐藏消息并重置播报状态。
 
 依赖：
-- src.recognizers.white_supply_recognizer.WhiteSupplyRecognizer
+- src.supply_notifier.white_supply_recognizer.WhiteSupplyRecognizer
 - src.output.message_presenter.MessagePresenter
 """
 
 from __future__ import annotations
 
-import os
 from typing import Optional, Tuple
 
 from PyQt5.QtCore import Qt
@@ -26,7 +26,6 @@ from src import config
 from src.game_state_service import state
 from src.output.message_presenter import MessagePresenter
 from src.supply_notifier.white_supply_recognizer import WhiteSupplyRecognizer
-from src.utils.fileutil import get_resources_dir
 from src.utils.logging_util import get_logger
 from src.utils.window_utils import get_sc2_window_geometry, is_game_active
 
@@ -34,52 +33,69 @@ from src.utils.window_utils import get_sc2_window_geometry, is_game_active
 class SupplyNotifier:
     """人口不足提示模块。"""
 
+    # ===== 功能开关 =====
+    SUPPLY_ALERT_ENABLED = True  # 总开关；False 时完全关闭人口提醒。
+
     # ===== 触发规则 =====
-    SUPPLY_WARNING_REMAINING = 5 #持续处于 max - current <= 5 的条件下才提示，剩余人口超过这个值则不提示。
-    SUPPLY_EXCLUDED_MAX_VALUES = (100, 150) #不对这些上限值进行提示，允许配置为列表/逗号分隔字符串，如 "100,150"。
-    SUPPLY_MAX_ALERT_LIMIT = 190 #当上限过大时不提示，避免误识别导致的骚扰。
+    # 早期/中后期使用不同人口余量阈值。
+    # 例如 4 分钟前剩余 <=2 提醒，4 分钟后剩余 <=4 提醒。
+    SUPPLY_WARNING_PHASE_SWITCH_SECONDS = 240
+    SUPPLY_WARNING_REMAINING_BEFORE_SWITCH = 2
+    SUPPLY_WARNING_REMAINING_AFTER_SWITCH = 4
+
+    # 兼容旧配置：如果外部仍然只设置 SUPPLY_WARNING_REMAINING，则作为 after_switch 的 fallback。
+    SUPPLY_WARNING_REMAINING = 3
+
+    SUPPLY_EXCLUDED_MAX_VALUES = (100, 150)
+    SUPPLY_MAX_ALERT_LIMIT = 190
 
     # 满足条件持续多少游戏秒后播放声音。
     # 例如首次满足在 10 秒，13 秒时 current_second - start_second == 3，会播放。
     SUPPLY_SOUND_AFTER_SECONDS = 3
 
+    # 音频提醒最短间隔，单位：游戏秒。
+    # 即使本轮满足 SUPPLY_SOUND_AFTER_SECONDS，也必须距离上一次播放至少这么久才会再次播放。
+    SUPPLY_SOUND_MIN_INTERVAL_SECONDS = 30
+
     # ===== 显示内容 =====
     SUPPLY_ALERT_TEXT = "更多补给"
-    SUPPLY_ALERT_COLOR_WHITE = "rgb(255,255,255)"
-    SUPPLY_ALERT_COLOR_RED = "rgb(255,60,60)"
-    SUPPLY_ALERT_SOUND = "notify_more_supplies.mp3"
+    SUPPLY_ALERT_COLOR_ONE = "rgb(255,255,255)"
+    SUPPLY_ALERT_COLOR_TWO = "rgb(255,60,60)"
+    SUPPLY_ALERT_SOUND = "Default.mp3"
 
     # ===== 显示位置 =====
-    # 消息默认右对齐到人口 ROI 右侧，并显示在 ROI 下方。
-    SUPPLY_ALERT_WIDTH = 180
-    SUPPLY_ALERT_HEIGHT = 38
-    SUPPLY_ALERT_FONT_SIZE = 26
-    SUPPLY_ALERT_VERTICAL_OFFSET = -4
-    SUPPLY_ALERT_Y_OFFSET_BELOW_ROI = 6
+    SUPPLY_ALERT_OFFSET_X = 1800
+    SUPPLY_ALERT_OFFSET_Y = 40
+    SUPPLY_ALERT_WIDTH = 90
+    SUPPLY_ALERT_HEIGHT = 32
+    SUPPLY_ALERT_FONT_SIZE = 20
+    SUPPLY_ALERT_VERTICAL_OFFSET = -5
 
     # 若右对齐后仍然过界，用这个边距做窗口内限制。
     SUPPLY_ALERT_WINDOW_MARGIN = 8
-
 
     # 识别失败是否立即隐藏。按当前需求：中途一旦不满足/无法确认，就取消消息。
     SUPPLY_HIDE_ON_RECOGNITION_FAIL = True
 
     SUPPLY_RUNTIME_CONFIG_KEYS = (
+        "SUPPLY_ALERT_ENABLED",
+        "SUPPLY_WARNING_PHASE_SWITCH_SECONDS",
+        "SUPPLY_WARNING_REMAINING_BEFORE_SWITCH",
+        "SUPPLY_WARNING_REMAINING_AFTER_SWITCH",
         "SUPPLY_WARNING_REMAINING",
         "SUPPLY_EXCLUDED_MAX_VALUES",
         "SUPPLY_MAX_ALERT_LIMIT",
-        "SUPPLY_SOUND_AFTER_SECONDS",
+        "SUPPLY_SOUND_MIN_INTERVAL_SECONDS",
         "SUPPLY_ALERT_TEXT",
-        "SUPPLY_ALERT_COLOR_WHITE",
-        "SUPPLY_ALERT_COLOR_RED",
+        "SUPPLY_ALERT_COLOR_ONE",
+        "SUPPLY_ALERT_COLOR_TWO",
         "SUPPLY_ALERT_SOUND",
+        "SUPPLY_ALERT_OFFSET_X",
+        "SUPPLY_ALERT_OFFSET_Y",
         "SUPPLY_ALERT_WIDTH",
         "SUPPLY_ALERT_HEIGHT",
         "SUPPLY_ALERT_FONT_SIZE",
         "SUPPLY_ALERT_VERTICAL_OFFSET",
-        "SUPPLY_ALERT_Y_OFFSET_BELOW_ROI",
-        "SUPPLY_ALERT_WINDOW_MARGIN",
-        "SUPPLY_HIDE_ON_RECOGNITION_FAIL",
     )
 
     def __init__(self, parent=None, recognizer: Optional[WhiteSupplyRecognizer] = None):
@@ -125,6 +141,7 @@ class SupplyNotifier:
         except Exception:
             return set()
 
+
     def reset(self):
         self._refresh_runtime_config()
 
@@ -133,6 +150,7 @@ class SupplyNotifier:
         self._condition_start_second = None
         self._last_condition_second = None
         self._sound_played_for_current_streak = False
+        self._last_sound_second = None
         self._current_overlay_visible = False
         self._last_result = None
         self._last_screen_shape = None
@@ -153,6 +171,10 @@ class SupplyNotifier:
             return
 
         self._refresh_runtime_config()
+
+        if not bool(self.SUPPLY_ALERT_ENABLED):
+            self._reset_condition_and_hide(reason="disabled")
+            return
 
         # 同一游戏秒只处理一次。
         if current_second == self._last_checked_second:
@@ -194,9 +216,10 @@ class SupplyNotifier:
         current_supply = int(result.get("current", -1))
         max_supply = int(result.get("max", -1))
 
-        if not self._should_show_alert(current_supply, max_supply):
+        if not self._should_show_alert(current_supply, max_supply, current_second):
+            threshold = self._get_warning_remaining_threshold(current_second)
             self._reset_condition_and_hide(
-                reason=f"condition_false:{current_supply}/{max_supply}"
+                reason=f"condition_false:{current_supply}/{max_supply}, threshold={threshold}"
             )
             return
 
@@ -212,7 +235,32 @@ class SupplyNotifier:
             return "en"
         return "cn"
 
-    def _should_show_alert(self, current_supply: int, max_supply: int) -> bool:
+    def _get_warning_remaining_threshold(self, current_second: int) -> int:
+        """
+        根据游戏时间选择人口余量提醒阈值。
+
+        默认：
+        - 4 分钟前：剩余 <= 2 提醒
+        - 4 分钟后：剩余 <= 4 提醒
+        """
+        try:
+            switch_second = int(self.SUPPLY_WARNING_PHASE_SWITCH_SECONDS)
+        except Exception:
+            switch_second = 240
+
+        if current_second < switch_second:
+            try:
+                return int(self.SUPPLY_WARNING_REMAINING_BEFORE_SWITCH)
+            except Exception:
+                return 2
+
+        try:
+            return int(self.SUPPLY_WARNING_REMAINING_AFTER_SWITCH)
+        except Exception:
+            # 兼容旧配置。
+            return int(self.SUPPLY_WARNING_REMAINING)
+
+    def _should_show_alert(self, current_supply: int, max_supply: int, current_second: int) -> bool:
         if current_supply < 0 or max_supply <= 0:
             return False
 
@@ -223,7 +271,8 @@ class SupplyNotifier:
             return False
 
         remaining = max_supply - current_supply
-        return remaining <= int(self.SUPPLY_WARNING_REMAINING)
+        threshold = self._get_warning_remaining_threshold(current_second)
+        return remaining <= threshold
 
     def _handle_condition_true(self, current_second: int, result: dict):
         if not self._condition_active:
@@ -254,20 +303,30 @@ class SupplyNotifier:
         if (
             not self._sound_played_for_current_streak
             and elapsed >= int(self.SUPPLY_SOUND_AFTER_SECONDS)
+            and self._can_play_sound(current_second)
         ):
             sound_filename = str(self.SUPPLY_ALERT_SOUND or "")
             self._sound_played_for_current_streak = True
+            self._last_sound_second = current_second
             self.logger.info(
                 f"SupplyNotifier 条件持续 {elapsed} 秒，播放声音: {sound_filename}, result={result.get('raw')}"
             )
 
         self._show_message(result=result, color=color, sound_filename=sound_filename)
 
+    def _can_play_sound(self, current_second: int) -> bool:
+        min_interval = int(self.SUPPLY_SOUND_MIN_INTERVAL_SECONDS)
+        if min_interval <= 0:
+            return True
+        if self._last_sound_second is None:
+            return True
+        return (current_second - self._last_sound_second) >= min_interval
+
     def _get_blink_color(self, current_second: int) -> str:
         # 每 1 游戏秒在白色和红色之间切换。
         if current_second % 2 == 0:
-            return str(self.SUPPLY_ALERT_COLOR_WHITE)
-        return str(self.SUPPLY_ALERT_COLOR_RED)
+            return str(self.SUPPLY_ALERT_COLOR_ONE)
+        return str(self.SUPPLY_ALERT_COLOR_TWO)
 
     def _reset_condition_and_hide(self, reason: str = ""):
         if self._condition_active or self._current_overlay_visible:
@@ -280,38 +339,29 @@ class SupplyNotifier:
         self._hide_message()
 
     def _calc_message_geometry(self, result: dict) -> Optional[Tuple[int, int, int, int]]:
+        """
+        计算提示窗口位置。
+
+        与 ToastManager 保持一致：
+        - SUPPLY_ALERT_OFFSET_X / SUPPLY_ALERT_OFFSET_Y 是相对游戏窗口左上角的像素坐标；
+        - SUPPLY_ALERT_WIDTH / HEIGHT / FONT_SIZE 都直接使用配置值，不按分辨率额外缩放。
+
+        这样玩家在设置里填多少，实际就尽量显示多少。
+        """
         sc2_rect = get_sc2_window_geometry()
         if not sc2_rect:
             self.logger.error("SupplyNotifier 无法获取游戏窗口位置，跳过提示。")
             return None
 
-        roi = result.get("roi")
-        if not roi or len(roi) != 4:
-            self.logger.error(f"SupplyNotifier 识别结果没有有效 roi: {roi}")
-            return None
-
         sc2_x, sc2_y, sc2_w, sc2_h = sc2_rect
-        roi_x, roi_y, roi_w, roi_h = [int(v) for v in roi]
 
-        screen_h, screen_w = self._last_screen_shape if self._last_screen_shape else (sc2_h, sc2_w)
-        if screen_w <= 0 or screen_h <= 0:
-            return None
-
-        scale_x = sc2_w / float(screen_w)
-        scale_y = sc2_h / float(screen_h)
-        ui_scale = max(0.75, min(2.0, sc2_w / 1920.0))
-
-        msg_w = max(120, int(round(float(self.SUPPLY_ALERT_WIDTH) * ui_scale)))
-        msg_h = max(24, int(round(float(self.SUPPLY_ALERT_HEIGHT) * ui_scale)))
-
-        roi_right_screen = sc2_x + int(round((roi_x + roi_w) * scale_x))
-        roi_bottom_screen = sc2_y + int(round((roi_y + roi_h) * scale_y))
-
-        margin = int(self.SUPPLY_ALERT_WINDOW_MARGIN)
-        msg_x = roi_right_screen - msg_w
-        msg_y = roi_bottom_screen + int(round(float(self.SUPPLY_ALERT_Y_OFFSET_BELOW_ROI) * ui_scale))
+        msg_x = sc2_x + int(self.SUPPLY_ALERT_OFFSET_X)
+        msg_y = sc2_y + int(self.SUPPLY_ALERT_OFFSET_Y)
+        msg_w = max(80, int(self.SUPPLY_ALERT_WIDTH))
+        msg_h = max(20, int(self.SUPPLY_ALERT_HEIGHT))
 
         # 限制在游戏窗口内。
+        margin = int(self.SUPPLY_ALERT_WINDOW_MARGIN)
         min_x = sc2_x + margin
         max_x = sc2_x + sc2_w - msg_w - margin
         min_y = sc2_y + margin
@@ -329,9 +379,8 @@ class SupplyNotifier:
 
         msg_x, msg_y, msg_w, msg_h = geometry
         text = str(self.SUPPLY_ALERT_TEXT or "更多补给")
-        ui_scale = max(0.75, min(2.0, msg_w / float(max(1, self.SUPPLY_ALERT_WIDTH))))
-        font_size = max(12, int(round(float(self.SUPPLY_ALERT_FONT_SIZE) * ui_scale)))
-        vertical_offset = int(round(float(self.SUPPLY_ALERT_VERTICAL_OFFSET) * ui_scale))
+        font_size = max(8, int(self.SUPPLY_ALERT_FONT_SIZE))
+        vertical_offset = int(self.SUPPLY_ALERT_VERTICAL_OFFSET)
 
         try:
             self.message_presenter.setAttribute(Qt.WA_TransparentForMouseEvents, True)
@@ -345,6 +394,7 @@ class SupplyNotifier:
 
             self.message_presenter.resize(msg_w, msg_h)
             self.message_presenter.setFixedHeight(msg_h)
+
 
             self.message_presenter.update_message(
                 text,

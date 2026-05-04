@@ -232,6 +232,7 @@ class SettingsWindow(QDialog):
         builder.create_general_tab(self)
         builder.create_data_management_tab(self)
         builder.create_interface_tab(self)
+        builder.create_auto_alert_tab(self)
         builder.create_map_settings_tab(self)
         builder.create_mutation_settings_tab(self)
         builder.create_hotkey_tab(self)

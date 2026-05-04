@@ -15,7 +15,17 @@ class SettingsTabsBuilder:
         tab = QWidget()
         layout = QFormLayout()
 
-        parent.add_row(layout, "当前游戏语言 (Game Language):", 'current_game_language', 'combo', items=['zh', 'en'])
+        # 游戏语言设置 - 目前主要影响净网行动和补给识别时使用的语言，将来也会影响到敌方AI构成识别等功能
+        parent.add_row(
+            layout,
+            "当前游戏语言 (Game Language):",
+            'current_game_language',
+            'combo',
+            items=[
+                ("简体中文", "zh"),
+                ("English", "en"),
+            ]
+        )
 
         gb_window = QGroupBox("窗口与表格设置 (Window & Table)")
         gl_window = QFormLayout(gb_window)
@@ -53,33 +63,88 @@ class SettingsTabsBuilder:
         layout.setVerticalSpacing(14)
         layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
+
+        # 2. Memo 设置
+        gb_memo = QGroupBox("笔记 (Memo) 设置")
+        gl_memo = QFormLayout(gb_memo)
+        gl_memo.setVerticalSpacing(10)
+        gl_memo.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+
+        hint_memo = QLabel(
+            "笔记以{地图文件名称}.png形式存放在{根目录}/resources/memo/里面。可以自己拿画图或者photoshop做好喜欢的笔记命名好文件放memo目录里\n"
+            "文件名只以地图名为准，例如机会渺茫-人虫和机会渺茫-神都会共用机会渺茫.png作为笔记。将来可能会加入支持一个地图针对不同指挥官使用不同图片\n"
+            "解锁状态下点击📝按钮显示当前地图的的笔记，显示数秒后消失。\n"
+            "也可以选择按快捷键，第一次按快捷键显示，再按一次快捷键消失。笔记显示时鼠标操作会穿过图片反应到游戏里面。"
+        )
+        hint_memo.setWordWrap(True)
+        hint_memo.setStyleSheet("color: #b8b8b8; font-size: 10pt;")
+        gl_memo.addRow(hint_memo)
+        
+        parent.add_row(gl_memo, "笔记透明度 (0-1):", 'MEMO_OPACITY', 'double', step=0.1)
+        SettingsTabsBuilder._add_compact_row(parent, gl_memo, "时长设置:", [
+            ("持续时间 (ms):", 'MEMO_DURATION', 'spin', {'max': 60000}),
+            ("淡出时间 (ms):", 'MEMO_FADE_TIME', 'spin', {'max': 5000}),
+        ])
+        layout.addRow(gb_memo)
+
+        # 3. 自定义倒计时
+        gb_cd = QGroupBox("自定义倒计时 (Custom Countdown)")
+        gl_cd = QFormLayout(gb_cd)
+        gl_cd.setVerticalSpacing(10)
+        gl_cd.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+
+        parent.add_row(gl_cd, "最大同时存在数量:", 'COUNTDOWN_MAX_CONCURRENT', 'spin', min=1, max=10)
+        SettingsTabsBuilder._add_compact_row(parent, gl_cd, "显示设置:", [
+            ("警告时间 (秒):", 'COUNTDOWN_WARNING_THRESHOLD_SECONDS', 'spin', {'max': 9999}),
+            ("显示颜色:", 'COUNTDOWN_DISPLAY_COLOR', 'color', {}),
+        ])
+        parent.add_row(gl_cd, "倒计时选项列表:", 'COUNTDOWN_OPTIONS', 'countdown_list')
+        layout.addRow(gb_cd)
+
+        scroll.setWidget(content)
+        parent.tabs.addTab(scroll, "通用提示")
+
+    @staticmethod
+    def create_auto_alert_tab(parent):
+        """自动读取画面触发的提示配置：神器提醒 / 人口提醒"""
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+
+        content = QWidget()
+        layout = QFormLayout(content)
+        layout.setContentsMargins(8, 8, 12, 12)
+        layout.setVerticalSpacing(14)
+        layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+
+        # =========================
         # 1. 神器提醒设置
+        # =========================
         gb_artifact = QGroupBox("神器提醒设置 (Artifact Alert)")
         gl_artifact = QFormLayout(gb_artifact)
         gl_artifact.setVerticalSpacing(10)
         gl_artifact.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
-        
         hint_mode = QLabel(
-            "指示器变得不是灰色时：时间上更灵敏，但可能误判。\n"
+            "指示器变得不是严格灰色时：时间上更灵敏，但可能误判。\n"
             "指示器出现明显神器图标时：判断神器已经就绪更准确，但会有明显延迟。\n"
-            "该设置会同时影响普通模式、周期模式和神器检测重置。目前建议周期模式使用后者更好匹配时间。"
+            "该设置会同时影响普通模式、周期模式和神器检测重置。目前建议周期模式使用后者更好匹配时间。\n目前状态判断只会在泽拉图存活时进行。"
+            
         )
         hint_mode.setWordWrap(True)
         hint_mode.setStyleSheet("color: #a8a8a8; font-size: 10pt;")
         gl_artifact.addRow(hint_mode)
-        
+
         parent.add_row(
             gl_artifact,
             "神器就绪状态判定:",
             'ARTIFACT_READY_DETECTION_MODE',
             'combo',
             items=[
-                ("指示器变得不是灰色时", "not_idle"),
+                ("指示器变得不是严格灰色时", "not_idle"),
                 ("指示器出现明显神器图标时", "ready"),
             ]
         )
-        
+
         hint1 = QLabel(
             "神器提醒周期只在110-180秒时生效。提醒周期不生效时会单纯按照顶部神器指示变成绿色时提示神器，会有固定几秒钟延迟。\n"
             "生效时会在顶部神器指示器变灰后固定时间后自动提醒，而不是等到顶部识别到有神器时提醒。也不会提醒第一个神器。\n"
@@ -88,6 +153,7 @@ class SettingsTabsBuilder:
         hint1.setWordWrap(True)
         hint1.setStyleSheet("color: #b8b8b8; font-size: 10pt;")
         gl_artifact.addRow(hint1)
+
         SettingsTabsBuilder._add_compact_row(parent, gl_artifact, "定时参数:", [
             ("神器提醒周期（秒）:", 'ARTIFACT_TIMED_TRIGGER_SECONDS', 'spin', {'max': 300}),
             ("无神器发现超时（秒）:", 'ARTIFACT_TIMED_TRIGGER_NO_NOT_IDLE_TIMEOUT_SECONDS', 'spin', {'max': 300}),
@@ -112,38 +178,73 @@ class SettingsTabsBuilder:
 
         parent.add_row(gl_artifact, "提示颜色:", 'ARTIFACT_ALERT_COLOR', 'color')
         parent.add_row(gl_artifact, "提示音频:", 'ARTIFACT_ALERT_SOUND', 'line')
+
         layout.addRow(gb_artifact)
 
-        # 2. Memo 设置
-        gb_memo = QGroupBox("笔记 (Memo) 设置")
-        gl_memo = QFormLayout(gb_memo)
-        gl_memo.setVerticalSpacing(10)
-        gl_memo.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
-        parent.add_row(gl_memo, "透明度 (0-1):", 'MEMO_OPACITY', 'double', step=0.1)
-        SettingsTabsBuilder._add_compact_row(parent, gl_memo, "时长设置:", [
-            ("持续时间 (ms):", 'MEMO_DURATION', 'spin', {'max': 60000}),
-            ("淡出时间 (ms):", 'MEMO_FADE_TIME', 'spin', {'max': 5000}),
+        # =========================
+        # 2. 人口提醒设置
+        # =========================
+        gb_supply = QGroupBox("人口提醒设置 (Supply Alert)")
+        gl_supply = QFormLayout(gb_supply)
+        gl_supply.setVerticalSpacing(10)
+        gl_supply.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+
+        hint_supply = QLabel(
+            "人口提醒会自动读取右上角人口数值，并在接近当前人口上限时显示提示。4分钟前和4分钟后可使用不同的剩余人口阈值，以适配游戏节奏。\n"
+            "人口上限超过最高提醒上限，或者人口上限在排除人口上限列表时不会触发提醒。"
+        )
+        hint_supply.setWordWrap(True)
+        hint_supply.setStyleSheet("color: #b8b8b8; font-size: 10pt;")
+        gl_supply.addRow(hint_supply)
+
+        parent.add_row(gl_supply, "启用人口提醒:", 'SUPPLY_ALERT_ENABLED', 'bool')
+
+        SettingsTabsBuilder._add_compact_row(parent, gl_supply, "触发规则:", [
+            ("阶段切换时间(秒):", 'SUPPLY_WARNING_PHASE_SWITCH_SECONDS', 'spin', {'max': 1200}),
+            ("切换前剩余人口:", 'SUPPLY_WARNING_REMAINING_BEFORE_SWITCH', 'spin', {'max': 20}),
+            ("切换后剩余人口:", 'SUPPLY_WARNING_REMAINING_AFTER_SWITCH', 'spin', {'max': 20}),
         ])
-        layout.addRow(gb_memo)
 
-        # 3. 自定义倒计时
-        gb_cd = QGroupBox("自定义倒计时 (Custom Countdown)")
-        gl_cd = QFormLayout(gb_cd)
-        gl_cd.setVerticalSpacing(10)
-        gl_cd.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
-
-        parent.add_row(gl_cd, "最大同时存在数量:", 'COUNTDOWN_MAX_CONCURRENT', 'spin', min=1, max=10)
-        SettingsTabsBuilder._add_compact_row(parent, gl_cd, "显示设置:", [
-            ("警告时间 (秒):", 'COUNTDOWN_WARNING_THRESHOLD_SECONDS', 'spin', {'max': 9999}),
-            ("显示颜色:", 'COUNTDOWN_DISPLAY_COLOR', 'color', {}),
+        SettingsTabsBuilder._add_compact_row(parent, gl_supply, "上限规则:", [
+            ("最大提醒上限:", 'SUPPLY_MAX_ALERT_LIMIT', 'spin', {'max': 300}),
+            ("排除人口上限:", 'SUPPLY_EXCLUDED_MAX_VALUES', 'line', {'width': 140}),
         ])
-        parent.add_row(gl_cd, "倒计时选项列表:", 'COUNTDOWN_OPTIONS', 'countdown_list')
-        layout.addRow(gb_cd)
+
+        parent.add_row(gl_supply, "提示文字:", 'SUPPLY_ALERT_TEXT', 'line')
+        SettingsTabsBuilder._add_compact_row(parent, gl_supply, "闪烁字体颜色:", [
+            ("颜色1:", 'SUPPLY_ALERT_COLOR_ONE', 'color', {}),
+            ("颜色2:", 'SUPPLY_ALERT_COLOR_TWO', 'color', {}),
+        ])
+
+        SettingsTabsBuilder._add_compact_row(parent, gl_supply, "声音设置:", [
+            ("提示音频:", 'SUPPLY_ALERT_SOUND', 'line', {'width': 180}),
+            ("最短间隔(秒):", 'SUPPLY_SOUND_MIN_INTERVAL_SECONDS', 'spin', {'max': 300}),
+        ])
+
+        hint_supply_pos = QLabel("游戏画面左上角为基准点(0,0)，数字越大越靠近右/下。")
+        hint_supply_pos.setWordWrap(True)
+        hint_supply_pos.setStyleSheet("color: #a8a8a8; font-size: 10pt; font-style: italic;")
+        gl_supply.addRow(hint_supply_pos)
+
+        SettingsTabsBuilder._add_compact_row(parent, gl_supply, "坐标偏移:", [
+            ("左侧 (X):", 'SUPPLY_ALERT_OFFSET_X', 'spin', {'max': 3000}),
+            ("顶部 (Y):", 'SUPPLY_ALERT_OFFSET_Y', 'spin', {'max': 2000}),
+        ])
+
+        SettingsTabsBuilder._add_compact_row(parent, gl_supply, "字体布局:", [
+            ("宽度:", 'SUPPLY_ALERT_WIDTH', 'spin', {'max': 1000}),
+            ("高度:", 'SUPPLY_ALERT_HEIGHT', 'spin', {'max': 300}),
+            ("字号:", 'SUPPLY_ALERT_FONT_SIZE', 'spin', {'max': 100}),
+            ("文字垂直偏移:", 'SUPPLY_ALERT_VERTICAL_OFFSET', 'spin', {'min': -100, 'max': 100}),
+        ])
+
+        layout.addRow(gb_supply)
+
 
         scroll.setWidget(content)
-        parent.tabs.addTab(scroll, "通用提示")
-
+        parent.tabs.addTab(scroll, "自动提示")
+    
     @staticmethod
     def create_data_management_tab(parent):
         tab = QWidget()
@@ -445,7 +546,11 @@ class SettingsTabsBuilder:
         val = parent.current_config.get(key)
         widget = None
 
-        if widget_type == 'spin':
+        if widget_type == 'line':
+            widget = QLineEdit(str(val) if val is not None else "")
+            widget.setMinimumWidth(kwargs.get('width', 160))
+        
+        elif widget_type == 'spin':
             widget = ThemedSpinBox()
             widget.setRange(kwargs.get('min', 0), kwargs.get('max', 9999))
             widget.setValue(int(val) if val is not None else 0)
