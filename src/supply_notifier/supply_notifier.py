@@ -5,8 +5,8 @@ SupplyNotifier
 
 用途：
 - 每个游戏秒读取右上角人口 current/max。
-- 4 分钟前，当 max - current <= 2，且 max 不属于排除上限时，在人口 ROI 下方显示“更多补给”。
-- 4 分钟后，当 max - current <= 4，且 max 不属于排除上限时，在人口 ROI 下方显示“更多补给”。
+- 4 分钟前，当 max - current <= 2，且 max 不属于排除上限时，在人口 ROI 下方显示“建造补给”。
+- 4 分钟后，当 max - current <= 4，且 max 不属于排除上限时，在人口 ROI 下方显示“建造补给”。
 - 消息颜色每 1 游戏秒在白色/红色之间切换。
 - 条件持续满足超过/达到配置秒数后，播放 notify_more_supplies.mp3。
 - 一旦识别失败或条件不满足，立即隐藏消息并重置播报状态。
@@ -58,7 +58,7 @@ class SupplyNotifier:
     SUPPLY_SOUND_MIN_INTERVAL_SECONDS = 30
 
     # ===== 显示内容 =====
-    SUPPLY_ALERT_TEXT = "更多补给"
+    SUPPLY_ALERT_TEXT = "建造补给"
     SUPPLY_ALERT_COLOR_ONE = "rgb(255,255,255)"
     SUPPLY_ALERT_COLOR_TWO = "rgb(255,60,60)"
     SUPPLY_ALERT_SOUND = "Default.mp3"
@@ -378,7 +378,7 @@ class SupplyNotifier:
             return
 
         msg_x, msg_y, msg_w, msg_h = geometry
-        text = str(self.SUPPLY_ALERT_TEXT or "更多补给")
+        text = str(self.SUPPLY_ALERT_TEXT or "建造补给")
         font_size = max(8, int(self.SUPPLY_ALERT_FONT_SIZE))
         vertical_offset = int(self.SUPPLY_ALERT_VERTICAL_OFFSET)
 

@@ -57,7 +57,7 @@
         100,
         150
     ],
-    "SUPPLY_ALERT_TEXT": "更多补给",
+    "SUPPLY_ALERT_TEXT": "建造补给",
     "SUPPLY_ALERT_COLOR_ONE": "rgb(255,255,255)",
     "SUPPLY_ALERT_COLOR_TWO": "rgb(255,60,60)",
     "SUPPLY_ALERT_SOUND": "Default.mp3",

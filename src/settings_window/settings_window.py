@@ -15,8 +15,8 @@ from PyQt5.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog,
     QFrame, QGraphicsDropShadowEffect, QProxyStyle, QStyle
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QRect
-from PyQt5.QtGui import QKeyEvent, QColor, QKeySequence
+from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QRect, QSize
+from PyQt5.QtGui import QKeyEvent, QColor, QKeySequence, QPainter
 
 from src import config
 from src.utils.logging_util import get_logger
@@ -33,6 +33,49 @@ from src.settings_window.theme import build_settings_qss
 from src.settings_window.complex_inputs import DictInput, DictTable, CountdownOptionsInput
 from src.settings_window.tabs import SettingsTabsBuilder
 from src.settings_window.setting_data_handler import SettingsHandler
+
+class SwitchButton(QCheckBox):
+    """iPhone 风格细长开关"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setText("")
+        self.setFixedSize(46, 24)
+
+    def sizeHint(self):
+        return QSize(46, 24)
+    
+    def hitButton(self, pos):
+        return self.rect().contains(pos)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        checked = self.isChecked()
+
+        track_rect = self.rect().adjusted(1, 1, -1, -1)
+        radius = track_rect.height() / 2
+
+        if checked:
+            track_color = QColor(52, 199, 89)      # iOS green
+            border_color = QColor(52, 199, 89)
+            knob_x = self.width() - 22
+        else:
+            track_color = QColor(74, 74, 74)
+            border_color = QColor(105, 105, 105)
+            knob_x = 2
+
+        painter.setPen(border_color)
+        painter.setBrush(track_color)
+        painter.drawRoundedRect(track_rect, radius, radius)
+
+        knob_rect = QRect(knob_x, 3, 18, 18)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(245, 245, 245))
+        painter.drawEllipse(knob_rect)
+
 
 class SettingsWindow(QDialog):
     settings_saved = pyqtSignal(dict)
@@ -445,6 +488,15 @@ class SettingsWindow(QDialog):
         elif widget_type == 'bool':
             widget = QCheckBox()
             widget.setChecked(bool(val))
+        elif widget_type == 'switch':
+            widget_data = self.create_switch_widget(bool(val))
+            self.widgets[key] = {
+                'widget': widget_data['button'],
+                'type': 'switch',
+                'label': label_text
+            }
+            layout.addRow(label_text, widget_data['box'])
+            return
         elif widget_type == 'combo':
             widget = QComboBox()
             combo_items = kwargs.get('items', [])
@@ -582,6 +634,39 @@ class SettingsWindow(QDialog):
         h.addStretch()
         return {'box': box, 'spins': [spin_x, spin_y]}
 
+    def create_switch_widget(self, checked: bool):
+        box = QWidget()
+        h = QHBoxLayout(box)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(10)
+
+        switch = SwitchButton()
+        switch.setChecked(bool(checked))
+
+        status = QLabel()
+        status.setMinimumWidth(58)
+
+        def refresh():
+            if switch.isChecked():
+                status.setText("已启用")
+                status.setStyleSheet("color: rgb(100, 255, 150); font-weight: bold;")
+            else:
+                status.setText("已关闭")
+                status.setStyleSheet("color: rgb(160, 160, 160); font-weight: bold;")
+
+        switch.toggled.connect(refresh)
+        refresh()
+
+        h.addWidget(switch)
+        h.addWidget(status)
+        h.addStretch()
+
+        return {
+            "box": box,
+            "button": switch,
+            "status": status,
+        }
+
     def get_ui_values(self):
         new_values = {}
         for key, item in self.widgets.items():
@@ -598,6 +683,8 @@ class SettingsWindow(QDialog):
             elif w_type == 'double':
                 val = round(widget.value(), 3)
             elif w_type == 'bool':
+                val = widget.isChecked()
+            elif w_type == 'switch':
                 val = widget.isChecked()
             elif w_type == 'combo':
                 data_val = widget.currentData()
@@ -767,3 +854,6 @@ if __name__ == '__main__':
     win = SettingsWindow()
     win.show()
     sys.exit(app.exec_())
+    
+    
+

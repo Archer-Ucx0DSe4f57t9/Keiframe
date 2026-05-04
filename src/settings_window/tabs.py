@@ -198,7 +198,7 @@ class SettingsTabsBuilder:
         hint_supply.setStyleSheet("color: #b8b8b8; font-size: 10pt;")
         gl_supply.addRow(hint_supply)
 
-        parent.add_row(gl_supply, "启用人口提醒:", 'SUPPLY_ALERT_ENABLED', 'bool')
+        parent.add_row(gl_supply, "启用人口提醒:", 'SUPPLY_ALERT_ENABLED', 'switch')
 
         SettingsTabsBuilder._add_compact_row(parent, gl_supply, "触发规则:", [
             ("阶段切换时间(秒):", 'SUPPLY_WARNING_PHASE_SWITCH_SECONDS', 'spin', {'max': 1200}),
