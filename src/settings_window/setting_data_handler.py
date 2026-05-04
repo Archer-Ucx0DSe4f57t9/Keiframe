@@ -159,10 +159,14 @@ class SettingsHandler:
             with open(self.settings_file, 'w', encoding='utf-8') as f:
                 json.dump(final_save_data, f, indent=4, ensure_ascii=False)
             
-            # 2. 批量更新数据库关键词
+            # 2. 批量更新数据库关键词（仅在关键词实际改变时才更新）
             if keyword_dict is not None and self.maps_db:
-                # 直接调用你提供的 map_daos 函数
-                map_daos.update_keywords_batch(self.maps_db, keyword_dict)
+                # 获取当前数据库中的关键词
+                current_keywords = map_daos.get_all_keywords(self.maps_db)
+                
+                # 仅当关键词有实际改变时才提交到数据库
+                if current_keywords != keyword_dict:
+                    map_daos.update_keywords_batch(self.maps_db, keyword_dict)
                 
             return True, "设置及关键词已成功保存"
         except Exception as e:
