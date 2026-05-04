@@ -399,6 +399,31 @@ class SettingsWindow(QDialog):
                     )
         return nested_roi
 
+    def _format_tuple_line_value(self, key, val):
+        """用于把 tuple/list/set 显示成 100,150 这种用户友好的格式。"""
+        if key == 'SUPPLY_EXCLUDED_MAX_VALUES':
+            if isinstance(val, (tuple, list, set)):
+                return ",".join(str(int(v)) for v in val)
+        return str(val)
+
+
+    def _parse_tuple_line_value(self, key, text):
+        """用于把 100,150 / (100, 150) / [100, 150] 转回 tuple，避免保存时类型变化。"""
+        if key == 'SUPPLY_EXCLUDED_MAX_VALUES':
+            text = str(text).strip()
+            if not text:
+                return tuple()
+
+            # 兼容:
+            # 100,150
+            # (100, 150)
+            # [100, 150]
+            # 100 150
+            nums = re.findall(r"-?\d+", text)
+            return tuple(int(n) for n in nums)
+
+        return text
+        
     def add_row(self, layout, label_text, key, widget_type, **kwargs):
         val = self.current_config.get(key)
         if val is None and widget_type != 'dict':
@@ -407,7 +432,7 @@ class SettingsWindow(QDialog):
 
         widget = None
         if widget_type == 'line':
-            widget = QLineEdit(str(val))
+            widget = QLineEdit(self._format_tuple_line_value(key, val))
         elif widget_type == 'spin':
             widget = ThemedSpinBox()
             widget.setRange(kwargs.get('min', 0), kwargs.get('max', 9999))
@@ -566,6 +591,8 @@ class SettingsWindow(QDialog):
             val = None
             if w_type in ('line', 'hotkey', 'color'):
                 val = widget.text()
+                if w_type == 'line':
+                    val = self._parse_tuple_line_value(key, val)
             elif w_type == 'spin':
                 val = widget.value()
             elif w_type == 'double':

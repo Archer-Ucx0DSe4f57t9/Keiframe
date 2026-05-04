@@ -547,7 +547,10 @@ class SettingsTabsBuilder:
         widget = None
 
         if widget_type == 'line':
-            widget = QLineEdit(str(val) if val is not None else "")
+            if hasattr(parent, "_format_tuple_line_value"):
+                widget = QLineEdit(parent._format_tuple_line_value(key, val))
+            else:
+                widget = QLineEdit(str(val) if val is not None else "")
             widget.setMinimumWidth(kwargs.get('width', 160))
         
         elif widget_type == 'spin':
