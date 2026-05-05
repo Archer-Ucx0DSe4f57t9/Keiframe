@@ -32,27 +32,9 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import cv2
 import numpy as np
 
-try:
-    from src import config
-except Exception:  # 单独运行时允许没有 config
-    config = None
-
-try:
-    from src.utils.fileutil import get_resources_dir
-except Exception:
-    def get_resources_dir(*parts: str) -> str:
-        # 兜底：假设当前工作目录是项目根目录
-        return os.path.join(os.getcwd(), "resources", *parts)
-
-try:
-    from src.utils.logging_util import get_logger
-except Exception:
-    import logging
-
-    def get_logger(name: str):
-        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-        return logging.getLogger(name)
-
+from src import config
+from src.utils.fileutil import get_resources_dir
+from src.utils.logging_util import get_logger
 
 @dataclass
 class SupplyCandidate:

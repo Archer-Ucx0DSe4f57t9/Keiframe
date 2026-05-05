@@ -47,6 +47,7 @@ class SupplyNotifier:
     SUPPLY_WARNING_REMAINING = 3
 
     SUPPLY_EXCLUDED_MAX_VALUES = (100, 150)
+    SUPPLY_MIN_ALERT_LIMIT = 20 # 低于这个人口上限的情况不提醒，避免开局初期误报。
     SUPPLY_MAX_ALERT_LIMIT = 190
 
     # 满足条件持续多少游戏秒后播放声音。
@@ -267,6 +268,9 @@ class SupplyNotifier:
         if max_supply in self.SUPPLY_EXCLUDED_MAX_VALUES:
             return False
 
+        if max_supply < int(self.SUPPLY_MIN_ALERT_LIMIT):
+            return False
+        
         if max_supply > int(self.SUPPLY_MAX_ALERT_LIMIT):
             return False
 

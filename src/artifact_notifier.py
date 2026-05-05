@@ -2,6 +2,7 @@ import math
 import os
 
 import cv2
+import numpy as np
 from PyQt5.QtCore import Qt
 
 from src import config
@@ -1205,22 +1206,98 @@ class ArtifactNotifier:
         if roi.size == 0:
             return None
 
-        b = roi[:, :, 0]
-        g = roi[:, :, 1]
-        r = roi[:, :, 2]
-        ready_mask = (
-            (r >= 0) & (r <= 34) &
-            (g >= 85) & (g <= 105) &
-            (b >= 56) & (b <= 76)
+        # 轻微模糊，减少截图压缩/动态光效带来的单点噪声
+        roi_blur = cv2.GaussianBlur(roi, (3, 3), 0)
+
+        # 注意：OpenCV 默认 BGR
+        hsv = cv2.cvtColor(roi_blur, cv2.COLOR_BGR2HSV)
+
+        h_ch = hsv[:, :, 0]
+        s_ch = hsv[:, :, 1]
+        v_ch = hsv[:, :, 2]
+
+        b = roi_blur[:, :, 0].astype(np.int16)
+        g = roi_blur[:, :, 1].astype(np.int16)
+        r = roi_blur[:, :, 2].astype(np.int16)
+
+        # 排除太暗/太灰的点，避免边框、阴影、白色高光影响比例
+        valid_mask = (
+            (v_ch >= 35) &
+            (s_ch >= 35)
         )
 
-        hit_count = int(ready_mask.sum())
-        total_count = int(ready_mask.size)
-        ratio = hit_count / total_count if total_count > 0 else 0.0
-        self.logger.debug(
-            f"Artifact ready ROI hit_count={hit_count}, total={total_count}, ratio={ratio:.2f}"
+        valid_count = int(valid_mask.sum())
+        if valid_count <= 0:
+            return 0.0
+
+        # Ready 后圆形区域整体偏绿色/青绿色
+        # OpenCV HSV：绿色大概 H=35~95，青绿可到 100 左右
+        green_mask = (
+            valid_mask &
+            (h_ch >= 35) & (h_ch <= 100) &
+            (s_ch >= 45) &
+            (v_ch >= 45)
         )
-        return ratio
+
+        # NotReady 时主要是紫黑/蓝紫雾
+        # 紫色/蓝紫大概 H=105~155
+        purple_mask = (
+            valid_mask &
+            (h_ch >= 105) & (h_ch <= 155) &
+            (s_ch >= 35) &
+            (v_ch >= 35)
+        )
+
+        # 神器本体亮青绿色边缘，图2/图3里这个特征很明显
+        artifact_edge_mask = (
+            (g >= 120) &
+            (b >= 80) &
+            (r <= 100) &
+            ((g - r) >= 60) &
+            ((b - r) >= 30)
+        )
+
+        # 较暗的神器本体/内部绿色，不一定很亮，但 G 明显压过 R
+        artifact_dark_mask = (
+            (g >= 70) &
+            (r <= 80) &
+            ((g - r) >= 35) &
+            (h_ch >= 35) & (h_ch <= 105) &
+            (s_ch >= 45)
+        )
+
+        green_count = int(green_mask.sum())
+        purple_count = int(purple_mask.sum())
+        edge_count = int(artifact_edge_mask.sum())
+        dark_artifact_count = int(artifact_dark_mask.sum())
+
+        green_ratio = green_count / valid_count
+        purple_ratio = purple_count / valid_count
+        edge_ratio = edge_count / valid_count
+        dark_artifact_ratio = dark_artifact_count / valid_count
+
+        # 单帧 Ready 分数：
+        # 1. 整体变绿是主要证据
+        # 2. 神器亮边是强证据，哪怕占比不大
+        # 3. 紫色占比越高，越像 NotReady，需要扣分
+        score = (
+            green_ratio * 1.0 +
+            edge_ratio * 4.0 +
+            dark_artifact_ratio * 1.5 -
+            purple_ratio * 0.7
+        )
+
+        self.logger.debug(
+            "Artifact ready ROI "
+            f"valid={valid_count}, "
+            f"green={green_count}/{green_ratio:.3f}, "
+            f"purple={purple_count}/{purple_ratio:.3f}, "
+            f"edge={edge_count}/{edge_ratio:.3f}, "
+            f"dark_artifact={dark_artifact_count}/{dark_artifact_ratio:.3f}, "
+            f"score={score:.3f}"
+        )
+
+        return score
 
     def _is_ready_by_region(self):
         ratio = self._ready_region_hit_ratio()
