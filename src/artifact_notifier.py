@@ -75,8 +75,8 @@ class ArtifactNotifier:
 
     ARTIFACT_READY_X1 = 885
     ARTIFACT_READY_X2 = 895
-    ARTIFACT_READY_Y1 = 94
-    ARTIFACT_READY_Y2 = 96
+    ARTIFACT_READY_Y1 = 29
+    ARTIFACT_READY_Y2 = 59
 
     # ===== 初始激活参数 =====
     # reset 后至少要累计 3 个不同游戏秒检测到 idle，才算激活神器识别
@@ -249,6 +249,13 @@ class ArtifactNotifier:
         self._force_recovery_waiting_for_idle_first = False
         self._force_recovery_notice_until_second = None
         self._current_overlay_kind = None
+        
+        # 定时模式：是否已经确认过本轮有效就绪态
+        self._timed_anchor_ready_confirmed = False
+
+        # 定时模式：有效就绪态连续秒数
+        self._timed_effective_ready_streak = 0
+        self._timed_last_effective_ready_second = None
 
         self._hide_message()
 
@@ -423,7 +430,7 @@ class ArtifactNotifier:
             return
 
         if self._state == self.STATE_TIMED_WAITING:
-            self._handle_timed_waiting_state(current_second, is_idle)
+            self._handle_timed_waiting_state(current_second, is_idle, hero_gate_ok)
             return
 
         if self._state == self.STATE_TIMED_COUNTDOWN:
@@ -527,7 +534,50 @@ class ArtifactNotifier:
         self._last_effective_ready_state = (not is_idle)
         self._last_is_idle = is_idle
     
-    def _handle_timed_waiting_state(self, current_second, is_idle):
+    def _handle_timed_waiting_state(self, current_second, is_idle, hero_gate_ok):
+        """
+        定时等待阶段：
+        - 正常根据 idle_anchor_second 倒计时；
+        - 但如果等待期间又真实检测到有效就绪态，说明上一轮定时可能偏了，
+        则取消当前倒计时，重新等这次有效就绪态回 idle 后记录新锚点。
+        """
+        if hero_gate_ok:
+            detection_mode = self._get_ready_detection_mode()
+            is_ready = None
+
+            if detection_mode == "ready":
+                if self._should_skip_ready_region_recognition(current_second):
+                    is_ready = False
+                else:
+                    is_ready = self._is_ready_by_region()
+
+            effective_ready_state = self._get_effective_ready_state(
+                current_second=current_second,
+                is_idle=is_idle,
+                is_ready=is_ready
+            )
+
+            if effective_ready_state:
+                self.logger.warning(
+                    f"定时等待期间提前检测到有效就绪态，取消当前倒计时，重新等待回 idle 记录锚点。"
+                )
+                self._state = self.STATE_MONITORING
+                self._idle_anchor_second = None
+                self._timed_countdown_last_remaining = None
+                self._timed_anchor_ready_confirmed = False
+                self._timed_effective_ready_streak = 0
+                self._timed_last_effective_ready_second = None
+                self._last_effective_ready_state = False
+
+                # 直接把当前这一秒交给定时锚点逻辑处理
+                self._update_idle_transition_tracking(
+                    current_second=current_second,
+                    effective_ready_state=effective_ready_state,
+                    is_idle=is_idle
+                )
+                self._last_is_idle = is_idle
+                return
+
         remaining = self._get_timed_remaining_seconds(current_second)
         if remaining is None:
             self._state = self.STATE_MONITORING
@@ -544,7 +594,7 @@ class ArtifactNotifier:
 
         if remaining <= 0:
             self.logger.info(
-                f"定时模式触发：距离最近一次 not idle -> idle 已达到 "
+                f"定时模式触发：距离最近一次有效就绪态 -> idle 已达到 "
                 f"{self.ARTIFACT_TIMED_TRIGGER_SECONDS} 秒，直接触发神器提示。"
             )
             self._trigger_ready_alert(current_second, is_idle, trigger_source="timed")
@@ -601,7 +651,7 @@ class ArtifactNotifier:
         if self._is_timed_trigger_mode_enabled():
             self._idle_anchor_second = current_second
             self._state = self.STATE_TIMED_WAITING
-            self.logger.info("图像触发的神器提示已回到 idle，切入定时模式等待下一轮。")
+            self.logger.warning(f"{current_second}:图像触发的神器提示已回到 idle，切入定时模式等待下一轮。")
         else:
             self._cooldown_start_time = current_second
             self._state = self.STATE_COOLDOWN
@@ -659,7 +709,7 @@ class ArtifactNotifier:
 
             if effective_ready_state:
                 self._timed_ready_seen_effective_ready = True
-                self.logger.info(
+                self.logger.warning(
                     f"定时模式下，提示后首次检测到有效就绪态（mode={detection_mode}）；"
                     f"继续保持提示，等待再次回到 idle。"
                 )
@@ -1014,28 +1064,66 @@ class ArtifactNotifier:
         self._last_not_idle_second = current_second
         self.logger.info(f"ArtifactNotifier not idle 连续秒数 = {self._not_idle_streak_seconds}")
 
-    def _update_idle_transition_tracking(self, current_second, effective_ready_state, is_idle):
+    def _update_timed_effective_ready_streak(self, current_second, effective_ready_state):
         """
-        记录周期模式的下一轮计时锚点。
-
-        规则：
-        - not_idle 模式：从 not_idle -> idle 记录锚点
-        - ready 模式：从 ready -> idle 记录锚点
+        定时模式用：
+        连续 N 个游戏秒检测到有效就绪态，才认为本轮 ready 成立。
+        避免单帧误判 not_idle 后立刻 idle，导致错误记录定时锚点。
         """
-        if self._last_effective_ready_state is None:
-            self._last_effective_ready_state = effective_ready_state
+        if not effective_ready_state:
+            self._timed_effective_ready_streak = 0
+            self._timed_last_effective_ready_second = None
             return
 
-        if self._last_effective_ready_state is True and is_idle is True:
+        if self._timed_last_effective_ready_second is None:
+            self._timed_effective_ready_streak = 1
+        elif current_second == self._timed_last_effective_ready_second + 1:
+            self._timed_effective_ready_streak += 1
+        else:
+            self._timed_effective_ready_streak = 1
+
+        self._timed_last_effective_ready_second = current_second
+
+
+    def _update_idle_transition_tracking(self, current_second, effective_ready_state, is_idle):
+        """
+        定时模式的锚点记录逻辑。
+
+        新规则：
+        1. 先等连续 N 秒有效就绪态，确认本轮神器真的出现过；
+        2. 确认后，再等它回到 idle；
+        3. 回到 idle 的那一秒才记录 idle_anchor_second；
+        4. 避免单帧 not_idle 误判导致定时整体提前。
+        """
+        required_seconds = max(1, int(self.ARTIFACT_NOT_IDLE_TRIGGER_SECONDS))
+
+        self._update_timed_effective_ready_streak(
+            current_second=current_second,
+            effective_ready_state=effective_ready_state
+        )
+
+        if not self._timed_anchor_ready_confirmed:
+            if self._timed_effective_ready_streak >= required_seconds:
+                self._timed_anchor_ready_confirmed = True
+                self.logger.info(
+                    f"定时模式：已确认有效就绪态连续 {required_seconds} 秒，等待回到 idle 后记录锚点。"
+                )
+            return
+
+        # 已确认本轮 ready，之后只有回到 idle 才记录锚点
+        if is_idle:
             self._idle_anchor_second = current_second
             self._state = self.STATE_TIMED_WAITING
             self._timed_countdown_last_remaining = None
-            self.logger.info(
-                f"检测到有效就绪态 -> idle，记录 idle_anchor_second = {self._idle_anchor_second}，"
-                f"进入 {self.STATE_TIMED_WAITING}。"
-            )
 
-        self._last_effective_ready_state = effective_ready_state
+            self._timed_anchor_ready_confirmed = False
+            self._timed_effective_ready_streak = 0
+            self._timed_last_effective_ready_second = None
+
+            self.logger.warning(
+                f"{current_second}: 定时模式检测到有效就绪态回到 idle，"
+                f"记录 idle_anchor_second={self._idle_anchor_second}，开始等待下一轮定时触发。"
+            )
 
     def _handle_validating_state(self, current_second, is_idle):
         if self._validation_locked:

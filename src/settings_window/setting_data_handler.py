@@ -133,6 +133,10 @@ class SettingsHandler:
         if not db_conn:
             return False, "数据库连接未就绪"
 
+        # 保护：如果数据列表为空，拒绝保存以避免误删数据库中的现有数据
+        if not data_list:
+            return False, f"当前表格无数据，保存已取消。请确认是否真的要清空【{target_name}】的所有背板数据，或先恢复数据后再保存。"
+
         try:
             # 第一步：物理删除该目标下的所有旧数据（确保 UI 删掉的行在数据库也同步消失）
             # 注意：bulk_import 里的 INSERT OR REPLACE 只能处理更新，不能处理删除
