@@ -153,24 +153,61 @@ class MalwarfareMapHandler:
                 combined_mask = cv2.bitwise_or(mask_green, mask_blue)
                 combined_mask = cv2.bitwise_or(combined_mask, mask_orange)
 
-                # 如果在这个ROI里找到了超过一定数量的有效颜色像素，就认为找到了
-                if cv2.countNonZero(combined_mask) > 50: # 阈值可以根据实际情况调整
-                    # 锁定状态
-                    self._current_ui_offset_state = base_index
 
-                    self.logger.debug(f"UI状态探测成功: base={base_index}, replay={replay_offset != 0}, 总偏移：y_offset = {y_offset}")
+                nonzero = cv2.countNonZero(combined_mask) # 统计ROI内符合任一颜色的像素数量，作为是否存在有效信息的粗筛依据
+                self.logger.info(
+                    f"UI探测候选: base={base_index}, replay={replay_offset != 0}, "
+                    f"y_offset={y_offset}, ROI={probe_roi_coords}, color_pixels={nonzero}"
+                )
 
-                    # 根据探测到的状态，设置所有实际使用的ROI
-                    self._count_roi = probe_roi_coords
-                    self._paused_roi = (
-                        self._base_paused_roi[0], self._base_paused_roi[1] + y_offset,
-                        self._base_paused_roi[2], self._base_paused_roi[3] + y_offset
+                # HSV 只作为粗筛，不直接认定成功
+                if nonzero <= 50:
+                    continue
+
+                detected_color = None
+                detected_text = None
+
+                for color_name in self._possible_colors:
+                    result_text = self.ocr.recognize(
+                        roi_img,
+                        color_name,
+                        confidence_thresh=0.70,
+                        debug_show=False
                     )
-                    self._time_roi = (
-                        self._base_time_roi[0], self._base_time_roi[1] + y_offset,
-                        self._base_time_roi[2], self._base_time_roi[3] + y_offset
+
+                    self.logger.info(
+                        f"UI探测OCR验证: y_offset={y_offset}, color={color_name}, result={result_text!r}"
                     )
-                    return True # 探测成功，结束函数
+
+                    if self._is_valid_count_text(result_text):
+                        detected_color = color_name
+                        detected_text = result_text
+                        break
+
+                if detected_color is None:
+                    self.logger.info(
+                        f"UI探测候选被拒绝: y_offset={y_offset}, 原因=颜色像素存在但count OCR不合法"
+                    )
+                    continue
+
+                self._current_ui_offset_state = base_index
+                self._detected_count_color = detected_color
+
+                self.logger.info(
+                    f"UI状态探测成功: base={base_index}, replay={replay_offset != 0}, "
+                    f"总偏移={y_offset}, count_color={detected_color}, count_text={detected_text!r}"
+                )
+
+                self._count_roi = probe_roi_coords
+                self._paused_roi = (
+                    self._base_paused_roi[0], self._base_paused_roi[1] + y_offset,
+                    self._base_paused_roi[2], self._base_paused_roi[3] + y_offset
+                )
+                self._time_roi = (
+                    self._base_time_roi[0], self._base_time_roi[1] + y_offset,
+                    self._base_time_roi[2], self._base_time_roi[3] + y_offset
+                )
+                return True
             
 
             
@@ -486,6 +523,15 @@ class MalwarfareMapHandler:
 
         with self._result_lock:
             self._latest_result = self._last_valid_parsed
+
+    def _is_valid_count_text(self, text):
+        if not text:
+            return False
+        if text.isdigit():
+            return True
+        if text.startswith('c') and text[1:].isdigit():
+            return True
+        return False
 
     def get_latest_data(self):
         with self._result_lock:
