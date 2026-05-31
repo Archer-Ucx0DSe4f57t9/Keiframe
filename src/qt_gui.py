@@ -14,9 +14,9 @@ from src.map_handlers.map_variant_auto_resolver import MapVariantAutoResolver
 from src.presentation_modules.toast_manager import ToastManager
 from src.game_readers.mutator_and_enemy_race_recognizer import Mutator_and_enemy_race_recognizer
 from src.memo_overlay import MemoOverlay
-from src.artifact_notifier import ArtifactNotifier
-from src.countdown_manager import CountdownManager
-from src.supply_notifier import SupplyNotifier
+from src.event_managers_and_notifiers.artifact_notifier import ArtifactNotifier
+from src.event_managers_and_notifiers.countdown_manager import CountdownManager
+from src.event_managers_and_notifiers.supply_notifier import SupplyNotifier
 
 from src.utils.fileutil import get_project_root
 from src.db.db_manager import DBManager
