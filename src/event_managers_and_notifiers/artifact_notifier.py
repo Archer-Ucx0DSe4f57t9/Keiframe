@@ -557,7 +557,7 @@ class ArtifactNotifier:
             )
 
             if effective_ready_state:
-                self.logger.warning(
+                self.logger.info(
                     f"定时等待期间提前检测到有效就绪态，取消当前倒计时，重新等待回 idle 记录锚点。"
                 )
                 self._state = self.STATE_MONITORING
@@ -650,7 +650,7 @@ class ArtifactNotifier:
         if self._is_timed_trigger_mode_enabled():
             self._idle_anchor_second = current_second
             self._state = self.STATE_TIMED_WAITING
-            self.logger.warning(f"{current_second}:图像触发的神器提示已回到 idle，切入定时模式等待下一轮。")
+            self.logger.info(f"{current_second}:图像触发的神器提示已回到 idle，切入定时模式等待下一轮。")
         else:
             self._cooldown_start_time = current_second
             self._state = self.STATE_COOLDOWN
@@ -708,7 +708,7 @@ class ArtifactNotifier:
 
             if effective_ready_state:
                 self._timed_ready_seen_effective_ready = True
-                self.logger.warning(
+                self.logger.info(
                     f"定时模式下，提示后首次检测到有效就绪态（mode={detection_mode}）；"
                     f"继续保持提示，等待再次回到 idle。"
                 )
@@ -1119,7 +1119,7 @@ class ArtifactNotifier:
             self._timed_effective_ready_streak = 0
             self._timed_last_effective_ready_second = None
 
-            self.logger.warning(
+            self.logger.info(
                 f"{current_second}: 定时模式检测到有效就绪态回到 idle，"
                 f"记录 idle_anchor_second={self._idle_anchor_second}，开始等待下一轮定时触发。"
             )

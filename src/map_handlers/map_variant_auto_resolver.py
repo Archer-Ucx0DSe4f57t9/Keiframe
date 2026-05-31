@@ -280,7 +280,7 @@ class MapVariantAutoResolver:
 
         self.monitor_ids[rule.rule_id] = monitor_id
 
-        self.logger.warning(
+        self.logger.info(
             "[MapVariantAutoResolver] monitor started: "
             "rule=%s monitor=%s window=%s-%s region=%s mode=%s",
             rule.rule_id,
@@ -396,7 +396,7 @@ class MapVariantAutoResolver:
         self.resolved_rule_ids.add(rule.rule_id)
         self._stop_monitor_for_rule(rule.rule_id)
 
-        self.logger.warning(
+        self.logger.info(
             "[MapVariantAutoResolver] rule finished without switch: "
             "rule=%s reason=%s result=%s",
             rule.rule_id,

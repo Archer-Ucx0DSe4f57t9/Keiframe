@@ -192,14 +192,18 @@ class RedDotFrameAnalyzer:
 
         # 1. 先从单个红色连通块里找“中央菱形 core”
         # 这一步不依赖外圈，也不依赖 cluster 是否成功。
-        core_candidates = self._find_core_candidates_from_components(components, red_mask)
+        core_candidates = self._find_core_candidates_from_components(
+            components,
+            red_mask,
+            minimap_bgr,
+        )
         candidates.extend(core_candidates)
 
         # 2. 再做 cluster，用于识别中央点 + 外圈的完整红点。
         clusters = self._cluster_components(components)
 
         for cluster in clusters:
-            candidate = self._cluster_to_candidate(cluster, red_mask)
+            candidate = self._cluster_to_candidate(cluster, red_mask, minimap_bgr)
             if candidate is not None:
                 candidates.append(candidate)
 
@@ -367,7 +371,8 @@ class RedDotFrameAnalyzer:
     def _cluster_to_candidate(
         self,
         cluster: List[Dict[str, Any]],
-        red_mask: np.ndarray
+        red_mask: np.ndarray,
+        minimap_bgr: np.ndarray,
     ) -> Optional[_FrameCandidate]:
         x1 = min(c["bbox"][0] for c in cluster)
         y1 = min(c["bbox"][1] for c in cluster)
@@ -379,15 +384,34 @@ class RedDotFrameAnalyzer:
 
         if w < self.min_candidate_w or h < self.min_candidate_h:
             return None
+
         if w > self.max_candidate_w or h > self.max_candidate_h:
-            return self._try_make_core_candidate_from_cluster(cluster, red_mask)
+            return self._try_make_core_candidate_from_cluster(
+                cluster,
+                red_mask,
+                minimap_bgr,
+            )
 
         aspect = w / max(1, h)
 
-        # 红点标记整体应接近正方形。
-        # 原本 0.55 太宽，会放过 9x17 这类竖向碎片组合。
         if aspect < 0.65 or aspect > 1.55:
-              return self._try_make_core_candidate_from_cluster(cluster, red_mask)
+            return self._try_make_core_candidate_from_cluster(
+                cluster,
+                red_mask,
+                minimap_bgr,
+            )
+
+        candidate_bbox = (x1, y1, w, h)
+
+        # 暴风雪防误判：
+        # 暴风雪是暗红半透明 blob，可能形状上凑成 ring，
+        # 但通常没有高亮纯红核心。
+        if not self._has_hot_ping_red(minimap_bgr, candidate_bbox):
+            return self._try_make_core_candidate_from_cluster(
+                cluster,
+                red_mask,
+                minimap_bgr,
+            )
 
         crop = red_mask[y1:y2, x1:x2]
         if crop.size == 0:
@@ -395,8 +419,6 @@ class RedDotFrameAnalyzer:
 
         red_count = int(np.count_nonzero(crop))
 
-        # 过滤非常小的红色噪声。
-        # 红点0.png 经过 mask + dilation 后通常明显大于这个值。
         if red_count < 18:
             return None
 
@@ -411,29 +433,28 @@ class RedDotFrameAnalyzer:
             fill_ratio=fill_ratio,
             has_outer_ring=has_outer_ring,
         ):
-            core_candidate = self._try_make_core_candidate_from_cluster(cluster, red_mask)
+            return self._try_make_core_candidate_from_cluster(
+                cluster,
+                red_mask,
+                minimap_bgr,
+            )
 
-            if core_candidate is not None:
-                return core_candidate
-
-            return None
-
-        # 没有外圈时，更要求它像一个有效中央红点，而不是单个小红色碎片。
         if not has_outer_ring:
             if w < 7 or h < 7 or red_count < 35:
                 return None
 
-        # 有外圈但分数偏低时，大概率是零散红色碎片拼出来的假 ring。
         if has_outer_ring and score < 0.68:
             return None
 
-        # 无外圈的中心红点也不要太宽松。
         if not has_outer_ring and score < 0.72:
             return None
 
         core_bbox = self._estimate_core_bbox(cluster, x1, y1, w, h)
 
-        # 用核心 bbox 中心作为红点中心，更少受外圈扩张影响。
+        # core 也必须有高亮纯红，否则可能是暴风雪碎片。
+        if not self._has_hot_ping_red(minimap_bgr, core_bbox, min_hot_pixels=2):
+            return None
+
         cx = core_bbox[0] + core_bbox[2] / 2.0
         cy = core_bbox[1] + core_bbox[3] / 2.0
 
@@ -444,7 +465,7 @@ class RedDotFrameAnalyzer:
             score=score,
             has_outer_ring=has_outer_ring,
         )
-
+        
     def _score_diamond_candidate(self, crop_mask: np.ndarray) -> Tuple[float, bool]:
         """
         计算候选是否像红色菱形标记。
@@ -717,12 +738,17 @@ class RedDotFrameAnalyzer:
     def _try_make_core_candidate_from_cluster(
         self,
         cluster: List[Dict[str, Any]],
-        red_mask: np.ndarray
+        red_mask: np.ndarray,
+        minimap_bgr: np.ndarray,
     ) -> Optional[_FrameCandidate]:
         components = sorted(cluster, key=lambda c: c["area"], reverse=True)
 
         for comp in components:
-            candidate = self._component_to_core_candidate(comp, red_mask)
+            candidate = self._component_to_core_candidate(
+                comp,
+                red_mask,
+                minimap_bgr,
+            )
             if candidate is not None:
                 return candidate
 
@@ -731,29 +757,101 @@ class RedDotFrameAnalyzer:
     def _find_core_candidates_from_components(
         self,
         components: List[Dict[str, Any]],
-        red_mask: np.ndarray
+        red_mask: np.ndarray,
+        minimap_bgr: np.ndarray,
     ) -> List[_FrameCandidate]:
         """
         直接从单个红色连通块中识别中央红色菱形。
-
-        用途：
-        - 保留只有中央菱形、外圈不完整、外圈被碎片干扰的真实红点。
-        - 避免必须依赖 cluster 通过。
         """
         candidates: List[_FrameCandidate] = []
 
         for comp in components:
-            candidate = self._component_to_core_candidate(comp, red_mask)
+            candidate = self._component_to_core_candidate(
+                comp,
+                red_mask,
+                minimap_bgr,
+            )
             if candidate is not None:
                 candidates.append(candidate)
 
         return candidates
 
-      
+    @staticmethod
+    def _hot_ping_red_stats(
+        minimap_bgr: np.ndarray,
+        bbox: BBox,
+    ) -> Tuple[int, float]:
+        """
+        检查候选区域内是否存在高亮纯红像素。
+
+        红点 ping 通常有少量非常纯、非常亮的红色核心像素；
+        暴风雪小地图标记通常是暗红半透明，没有这种 hot red。
+        """
+        x, y, w, h = bbox
+
+        x1 = max(0, x)
+        y1 = max(0, y)
+        x2 = min(minimap_bgr.shape[1], x + w)
+        y2 = min(minimap_bgr.shape[0], y + h)
+
+        if x2 <= x1 or y2 <= y1:
+            return 0, 0.0
+
+        crop = minimap_bgr[y1:y2, x1:x2]
+        if crop.size == 0:
+            return 0, 0.0
+
+        b = crop[:, :, 0].astype(np.int16)
+        g = crop[:, :, 1].astype(np.int16)
+        r = crop[:, :, 2].astype(np.int16)
+
+        hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+        hue = hsv[:, :, 0].astype(np.int16)
+        sat = hsv[:, :, 1].astype(np.int16)
+        val = hsv[:, :, 2].astype(np.int16)
+
+        red_hue = (hue <= 8) | (hue >= 172)
+
+        hot_red = (
+            red_hue &
+            (sat >= 185) &
+            (val >= 140) &
+            (r >= 140) &
+            ((r - g) >= 70) &
+            ((r - b) >= 70) &
+            (g <= 90) &
+            (b <= 90)
+        )
+
+        hot_count = int(np.count_nonzero(hot_red))
+        hot_ratio = hot_count / max(1, crop.shape[0] * crop.shape[1])
+
+        return hot_count, hot_ratio
+
+    def _has_hot_ping_red(
+        self,
+        minimap_bgr: np.ndarray,
+        bbox: BBox,
+        min_hot_pixels: int = 3,
+        min_hot_ratio: float = 0.008,
+    ) -> bool:
+        hot_count, hot_ratio = self._hot_ping_red_stats(minimap_bgr, bbox)
+
+        if hot_count >= min_hot_pixels:
+            return True
+
+        # 小型 core 有时候只有很少几个亮红点。
+        if hot_count >= 2 and hot_ratio >= min_hot_ratio:
+            return True
+
+        return False
+
+
     def _component_to_core_candidate(
         self,
         comp: Dict[str, Any],
-        red_mask: np.ndarray
+        red_mask: np.ndarray,
+        minimap_bgr: np.ndarray,
     ) -> Optional[_FrameCandidate]:
         x, y, w, h = comp["bbox"]
         area = int(comp["area"])
@@ -766,7 +864,12 @@ class RedDotFrameAnalyzer:
                 area,
             )
             return None
-          
+
+        # 中央 core 必须有高亮纯红。
+        # 暴风雪标记通常是暗红半透明，没有这种 hot red。
+        if not self._has_hot_ping_red(minimap_bgr, (x, y, w, h), min_hot_pixels=2):
+            return reject("no_hot_ping_red")
+
         if w < 7 or h < 7:
             return reject("too_small")
 
@@ -805,7 +908,6 @@ class RedDotFrameAnalyzer:
             score=score,
             has_outer_ring=False,
         )
-        
     def _dedupe_candidates(
         self,
         candidates: List[_FrameCandidate],
