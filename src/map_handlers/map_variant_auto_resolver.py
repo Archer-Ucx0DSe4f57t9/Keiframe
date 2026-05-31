@@ -8,8 +8,10 @@ from src.game_readers.minimap_red_dot_detector import (
     red_dot_detector,
     MinimapRedDotDetector,
 )
-from src.presentation_modules import message_presenter
-
+from PyQt5.QtCore import Qt,QTimer
+from src.presentation_modules.message_presenter import MessagePresenter
+from src.utils.logging_util import get_logger
+from src.utils.window_utils import get_sc2_window_geometry
 Region = Tuple[int, int, int, int]
 
 
@@ -63,10 +65,10 @@ RULES: Tuple[MapVariantRule, ...] = (
         region_mode=MinimapRedDotDetector.REGION_CENTER_IN,
 
         present_map="往日神庙-B",
-        present_message="310波次检测到红点，选择：庙B",
+        present_message="310波次检测到红点，保持：庙B",
 
         absent_map="往日神庙-A",
-        absent_message="310波次未检测到红点，选择：庙A",
+        absent_message="310波次未检测到红点，切换：庙A",
     ),
 
     MapVariantRule(
@@ -93,10 +95,10 @@ RULES: Tuple[MapVariantRule, ...] = (
         region_mode=MinimapRedDotDetector.REGION_CORE_BBOX_IN,
 
         present_map="虚空撕裂-左",
-        present_message="3分钟检测到指定区域红点，选择：虚空撕裂A",
+        present_message="3分钟检测到指定区域红点，保持：虚空撕裂A",
 
         absent_map="虚空撕裂-右",
-        absent_message="3分钟未检测到指定区域红点，选择：虚空撕裂B",
+        absent_message="3分钟未检测到指定区域红点，切换：虚空撕裂B",
     ),
 )
 
@@ -116,18 +118,31 @@ class MapVariantAutoResolver:
     2. 表格刷新。
     3. 地图数据加载。
     """
+    
+    VARIANT_ALERT_OFFSET_X = 800
+    VARIANT_ALERT_OFFSET_Y = 100
+    VARIANT_ALERT_HEIGHT = 40
+    VARIANT_ALERT_FONT_SIZE = 20
+    VARIANT_ALERT_VERTICAL_OFFSET = -7
+    VARIANT_ALERT_COLOR = "rgb(255,255,255)"
+    VARIANT_ALERT_AUTO_HIDE_MS = 10_000
 
-    def __init__(self, window, logger):
-        self.window = window
-        self.logger = logger
+    def __init__(self, parent=None, logger=None):
+        self.parent = parent
+        self.window = parent
+        self.logger = logger or get_logger(__name__)
+
+        # 不在启动阶段创建 MessagePresenter，避免透明分层窗口影响主界面初始化。
+        self.message_presenter = None
+
+        self._current_overlay_kind = None
+        self._variant_message_token = 0
 
         self.monitor_ids: Dict[str, str] = {}
         self.last_results: Dict[str, Dict[str, Any]] = {}
 
-        # 本局已经完成判定的规则
         self.resolved_rule_ids: Set[str] = set()
 
-        # 用户手动覆盖后，本局禁用自动分支
         self.disabled_by_manual: bool = False
         self.manual_disable_reason: Optional[str] = None
 
@@ -141,8 +156,9 @@ class MapVariantAutoResolver:
         self.resolved_rule_ids.clear()
         self.disabled_by_manual = False
         self.manual_disable_reason = None
+        self._hide_variant_message()
         self.logger.info("[MapVariantAutoResolver] reset completed")
-
+        
     def disable_by_manual(self, reason: str = "manual_selection") -> None:
         """
         用户手动选择 A/B 或左/右后，本局不要再自动改分支。
@@ -150,6 +166,7 @@ class MapVariantAutoResolver:
         self.disabled_by_manual = True
         self.manual_disable_reason = reason
         self.stop_all_monitors()
+        self._hide_variant_message()
         self.logger.info(
             "[MapVariantAutoResolver] disabled by manual action: %s",
             reason,
@@ -165,6 +182,7 @@ class MapVariantAutoResolver:
         """
         if not is_in_game:
             self.stop_all_monitors()
+            self._hide_variant_message()
             return False
 
         if self.disabled_by_manual:
@@ -179,6 +197,7 @@ class MapVariantAutoResolver:
         if rule is None:
             # 当前地图不是这类自动分支地图，清掉可能残留的 monitor
             self.stop_all_monitors()
+            self._hide_variant_message()
             return False
 
         if rule.rule_id in self.resolved_rule_ids:
@@ -364,7 +383,7 @@ class MapVariantAutoResolver:
         )
 
         switched = self._switch_map(target_map)
-        self._present_message(message)
+        self._show_variant_message(message)
 
         return switched
 
@@ -436,54 +455,87 @@ class MapVariantAutoResolver:
 
         return True
 
-    def _present_message(self, message: str) -> None:
-        """
-        这里根据你现有 message_presenter 的真实方法名调整。
+    #创建或返回 MessagePresenter 实例，确保它存在但不重复创建。
+    def _ensure_message_presenter(self):
+        if self.message_presenter is not None:
+            return self.message_presenter
 
-        我这里写成兼容式调用：
-        - show_message(message)
-        - present_message(message)
-        - present(message)
-        - add_message(message)
-
-        如果你的 message_presenter 方法名固定，建议改成明确调用。
-        """
-        presenter = getattr(self.window, "message_presenter", None)
-
-        if presenter is None:
-            self.logger.warning(
-                "[MapVariantAutoResolver] message_presenter not found, message=%s",
-                message,
-            )
+        # 先用 parent=None 更稳，避免它作为主窗口子控件参与主 UI 布局/绘制。
+        self.message_presenter = MessagePresenter(None)
+        self.message_presenter.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.message_presenter.hide()
+        return self.message_presenter
+      
+    # 这个函数专门负责显示提示信息，和切图逻辑分开，方便以后调整提示时机和内容。
+    def _show_variant_message(self, text, kind="map_variant"):
+        sc2_rect = get_sc2_window_geometry()
+        if not sc2_rect:
+            self.logger.error("MapVariantAutoResolver 无法获取游戏窗口位置，跳过提示。")
             return
 
-        called = False
+        presenter = self._ensure_message_presenter()
 
-        for method_name in (
-            "show_message",
-            "present_message",
-            "present",
-            "add_message",
-            "show",
-        ):
-            method = getattr(presenter, method_name, None)
-            if not callable(method):
-                continue
+        sc2_x, sc2_y, sc2_width, _ = sc2_rect
 
-            try:
-                method(message)
-                called = True
-                break
-            except TypeError:
-                # 方法名撞上但参数不匹配，试下一个
-                continue
+        msg_x = sc2_x + int(self.VARIANT_ALERT_OFFSET_X)
+        msg_y = sc2_y + int(self.VARIANT_ALERT_OFFSET_Y)
+        msg_w = sc2_width
+        msg_h = int(self.VARIANT_ALERT_HEIGHT)
 
-        if not called:
-            self.logger.warning(
-                "[MapVariantAutoResolver] no compatible message_presenter method, message=%s",
-                message,
+        try:
+            presenter.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+
+            refresh_show = self._current_overlay_kind != kind
+            if refresh_show and presenter.isVisible():
+                presenter.hide()
+
+            if presenter.x() != msg_x or presenter.y() != msg_y:
+                presenter.move(msg_x, msg_y)
+
+            presenter.resize(msg_w, msg_h)
+            presenter.setFixedHeight(msg_h)
+
+            presenter.update_message(
+                text,
+                self.VARIANT_ALERT_COLOR,
+                x=msg_x,
+                y=msg_y,
+                width=msg_w,
+                height=msg_h,
+                font_size=int(self.VARIANT_ALERT_FONT_SIZE),
+                sound_filename="",
+                vertical_offset=int(self.VARIANT_ALERT_VERTICAL_OFFSET),
             )
-            return
 
-        # 你现有 game_state_service 会根据这个标记在离开游戏时 reset_game_info。
-        game_state_service.state.message_presenter_triggered = True
+            presenter.show()
+            presenter.raise_()
+            self._current_overlay_kind = kind
+
+            self._variant_message_token += 1
+            token = self._variant_message_token
+            QTimer.singleShot(
+                int(self.VARIANT_ALERT_AUTO_HIDE_MS),
+                lambda: self._hide_variant_message_if_token(token),
+            )
+
+            game_state_service.state.message_presenter_triggered = True
+
+        except Exception as e:
+            self.logger.error(f"MapVariantAutoResolver 显示分支提示失败: {e}")
+            
+    # 这个函数专门负责隐藏提示信息，和切图逻辑分开，方便以后调整提示时机和内容。
+    def _hide_variant_message_if_token(self, token: int):
+        if token != self._variant_message_token:
+            return
+        self._hide_variant_message()
+
+
+    def _hide_variant_message(self):
+        try:
+            self._variant_message_token += 1
+            if self.message_presenter is not None and self.message_presenter.isVisible():
+                self.message_presenter.hide()
+        except Exception:
+            pass
+        finally:
+            self._current_overlay_kind = None

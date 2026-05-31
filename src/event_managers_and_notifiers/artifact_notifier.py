@@ -12,7 +12,6 @@ from src.utils.fileutil import get_resources_dir
 from src.utils.logging_util import get_logger
 from src.utils.window_utils import is_game_active, get_sc2_window_geometry
 
-
 class ArtifactNotifier:
     """
     神器就绪提示模块
