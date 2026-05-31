@@ -10,7 +10,7 @@ from PyQt5.QtCore import Qt, QTimer
 
 from src import config
 from src.utils.font_uitils import set_font_size
-from src.mutaor_handlers.mutator_manager import MutatorManager
+from src.mutator_manager import MutatorManager
 from src.db.map_daos import get_all_map_names
 from pypinyin import lazy_pinyin, Style
 from PyQt5.QtGui import QPixmap

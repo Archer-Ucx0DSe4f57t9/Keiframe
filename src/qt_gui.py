@@ -11,12 +11,12 @@ from PyQt5 import QtCore
 from src import  config, ui_setup, game_state_service, config_hotkeys, game_time_handler, app_window_manager, language_manager
 from src.map_handlers import map_loader
 from src.map_handlers.map_variant_auto_resolver import MapVariantAutoResolver
-from src.output.toast_manager import ToastManager
-from src.mutaor_handlers.mutator_and_enemy_race_recognizer import Mutator_and_enemy_race_recognizer
+from src.presentation_modules.toast_manager import ToastManager
+from src.game_readers.mutator_and_enemy_race_recognizer import Mutator_and_enemy_race_recognizer
 from src.memo_overlay import MemoOverlay
 from src.artifact_notifier import ArtifactNotifier
 from src.countdown_manager import CountdownManager
-from src.supply_notifier.supply_notifier import SupplyNotifier
+from src.supply_notifier import SupplyNotifier
 
 from src.utils.fileutil import get_project_root
 from src.db.db_manager import DBManager

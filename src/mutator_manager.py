@@ -12,7 +12,7 @@ from src import config
 from src.utils.fileutil import get_resources_dir
 from src.utils.logging_util import get_logger
 from src.utils.temp_translate_utils import mutator_names_to_CHS
-from src.output.message_presenter import MessagePresenter
+from src.presentation_modules.message_presenter import MessagePresenter
 from src.utils.window_utils import get_sc2_window_geometry
 from src.game_state_service import state as game_state
 from src.db.mutator_daos import load_mutator_by_name,get_all_mutator_names,get_all_notify_mutator_names

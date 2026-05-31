@@ -4,11 +4,11 @@ from dataclasses import dataclass
 from typing import Dict, Optional, Tuple, Set, Any
 
 from src import game_state_service
-from src.game_utils.minimap_red_dot_detector import (
+from src.game_readers.minimap_red_dot_detector import (
     red_dot_detector,
     MinimapRedDotDetector,
 )
-
+from src.presentation_modules import message_presenter
 
 Region = Tuple[int, int, int, int]
 
@@ -63,10 +63,10 @@ RULES: Tuple[MapVariantRule, ...] = (
         region_mode=MinimapRedDotDetector.REGION_CENTER_IN,
 
         present_map="往日神庙-B",
-        present_message="310波次检测到左下区域小地图红点，选择：往日神庙-B",
+        present_message="310波次检测到红点，选择：庙B",
 
         absent_map="往日神庙-A",
-        absent_message="310波次未检测到左下区域红点，选择：往日神庙-A",
+        absent_message="310波次未检测到红点，选择：庙A",
     ),
 
     MapVariantRule(
@@ -93,10 +93,10 @@ RULES: Tuple[MapVariantRule, ...] = (
         region_mode=MinimapRedDotDetector.REGION_CORE_BBOX_IN,
 
         present_map="虚空撕裂-左",
-        present_message="3分钟检测到指定区域红点，选择：虚空撕裂-左1",
+        present_message="3分钟检测到指定区域红点，选择：虚空撕裂A",
 
         absent_map="虚空撕裂-右",
-        absent_message="3分钟未检测到指定区域红点，选择：虚空撕裂-右",
+        absent_message="3分钟未检测到指定区域红点，选择：虚空撕裂B",
     ),
 )
 

@@ -12,7 +12,7 @@ SupplyNotifier
 - 一旦识别失败或条件不满足，立即隐藏消息并重置播报状态。
 
 依赖：
-- src.supply_notifier.white_supply_recognizer.WhiteSupplyRecognizer
+- src.game_readers.white_supply_recognizer.WhiteSupplyRecognizer
 - src.output.message_presenter.MessagePresenter
 """
 
@@ -24,8 +24,8 @@ from PyQt5.QtCore import Qt
 
 from src import config
 from src.game_state_service import state
-from src.output.message_presenter import MessagePresenter
-from src.supply_notifier.white_supply_recognizer import WhiteSupplyRecognizer
+from src.presentation_modules.message_presenter import MessagePresenter
+from src.game_readers.white_supply_recognizer import WhiteSupplyRecognizer
 from src.utils.logging_util import get_logger
 from src.utils.window_utils import get_sc2_window_geometry, is_game_active
 

@@ -8,7 +8,7 @@ from src.utils.fileutil import get_resources_dir
 import sys
 from src import config
 
-from src.output.sound_player import shared_sound_manager
+from src.presentation_modules.sound_player import shared_sound_manager
 
 # 将屏幕提示优化，减少帧数影响
 class OutlinedLabel(QLabel):

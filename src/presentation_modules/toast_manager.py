@@ -6,7 +6,7 @@ import traceback
 import asyncio
 from src import config
 from src.troop_util import TroopLoader
-from src.output.message_presenter import MessagePresenter
+from src.presentation_modules.message_presenter import MessagePresenter
 from src.utils.window_utils import get_sc2_window_geometry
 
 class ToastManager:

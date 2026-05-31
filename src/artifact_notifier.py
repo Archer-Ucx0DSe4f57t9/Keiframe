@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt
 
 from src import config
 from src.game_state_service import state
-from src.output.message_presenter import MessagePresenter
+from src.presentation_modules.message_presenter import MessagePresenter
 from src.utils.fileutil import get_resources_dir
 from src.utils.logging_util import get_logger
 from src.utils.window_utils import is_game_active, get_sc2_window_geometry
