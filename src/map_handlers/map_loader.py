@@ -16,6 +16,14 @@ def handle_version_selection(window):
     if not sender or not isinstance(sender, QPushButton):
         return
 
+    # 玩家手动点击 左/右、A/B、神/人虫 按钮后，本局禁用自动分支。
+    # 自动分支不会走这个函数，所以这里可以认为是明确的手动覆盖。
+    if (
+        not getattr(window, "auto_map_variant_switching", False)
+        and hasattr(window, "map_variant_auto_resolver")
+    ):
+        window.map_variant_auto_resolver.disable_by_manual("version_button")
+
     # 取消其他按钮的选中状态
     for btn in window.version_buttons:
         if btn != sender:
@@ -51,9 +59,18 @@ def handle_map_selection(window, map_name):
     # 检查是否是由用户手动选择触发的
     if hasattr(window, 'toast_manager') and window.toast_manager:
         window.toast_manager.clear_all_alerts()
-    if not window.manual_map_selection and window.sender() == window.combo_box:
-        window.manual_map_selection = True
-        window.logger.info('用户手动选择了地图')
+        
+        # 添加日志记录，帮助调试地图选择来源
+        is_auto_map_variant_switching = getattr(window, "auto_map_variant_switching", False)
+        
+        # 只有在不是自动切换地图版本的情况下，才将 manual_map_selection 设置为 True
+        if (
+            not is_auto_map_variant_switching
+            and not window.manual_map_selection
+            and window.sender() == window.combo_box
+        ):
+            window.manual_map_selection = True
+            window.logger.info('用户手动选择了地图')
         
     game_state_service.state.current_selected_map = map_name
     

@@ -95,7 +95,19 @@ def update_game_time(window):
                             window.countdown_label.setText("")
 
                         if is_new_game_second:
-                            window.map_event_manager.update_events(current_seconds, window.game_state.is_in_game)
+                            map_variant_switched = False
+
+                            if hasattr(window, "map_variant_auto_resolver"):
+                                map_variant_switched = window.map_variant_auto_resolver.update(
+                                    current_seconds=current_seconds,
+                                    is_in_game=window.game_state.is_in_game,
+                                )
+
+                            if not map_variant_switched:
+                                window.map_event_manager.update_events(
+                                    current_seconds,
+                                    window.game_state.is_in_game,
+                                )
 
                 # === 突变因子识别器相关 ===
                 if is_new_game_second and hasattr(window, 'mutator_and_enemy_race_recognizer'):

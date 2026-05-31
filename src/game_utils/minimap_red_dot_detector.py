@@ -160,19 +160,23 @@ class RedDotFrameAnalyzer:
 
     def __init__(self) -> None:
         # 候选尺寸范围，基于 1920x1080 下的小地图像素。
-        self.min_candidate_w = 3
-        self.min_candidate_h = 3
-        self.max_candidate_w = 32
-        self.max_candidate_h = 32
+        # 红点0.png 的本体在膨胀后仍会大于 5x5，所以这里可以安全收紧。
+        self.min_candidate_w = 5
+        self.min_candidate_h = 5
+        self.max_candidate_w = 28
+        self.max_candidate_h = 28
 
         # 连通块过滤。
-        self.min_component_area = 2
-        self.max_component_area = 280
+        self.min_component_area = 3
+        self.max_component_area = 220
 
         # 聚类时允许的红色块间隙。
-        self.cluster_gap = 10
-        self.max_cluster_w = 34
-        self.max_cluster_h = 34
+        # 原本 10 太宽，容易把单位/选择框附近的红色碎片合并。
+        self.cluster_gap = 5
+        self.component_center_merge_distance = 9.0
+
+        self.max_cluster_w = 28
+        self.max_cluster_h = 28
 
     def analyze(self, minimap_bgr: np.ndarray) -> List[_FrameCandidate]:
         if minimap_bgr is None or minimap_bgr.size == 0:
@@ -184,55 +188,83 @@ class RedDotFrameAnalyzer:
         if not components:
             return []
 
-        clusters = self._cluster_components(components)
         candidates: List[_FrameCandidate] = []
+
+        # 1. 先从单个红色连通块里找“中央菱形 core”
+        # 这一步不依赖外圈，也不依赖 cluster 是否成功。
+        core_candidates = self._find_core_candidates_from_components(components, red_mask)
+        candidates.extend(core_candidates)
+
+        # 2. 再做 cluster，用于识别中央点 + 外圈的完整红点。
+        clusters = self._cluster_components(components)
 
         for cluster in clusters:
             candidate = self._cluster_to_candidate(cluster, red_mask)
             if candidate is not None:
                 candidates.append(candidate)
 
-        return candidates
+        # 3. 去重，避免同一个红点既被 core 检出，又被 cluster 检出。
+        return self._dedupe_candidates(candidates)
 
     def _build_red_mask(self, bgr: np.ndarray) -> np.ndarray:
         """
         生成红色二值 mask。
         返回 uint8 mask，红色为 255。
+
+        这里故意偏向检测“纯红 ping 标记”，避免把小地图上的红紫色单位、
+        棕红色头像/选择框像素误认为红点。
         """
         b = bgr[:, :, 0].astype(np.int16)
         g = bgr[:, :, 1].astype(np.int16)
         r = bgr[:, :, 2].astype(np.int16)
 
-        # RGB dominance：适合截图里的纯红色菱形。
-        mask_rgb = (
-            (r >= 105) &
-            ((r - g) >= 50) &
-            ((r - b) >= 50) &
-            (g <= 120) &
-            (b <= 120)
+        hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+        hue = hsv[:, :, 0].astype(np.int16)
+        sat = hsv[:, :, 1].astype(np.int16)
+        val = hsv[:, :, 2].astype(np.int16)
+
+        # SC2 小地图 ping 红点基本是非常纯的红色：
+        # hue 接近 0/180，饱和度高，G/B 很低。
+        red_hue = (hue <= 8) | (hue >= 172)
+
+        pure_red_hsv = (
+            red_hue &
+            (sat >= 155) &
+            (val >= 65)
         )
 
-        # HSV 补充，容忍压缩/缩放造成的红色偏移。
-        hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
-        lower_red1 = np.array([0, 70, 70], dtype=np.uint8)
-        upper_red1 = np.array([12, 255, 255], dtype=np.uint8)
-        lower_red2 = np.array([168, 70, 70], dtype=np.uint8)
-        upper_red2 = np.array([180, 255, 255], dtype=np.uint8)
+        red_dominance = (
+            (r >= 65) &
+            ((r - g) >= 45) &
+            ((r - b) >= 45) &
+            (g <= 85) &
+            (b <= 85)
+        )
 
-        mask_hsv_1 = cv2.inRange(hsv, lower_red1, upper_red1) > 0
-        mask_hsv_2 = cv2.inRange(hsv, lower_red2, upper_red2) > 0
+        # 对非常亮的纯红做一点兜底。
+        bright_pure_red = (
+            red_hue &
+            (r >= 150) &
+            ((r - g) >= 80) &
+            ((r - b) >= 80) &
+            (g <= 90) &
+            (b <= 90)
+        )
 
-        mask = (mask_rgb | mask_hsv_1 | mask_hsv_2).astype(np.uint8) * 255
+        mask = ((pure_red_hsv & red_dominance) | bright_pure_red).astype(np.uint8) * 255
 
         # 轻微连接被背景侵蚀的红色边缘。
-        kernel = np.array([[0, 1, 0],
-                           [1, 1, 1],
-                           [0, 1, 0]], dtype=np.uint8)
+        # 保留 1 次膨胀，但前面的 mask 已经收紧，误合并会少很多。
+        kernel = np.array(
+            [[0, 1, 0],
+            [1, 1, 1],
+            [0, 1, 0]],
+            dtype=np.uint8
+        )
 
         mask = cv2.dilate(mask, kernel, iterations=1)
 
         return mask
-
     def _find_red_components(self, mask: np.ndarray) -> List[Dict[str, Any]]:
         """
         找红色连通块。
@@ -308,7 +340,6 @@ class RedDotFrameAnalyzer:
         if union_w > self.max_cluster_w or union_h > self.max_cluster_h:
             return False
 
-        # 扩展 bbox 后有重叠，则认为可能属于同一个红点。
         gap = self.cluster_gap
         a_exp = (ax - gap, ay - gap, aw + gap * 2, ah + gap * 2)
         b_exp = (bx, by, bw, bh)
@@ -320,8 +351,8 @@ class RedDotFrameAnalyzer:
         bcx, bcy = b["center"]
         dist = math.hypot(acx - bcx, acy - bcy)
 
-        return dist <= 16
-
+        return dist <= self.component_center_merge_distance
+    
     @staticmethod
     def _bbox_overlap(a: BBox, b: BBox) -> bool:
         ax, ay, aw, ah = a
@@ -332,7 +363,7 @@ class RedDotFrameAnalyzer:
             ay + ah < by or
             by + bh < ay
         )
-
+        
     def _cluster_to_candidate(
         self,
         cluster: List[Dict[str, Any]],
@@ -349,20 +380,55 @@ class RedDotFrameAnalyzer:
         if w < self.min_candidate_w or h < self.min_candidate_h:
             return None
         if w > self.max_candidate_w or h > self.max_candidate_h:
-            return None
+            return self._try_make_core_candidate_from_cluster(cluster, red_mask)
 
         aspect = w / max(1, h)
-        if aspect < 0.55 or aspect > 1.65:
-            return None
+
+        # 红点标记整体应接近正方形。
+        # 原本 0.55 太宽，会放过 9x17 这类竖向碎片组合。
+        if aspect < 0.65 or aspect > 1.55:
+              return self._try_make_core_candidate_from_cluster(cluster, red_mask)
 
         crop = red_mask[y1:y2, x1:x2]
         if crop.size == 0:
             return None
 
+        red_count = int(np.count_nonzero(crop))
+
+        # 过滤非常小的红色噪声。
+        # 红点0.png 经过 mask + dilation 后通常明显大于这个值。
+        if red_count < 18:
+            return None
+
         score, has_outer_ring = self._score_diamond_candidate(crop)
 
-        # 分数太低基本就是普通红色块或噪声。
-        if score < 0.45:
+        component_count, red_count, largest_area, fill_ratio = self._component_fragment_stats(crop)
+
+        if self._is_fragmented_false_candidate(
+            component_count=component_count,
+            red_count=red_count,
+            largest_area=largest_area,
+            fill_ratio=fill_ratio,
+            has_outer_ring=has_outer_ring,
+        ):
+            core_candidate = self._try_make_core_candidate_from_cluster(cluster, red_mask)
+
+            if core_candidate is not None:
+                return core_candidate
+
+            return None
+
+        # 没有外圈时，更要求它像一个有效中央红点，而不是单个小红色碎片。
+        if not has_outer_ring:
+            if w < 7 or h < 7 or red_count < 35:
+                return None
+
+        # 有外圈但分数偏低时，大概率是零散红色碎片拼出来的假 ring。
+        if has_outer_ring and score < 0.68:
+            return None
+
+        # 无外圈的中心红点也不要太宽松。
+        if not has_outer_ring and score < 0.72:
             return None
 
         core_bbox = self._estimate_core_bbox(cluster, x1, y1, w, h)
@@ -503,16 +569,19 @@ class RedDotFrameAnalyzer:
     def _has_outer_ring(red: np.ndarray) -> bool:
         """
         判断是否存在外围菱形边框特征。
+
+        收紧版：
+        不只要求上下左右有红色，还要求红色分布不能太碎。
         """
         h, w = red.shape[:2]
 
-        if w < 8 or h < 8:
+        if w < 12 or h < 12:
             return False
 
-        top = red[0:max(1, h // 4), :]
-        bottom = red[h - max(1, h // 4):h, :]
-        left = red[:, 0:max(1, w // 4)]
-        right = red[:, w - max(1, w // 4):w]
+        top_band = red[0:max(1, h // 4), :]
+        bottom_band = red[h - max(1, h // 4):h, :]
+        left_band = red[:, 0:max(1, w // 4)]
+        right_band = red[:, w - max(1, w // 4):w]
 
         center_y1 = int(h * 0.35)
         center_y2 = int(h * 0.65) + 1
@@ -521,15 +590,38 @@ class RedDotFrameAnalyzer:
         center = red[center_y1:center_y2, center_x1:center_x2]
 
         has_cardinal = (
-            np.count_nonzero(top) > 0 and
-            np.count_nonzero(bottom) > 0 and
-            np.count_nonzero(left) > 0 and
-            np.count_nonzero(right) > 0
+            np.count_nonzero(top_band) >= 2 and
+            np.count_nonzero(bottom_band) >= 2 and
+            np.count_nonzero(left_band) >= 2 and
+            np.count_nonzero(right_band) >= 2
         )
 
-        has_center = np.count_nonzero(center) > 0
+        has_center = np.count_nonzero(center) >= 1
 
-        return bool(has_cardinal and has_center)
+        if not (has_cardinal and has_center):
+            return False
+
+        # 额外要求：整体不能太碎。
+        binary = red.astype(np.uint8) * 255
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(binary, connectivity=8)
+        component_count = max(0, num_labels - 1)
+
+        red_count = int(np.count_nonzero(red))
+        largest_area = 0
+        for label_id in range(1, num_labels):
+            largest_area = max(largest_area, int(stats[label_id, cv2.CC_STAT_AREA]))
+
+        largest_ratio = largest_area / max(1, red_count)
+
+        # 很小的单连通块通常只是中央菱形本体，不要当作 outer ring。
+        if component_count <= 1 and min(w, h) < 16:
+            return False
+
+        # 如果碎成 3 块以上，而且没有一个主块占主导，就不要认为它是 ring。
+        if component_count >= 3 and largest_ratio < 0.72:
+            return False
+
+        return True
 
     @staticmethod
     def _estimate_core_bbox(
@@ -569,8 +661,218 @@ class RedDotFrameAnalyzer:
             return (group_x, group_y, group_w, group_h)
 
         return best["bbox"]
+      
+    @staticmethod
+    def _component_fragment_stats(crop_mask: np.ndarray) -> Tuple[int, int, int, float]:
+        """
+        返回：
+        - component_count: crop 内红色连通块数量
+        - red_count: 红色像素数量
+        - largest_area: 最大连通块面积
+        - fill_ratio: 红色像素 / bbox 面积
+        """
+        binary = (crop_mask > 0).astype(np.uint8) * 255
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(binary, connectivity=8)
+
+        component_count = max(0, num_labels - 1)
+        red_count = int(np.count_nonzero(binary))
+        fill_ratio = red_count / max(1, crop_mask.shape[0] * crop_mask.shape[1])
+
+        largest_area = 0
+        for label_id in range(1, num_labels):
+            largest_area = max(largest_area, int(stats[label_id, cv2.CC_STAT_AREA]))
+
+        return component_count, red_count, largest_area, fill_ratio
 
 
+    @staticmethod
+    def _is_fragmented_false_candidate(
+        component_count: int,
+        red_count: int,
+        largest_area: int,
+        fill_ratio: float,
+        has_outer_ring: bool,
+    ) -> bool:
+        """
+        过滤多个零散红色碎片被误聚类成红点的情况。
+        """
+        if red_count <= 0:
+            return True
+
+        largest_ratio = largest_area / max(1, red_count)
+
+        # 典型 C4：
+        # - 多个连通块
+        # - bbox 内红色填充率低
+        # - 最大块占比不够高
+        if component_count >= 3 and fill_ratio < 0.36 and largest_ratio < 0.72:
+            return True
+
+        # 有外圈但非常稀碎，也很可疑。
+        if has_outer_ring and component_count >= 3 and fill_ratio < 0.30:
+            return True
+
+        return False
+      
+    def _try_make_core_candidate_from_cluster(
+        self,
+        cluster: List[Dict[str, Any]],
+        red_mask: np.ndarray
+    ) -> Optional[_FrameCandidate]:
+        components = sorted(cluster, key=lambda c: c["area"], reverse=True)
+
+        for comp in components:
+            candidate = self._component_to_core_candidate(comp, red_mask)
+            if candidate is not None:
+                return candidate
+
+        return None
+      
+    def _find_core_candidates_from_components(
+        self,
+        components: List[Dict[str, Any]],
+        red_mask: np.ndarray
+    ) -> List[_FrameCandidate]:
+        """
+        直接从单个红色连通块中识别中央红色菱形。
+
+        用途：
+        - 保留只有中央菱形、外圈不完整、外圈被碎片干扰的真实红点。
+        - 避免必须依赖 cluster 通过。
+        """
+        candidates: List[_FrameCandidate] = []
+
+        for comp in components:
+            candidate = self._component_to_core_candidate(comp, red_mask)
+            if candidate is not None:
+                candidates.append(candidate)
+
+        return candidates
+
+      
+    def _component_to_core_candidate(
+        self,
+        comp: Dict[str, Any],
+        red_mask: np.ndarray
+    ) -> Optional[_FrameCandidate]:
+        x, y, w, h = comp["bbox"]
+        area = int(comp["area"])
+
+        def reject(reason: str):
+            logger.debug(
+                "core reject: reason=%s bbox=%s area=%s",
+                reason,
+                (x, y, w, h),
+                area,
+            )
+            return None
+          
+        if w < 7 or h < 7:
+            return reject("too_small")
+
+        if w > 24 or h > 24:
+            return reject("too_large")
+
+        aspect = w / max(1, h)
+        if aspect < 0.70 or aspect > 1.45:
+            return reject(f"bad_aspect_{aspect:.2f}")
+
+        if area < 40:
+            return reject("area_lt_40")
+
+        crop = red_mask[y:y + h, x:x + w]
+        if crop.size == 0:
+            return reject("empty_crop")
+
+        red_count = int(np.count_nonzero(crop))
+        fill_ratio = red_count / max(1, w * h)
+
+        if fill_ratio < 0.30:
+            return reject(f"fill_ratio_low_{fill_ratio:.2f}")
+
+        score, _ = self._score_diamond_candidate(crop)
+
+        if score < 0.68:
+            return reject(f"score_low_{score:.3f}")
+
+        cx = x + w / 2.0
+        cy = y + h / 2.0
+
+        return _FrameCandidate(
+            center=(cx, cy),
+            bbox=(x, y, w, h),
+            core_bbox=(x, y, w, h),
+            score=score,
+            has_outer_ring=False,
+        )
+        
+    def _dedupe_candidates(
+        self,
+        candidates: List[_FrameCandidate],
+        merge_distance: float = 16.0
+    ) -> List[_FrameCandidate]:
+        """
+        去除同一个红点的重复候选。
+
+        规则：
+        - bbox 接触/轻微重叠，认为是同一红点。
+        - 中心距离很近，也认为是同一红点。
+        - 优先保留有 ring、bbox 更大、score 更高的候选。
+        """
+        if not candidates:
+            return []
+
+        def bbox_area(c: _FrameCandidate) -> int:
+            return c.bbox[2] * c.bbox[3]
+
+        def expand_bbox(bbox: BBox, gap: int) -> BBox:
+            x, y, w, h = bbox
+            return (x - gap, y - gap, w + gap * 2, h + gap * 2)
+
+        def same_dot(a: _FrameCandidate, b: _FrameCandidate) -> bool:
+            ax, ay = a.center
+            bx, by = b.center
+            dist = math.hypot(ax - bx, ay - by)
+
+            # bbox 轻微接触/重叠，基本就是同一个 ping 的外圈/核心。
+            if self._bbox_overlap(expand_bbox(a.bbox, 3), b.bbox):
+                return True
+
+            # 中心近但 bbox 没接触时，仍保守一点，避免误合并两个真实红点。
+            if dist <= merge_distance:
+                aw, ah = a.bbox[2], a.bbox[3]
+                bw, bh = b.bbox[2], b.bbox[3]
+
+                # 两个候选至少有一个不是很小，才按同一点合并。
+                if max(aw, ah, bw, bh) >= 12:
+                    return True
+
+            return False
+
+        sorted_candidates = sorted(
+            candidates,
+            key=lambda c: (
+                1 if c.has_outer_ring else 0,
+                bbox_area(c),
+                c.score,
+            ),
+            reverse=True
+        )
+
+        kept: List[_FrameCandidate] = []
+
+        for cand in sorted_candidates:
+            duplicated = False
+
+            for old in kept:
+                if same_dot(cand, old):
+                    duplicated = True
+                    break
+
+            if not duplicated:
+                kept.append(cand)
+
+        return kept
 class MinimapRedDotDetector:
     """
     小地图红点检测器。
@@ -1012,11 +1314,16 @@ class MinimapRedDotDetector:
         if track.hit_frames < monitor.min_confirmed_frames:
             return
 
+        # 严格模式：
+        # core-only 只用于维持 track，不直接确认。
+        # 必须至少观察到一次 outer ring，才认为这是红点 ping。
+        if not track.has_outer_ring:
+            return
+
         if track.max_score >= monitor.min_score:
             track.confirmed = True
             return
 
-        # 高分条件目前仍要求 min_confirmed_frames，保持保守。
         if track.max_score >= monitor.high_score:
             track.confirmed = True
 

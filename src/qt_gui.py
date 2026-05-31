@@ -10,6 +10,7 @@ from PyQt5 import QtCore
 
 from src import  config, ui_setup, game_state_service, config_hotkeys, game_time_handler, app_window_manager, language_manager
 from src.map_handlers import map_loader
+from src.map_handlers.map_variant_auto_resolver import MapVariantAutoResolver
 from src.output.toast_manager import ToastManager
 from src.mutaor_handlers.mutator_and_enemy_race_recognizer import Mutator_and_enemy_race_recognizer
 from src.memo_overlay import MemoOverlay
@@ -92,7 +93,10 @@ class TimerWindow(QMainWindow):
         self.map_event_manager = None
         self.is_map_Malwarfare = False
         self.malwarfare_handler = None
-
+        
+        # 添加一个标志来控制是否需启用自动地图版本切换
+        self.auto_map_variant_switching = False
+        self.map_variant_auto_resolver = MapVariantAutoResolver(self, self.logger)
         # 初始化UI
         self.init_ui()
 
@@ -400,7 +404,12 @@ class TimerWindow(QMainWindow):
             # 清空自定义倒计时
             if hasattr(self, 'countdown_manager') and self.countdown_manager:
                 self.countdown_manager.clear_all_countdowns()
-            
+
+            # 重置自动地图版本切换器状态
+            if hasattr(self, "map_variant_auto_resolver"):
+                self.map_variant_auto_resolver.reset()
+
+
             # 清理神器自动识别残留
             if hasattr(self, 'artifact_notifier') and self.artifact_notifier:
                 self.artifact_notifier.reset()
