@@ -77,7 +77,7 @@ class SettingsTabsBuilder:
             "也可以选择按快捷键，第一次按快捷键显示，再按一次快捷键消失。笔记显示时鼠标操作会穿过图片反应到游戏里面。"
         )
         hint_memo.setWordWrap(True)
-        hint_memo.setStyleSheet("color: #b8b8b8; font-size: 10pt;")
+        hint_memo.setStyleSheet("color: #b8b8b8; font-size: 10px;")
         gl_memo.addRow(hint_memo)
         
         parent.add_row(gl_memo, "笔记透明度 (0-1):", 'MEMO_OPACITY', 'double', step=0.1)
@@ -131,7 +131,7 @@ class SettingsTabsBuilder:
             
         )
         hint_mode.setWordWrap(True)
-        hint_mode.setStyleSheet("color: #a8a8a8; font-size: 10pt;")
+        hint_mode.setStyleSheet("color: #a8a8a8; font-size: 10px;")
         gl_artifact.addRow(hint_mode)
 
         parent.add_row(
@@ -151,7 +151,7 @@ class SettingsTabsBuilder:
             "此时既不会提醒第一个神器，在捡完最后一个神器后下个周期到时时，神器提醒会依旧保持到无神器发现（即指示器一直没变绿色）超时前。"
         )
         hint1.setWordWrap(True)
-        hint1.setStyleSheet("color: #b8b8b8; font-size: 10pt;")
+        hint1.setStyleSheet("color: #b8b8b8; font-size: 10px;")
         gl_artifact.addRow(hint1)
 
         SettingsTabsBuilder._add_compact_row(parent, gl_artifact, "定时参数:", [
@@ -162,7 +162,7 @@ class SettingsTabsBuilder:
 
         hint2 = QLabel("游戏画面左上角为基准点(0,0)，数字越大越靠近右/下")
         hint2.setWordWrap(True)
-        hint2.setStyleSheet("color: #a8a8a8; font-size: 10pt; font-style: italic;")
+        hint2.setStyleSheet("color: #a8a8a8; font-size: 10px; font-style: italic;")
         gl_artifact.addRow(hint2)
 
         SettingsTabsBuilder._add_compact_row(parent, gl_artifact, "坐标偏移:", [
@@ -195,7 +195,7 @@ class SettingsTabsBuilder:
             "人口上限超过最高提醒上限，或者人口上限在排除人口上限列表时不会触发提醒。"
         )
         hint_supply.setWordWrap(True)
-        hint_supply.setStyleSheet("color: #b8b8b8; font-size: 10pt;")
+        hint_supply.setStyleSheet("color: #b8b8b8; font-size: 10px;")
         gl_supply.addRow(hint_supply)
 
         parent.add_row(gl_supply, "启用人口提醒:", 'SUPPLY_ALERT_ENABLED', 'switch')
@@ -224,7 +224,7 @@ class SettingsTabsBuilder:
 
         hint_supply_pos = QLabel("游戏画面左上角为基准点(0,0)，数字越大越靠近右/下。")
         hint_supply_pos.setWordWrap(True)
-        hint_supply_pos.setStyleSheet("color: #a8a8a8; font-size: 10pt; font-style: italic;")
+        hint_supply_pos.setStyleSheet("color: #a8a8a8; font-size: 10px; font-style: italic;")
         gl_supply.addRow(hint_supply_pos)
 
         SettingsTabsBuilder._add_compact_row(parent, gl_supply, "坐标偏移:", [
@@ -406,7 +406,7 @@ class SettingsTabsBuilder:
         gb_layout = QGroupBox("地图事件提示位置设置 (Map Event Toast Layout)")
         gl_layout = QFormLayout(gb_layout)
         hint = QLabel("游戏画面左上角为基准点(0,0),数字越大越靠近右/下")
-        hint.setStyleSheet("color: gray; font-size: 10pt; font-style: italic;")
+        hint.setStyleSheet("color: gray; font-size: 10px; font-style: italic;")
         gl_layout.addRow(hint)
         SettingsTabsBuilder._add_compact_row(parent, gl_layout, "坐标偏移:", [
             ("左侧 (X):", 'TOAST_OFFSET_X', 'spin', {'max': 3000}),
@@ -449,7 +449,7 @@ class SettingsTabsBuilder:
         gb_layout = QGroupBox("因子图标消息设置 (Icon & Text Layout)")
         gl_layout = QFormLayout(gb_layout)
         label_hint = QLabel("游戏画面左上角为基准点(0,0),数字越大越靠近右/下")
-        label_hint.setStyleSheet("color: gray; font-size: 10pt; font-style: italic;")
+        label_hint.setStyleSheet("color: gray; font-size: 10px; font-style: italic;")
         gl_layout.addRow(label_hint)
         SettingsTabsBuilder._add_compact_row(parent, gl_layout, "坐标偏移:", [
             ("左侧 (X):", 'MUTATOR_ALERT_OFFSET_X', 'spin', {'max': 3000}),

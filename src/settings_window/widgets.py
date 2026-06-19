@@ -40,7 +40,7 @@ class ThemedSpinBox(QSpinBox):
                     color: #f2f2f2;
                     background: rgba(70, 74, 84, 205);
                     border: 1px solid rgba(255, 255, 255, 26);
-                    font-size: 8pt;
+                    font-size: 8px;
                     font-weight: 700;
                     padding: 0px;
                 }
@@ -92,7 +92,7 @@ class ThemedDoubleSpinBox(QDoubleSpinBox):
                     color: #f2f2f2;
                     background: rgba(70, 74, 84, 205);
                     border: 1px solid rgba(255, 255, 255, 26);
-                    font-size: 8pt;
+                    font-size: 8px;
                     font-weight: 700;
                     padding: 0px;
                 }

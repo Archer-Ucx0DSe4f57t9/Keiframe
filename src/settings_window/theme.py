@@ -2,7 +2,7 @@ def build_settings_qss(font_pt=12):
     return f"""
     QWidget {{
         color: #e8e8e8;
-        font-size: {font_pt}pt;
+        font-size: {font_pt}px;
     }}
 
     QDialog {{
@@ -21,7 +21,7 @@ def build_settings_qss(font_pt=12):
     }}
 
     QLabel#titleLabel {{
-        font-size: {font_pt}pt;
+        font-size: {font_pt}px;
         font-weight: 600;
         color: #f7f7f7;
         background: transparent;
@@ -259,7 +259,7 @@ def build_settings_qss(font_pt=12):
         border-radius: 3px;
         padding: 0px;
         min-height: 20px;
-        font-size: 10pt;
+        font-size: 10px;
         font-weight: bold;
     }}
 
@@ -287,7 +287,7 @@ def build_settings_qss(font_pt=12):
         border-radius: 3px;
         padding: 0px;
         min-height: 20px;
-        font-size: 10pt;
+        font-size: 10px;
         font-weight: bold;
     }}
 
