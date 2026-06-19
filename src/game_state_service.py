@@ -35,6 +35,7 @@ class GlobalState:
         self.troop = None
         self.active_mutators = None
         self.enemy_race = None
+        self.enemy_composition = None
         
         # 截图相关信息
         self.latest_screenshot = None  # 存储BGR格式的numpy数组
