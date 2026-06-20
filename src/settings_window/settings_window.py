@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
     QCheckBox, QPushButton, QColorDialog, QMessageBox,
     QFormLayout, QScrollArea, QDialog, QComboBox, QGroupBox,
     QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog,
-    QFrame, QGraphicsDropShadowEffect, QProxyStyle, QStyle
+    QFrame, QProxyStyle, QStyle, QApplication
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QRect, QSize
 from PyQt5.QtGui import QKeyEvent, QColor, QKeySequence, QPainter
@@ -30,6 +30,11 @@ from src.settings_window.widgets import (
 )
 from src.settings_window.title_bar import AeroTitleBar
 from src.settings_window.theme import build_settings_qss
+from src.settings_window.dpi_scaling import (
+    get_settings_window_dpi_scale,
+    scale_px,
+    scale_qss_px,
+)
 from src.settings_window.complex_inputs import DictInput, DictTable, CountdownOptionsInput
 from src.settings_window.tabs import SettingsTabsBuilder
 from src.settings_window.setting_data_handler import SettingsHandler
@@ -58,20 +63,23 @@ class SwitchButton(QCheckBox):
         track_rect = self.rect().adjusted(1, 1, -1, -1)
         radius = track_rect.height() / 2
 
+        knob_margin = max(2, round(self.height() * 0.125))
+        knob_size = max(1, self.height() - knob_margin * 2)
+
         if checked:
-            track_color = QColor(52, 199, 89)      # iOS green
+            track_color = QColor(52, 199, 89)      # iOS 绿色
             border_color = QColor(52, 199, 89)
-            knob_x = self.width() - 22
+            knob_x = self.width() - knob_size - knob_margin
         else:
             track_color = QColor(74, 74, 74)
             border_color = QColor(105, 105, 105)
-            knob_x = 2
+            knob_x = knob_margin
 
         painter.setPen(border_color)
         painter.setBrush(track_color)
         painter.drawRoundedRect(track_rect, radius, radius)
 
-        knob_rect = QRect(knob_x, 3, 18, 18)
+        knob_rect = QRect(knob_x, knob_margin, knob_size, knob_size)
         painter.setPen(Qt.NoPen)
         painter.setBrush(QColor(245, 245, 245))
         painter.drawEllipse(knob_rect)
@@ -81,7 +89,7 @@ class SettingsWindow(QDialog):
     settings_saved = pyqtSignal(dict)
 
     def __init__(self, parent=None):
-        super().__init__(parent)
+        super().__init__(parent, Qt.Dialog | Qt.FramelessWindowHint)
         self.settings_file = os.path.join(get_project_root(), 'settings.json')
         self.data_handler = SettingsHandler(
             self.settings_file,
@@ -94,9 +102,10 @@ class SettingsWindow(QDialog):
         self.current_config = self.data_handler.load_config()
         self.original_config = copy.deepcopy(self.current_config)
         self.widgets = {}
+        self._dpi, self._dpi_scale = get_settings_window_dpi_scale(parent)
 
-        # 无边框 / 半透明 / 自定义缩放参数
-        self._resize_margin = 8
+        # 无边框 / Alpha 透明顶层窗口 / 自定义缩放参数
+        self._resize_margin = self._px(8)
         self._resizing = False
         self._resize_edges = set()
         self._resize_start_pos = QPoint()
@@ -105,10 +114,13 @@ class SettingsWindow(QDialog):
         self._setup_window_shell()
 
         self.setWindowTitle("系统设置 / Settings")
-        self.resize(1000, 980)
-        self.setMinimumSize(920, 820)
+        initial_w, initial_h = self._fit_size_to_available_screen(self._px(1000), self._px(980))
+        min_w, min_h = self._fit_size_to_available_screen(self._px(920), self._px(820))
+        self.resize(initial_w, initial_h)
+        self.setMinimumSize(min_w, min_h)
+        self._center_on_available_screen()
 
-        self._first_show_layout_fixed = False
+        self._settings_open_logged = False
 
         self.init_ui()
         self.apply_dark_theme()
@@ -117,13 +129,82 @@ class SettingsWindow(QDialog):
     # =========================
     # 窗口外壳
     # =========================
+    def _px(self, value):
+        return scale_px(value, self._dpi_scale)
+
+    def _target_screen(self):
+        if self.main_window is not None:
+            try:
+                center = self.main_window.frameGeometry().center()
+                screen = QApplication.screenAt(center)
+                if screen is not None:
+                    return screen
+            except Exception:
+                pass
+
+            try:
+                screen = self.main_window.screen()
+                if screen is not None:
+                    return screen
+            except Exception:
+                pass
+
+        return self.screen() or QApplication.primaryScreen()
+
+    def _available_geometry(self):
+        screen = self._target_screen()
+        return screen.availableGeometry() if screen is not None else None
+
+    def _fit_size_to_available_screen(self, width, height):
+        available = self._available_geometry()
+        if available is None:
+            return width, height
+
+        max_w = max(1, available.width())
+        max_h = max(1, available.height())
+        return min(width, max_w), min(height, max_h)
+
+    def _clamp_to_available_screen(self):
+        available = self._available_geometry()
+        if available is None:
+            return
+
+        target_w = min(self.width(), available.width())
+        target_h = min(self.height(), available.height())
+        if self.width() != target_w or self.height() != target_h:
+            self.resize(target_w, target_h)
+
+        self._clamp_position_to_available_screen()
+
+    def _clamp_position_to_available_screen(self):
+        available = self._available_geometry()
+        if available is None:
+            return
+
+        max_x = available.right() - self.width() + 1
+        max_y = available.bottom() - self.height() + 1
+        x = min(max(self.x(), available.left()), max_x)
+        y = min(max(self.y(), available.top()), max_y)
+        self.move(x, y)
+
+    def _center_on_available_screen(self):
+        available = self._available_geometry()
+        if available is None:
+            return
+
+        x = available.left() + (available.width() - self.width()) // 2
+        y = available.top() + (available.height() - self.height()) // 2
+        self.move(x, y)
+        self._clamp_to_available_screen()
+
+
     def _setup_window_shell(self):
-        self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setAutoFillBackground(False)
         self.setMouseTracking(True)
 
     def apply_dark_theme(self):
-        self.setStyleSheet(build_settings_qss(font_pt=12))
+        self.setStyleSheet(scale_qss_px(build_settings_qss(font_px=12), self._dpi_scale))
 
     # =========================
     # 窗口缩放
@@ -233,26 +314,24 @@ class SettingsWindow(QDialog):
     
     def init_ui(self):
         outer_layout = QVBoxLayout(self)
-        outer_layout.setContentsMargins(12, 12, 12, 12)
+        outer_layout.setContentsMargins(self._px(12), self._px(12), self._px(12), self._px(12))
         outer_layout.setSpacing(0)
 
         self.window_frame = QFrame()
         self.window_frame.setObjectName("windowFrame")
+        self.window_frame.setAttribute(Qt.WA_StyledBackground, True)
+        self.window_frame.setAutoFillBackground(False)
         self.window_frame.setMouseTracking(True)
-
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(34)
-        shadow.setOffset(0, 8)
-        shadow.setColor(QColor(0, 0, 0, 135))
-        self.window_frame.setGraphicsEffect(shadow)
 
         outer_layout.addWidget(self.window_frame)
 
         frame_layout = QVBoxLayout(self.window_frame)
-        frame_layout.setContentsMargins(1, 1, 1, 1)
+        frame_layout.setContentsMargins(self._px(1), self._px(1), self._px(1), self._px(1))
         frame_layout.setSpacing(0)
 
         self.title_bar = AeroTitleBar(self, "系统设置 / Settings")
+        if hasattr(self.title_bar, "apply_dpi_scale"):
+            self.title_bar.apply_dpi_scale(self._dpi_scale)
         frame_layout.addWidget(self.title_bar)
 
         self.content_area = QFrame()
@@ -260,8 +339,8 @@ class SettingsWindow(QDialog):
         frame_layout.addWidget(self.content_area)
 
         content_layout = QVBoxLayout(self.content_area)
-        content_layout.setContentsMargins(16, 14, 16, 16)
-        content_layout.setSpacing(12)
+        content_layout.setContentsMargins(self._px(16), self._px(14), self._px(16), self._px(16))
+        content_layout.setSpacing(self._px(12))
 
         self.tabs = QTabWidget()
         self.tabs.setUsesScrollButtons(True)
@@ -286,8 +365,8 @@ class SettingsWindow(QDialog):
         bottom_bar = QFrame()
         bottom_bar.setObjectName("bottomBar")
         btn_layout = QHBoxLayout(bottom_bar)
-        btn_layout.setContentsMargins(0, 4, 0, 0)
-        btn_layout.setSpacing(10)
+        btn_layout.setContentsMargins(0, self._px(4), 0, 0)
+        btn_layout.setSpacing(self._px(10))
 
         save_btn = QPushButton("保存 (Save)")
         save_btn.setObjectName("accentButton")
@@ -310,59 +389,17 @@ class SettingsWindow(QDialog):
 
     def showEvent(self, event):
         super().showEvent(event)
+        self._clamp_position_to_available_screen()
+        QtCore.QTimer.singleShot(0, self._finish_initial_show_layout)
 
-        QtCore.QTimer.singleShot(0, self._refresh_current_tab_layout)
-
-        if not self._first_show_layout_fixed:
-            self._first_show_layout_fixed = True
-            QtCore.QTimer.singleShot(0, self._finalize_first_show_layout)
-            QtCore.QTimer.singleShot(30, self._finalize_first_show_layout)
-
-    def _finalize_first_show_layout(self):
-        """
-        首次显示后，等待 Qt/Windows 把最终几何尺寸稳定下来，
-        然后主动补一次布局刷新 + 轻微 resize 事件，避免用户手动拖一下窗口才正常。
-        """
+    def _finish_initial_show_layout(self):
+        """首次显示后只做一次延迟布局刷新，避免同步重绘顶层窗口。"""
         self._refresh_current_tab_layout()
-
-        # 取当前窗口和内容实际需要尺寸中的较大值
-        hint_w = max(
-            self.minimumWidth(),
-            self.minimumSizeHint().width(),
-            self.sizeHint().width(),
-            self.width()
-        )
-        hint_h = max(
-            self.minimumHeight(),
-            self.minimumSizeHint().height(),
-            self.sizeHint().height(),
-            self.height()
-        )
-
-        # 给一点余量，避免边框/阴影/字体放大后刚好卡边
-        target_w = max(1000, hint_w)
-        target_h = max(980, hint_h + 8)
-
-        if self.width() != target_w or self.height() != target_h:
-            self.resize(target_w, target_h)
-
-        # 关键：程序自己制造一次很小的 resize 往返，等价于“手动拖一下”
-        self._force_fake_resize_event()
-        self._refresh_current_tab_layout()
-
-    def _force_fake_resize_event(self):
-        """
-        某些复杂页（尤其 QTableWidget 所在页）在首次 show 后，
-        只有收到一次明确 resize event 才会完全铺开。
-        """
-        w = self.width()
-        h = self.height()
-
-        self.resize(w, h + 1)
-        self.resize(w, h)
+        self._clamp_position_to_available_screen()
+        self._log_settings_open_geometry()
 
     def _refresh_current_tab_layout(self):
-        """强制刷新当前页签布局，解决首次显示时表格区未正确撑开的情况"""
+        """刷新当前页签布局，保证首次打开时表格和滚动区域正确显示。"""
         if not hasattr(self, "tabs") or self.tabs is None:
             return
 
@@ -370,29 +407,37 @@ class SettingsWindow(QDialog):
         if current is None:
             return
 
-        self._activate_layout_recursively(current)
+        widgets_to_refresh = [current]
 
         for area in current.findChildren(QScrollArea):
+            widgets_to_refresh.append(area)
             inner = area.widget()
             if inner is not None:
-                self._activate_layout_recursively(inner)
+                widgets_to_refresh.append(inner)
+
+        widgets_to_refresh.extend([self.tabs, self.content_area, self.window_frame])
+
+        seen = set()
+        for widget in widgets_to_refresh:
+            if widget is None or id(widget) in seen:
+                continue
+            seen.add(id(widget))
+
+            layout = self._safe_get_qt_layout(widget)
+            if layout is not None:
+                layout.invalidate()
+                layout.activate()
+
+            widget.updateGeometry()
+            widget.update()
 
         for table in current.findChildren(QTableWidget):
             table.updateGeometry()
             table.viewport().update()
-            table.repaint()
-
-        self.tabs.updateGeometry()
-        self.content_area.updateGeometry()
-        self.window_frame.updateGeometry()
-
-        frame_layout = self._safe_get_qt_layout(self.window_frame)
-        if frame_layout is not None:
-            frame_layout.invalidate()
-            frame_layout.activate()
+            table.update()
 
         self.updateGeometry()
-        self.repaint()
+        self.update()
 
     def _safe_get_qt_layout(self, widget):
         """
@@ -407,25 +452,33 @@ class SettingsWindow(QDialog):
         except Exception:
             return None
 
-    def _activate_layout_recursively(self, widget):
-        if widget is None:
+    def _rect_to_tuple(self, rect):
+        return (rect.x(), rect.y(), rect.width(), rect.height())
+
+    def _log_settings_open_geometry(self):
+        """打开设置窗口时记录一次 DPI 和几何信息，便于排查定位问题。"""
+        if self._settings_open_logged:
             return
 
-        layout = self._safe_get_qt_layout(widget)
-        if layout is not None:
-            layout.invalidate()
-            layout.activate()
+        self._settings_open_logged = True
+        screen = self._target_screen()
+        screen_name = screen.name() if screen is not None else "unknown"
+        available = screen.availableGeometry() if screen is not None else QRect()
+        title_geom = self.title_bar.geometry() if hasattr(self, "title_bar") else QRect()
+        title_visible = self.title_bar.isVisible() if hasattr(self, "title_bar") else False
 
-        widget.updateGeometry()
+        self.logger.info(
+            "设置窗口 DPI=%s scale=%.2f screen=%s available=%s geometry=%s "
+            "title_bar=%s title_visible=%s",
+            self._dpi,
+            self._dpi_scale,
+            screen_name,
+            self._rect_to_tuple(available),
+            self._rect_to_tuple(self.geometry()),
+            self._rect_to_tuple(title_geom),
+            title_visible,
+        )
 
-        for child in widget.findChildren(QWidget):
-            child_layout = self._safe_get_qt_layout(child)
-            if child_layout is not None:
-                child_layout.invalidate()
-                child_layout.activate()
-            child.updateGeometry()
-
-    
     def _collect_roi_data(self):
         """
         遍历存储在 self.roi_widgets 中的 QSpinBox，

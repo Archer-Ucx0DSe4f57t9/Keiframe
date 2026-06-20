@@ -7,7 +7,7 @@ _DPI_AWARENESS_MODE = None
 
 
 def configure_qt_fixed_pixel_environment():
-    """Disable Qt's automatic UI scaling before PyQt is imported."""
+    """在导入 PyQt 前关闭 Qt 自动 UI 缩放。"""
     for key in (
         "QT_DEVICE_PIXEL_RATIO",
         "QT_SCALE_FACTOR",
@@ -21,8 +21,8 @@ def configure_qt_fixed_pixel_environment():
 
 def configure_process_dpi() -> str:
     """
-    Make the process DPI aware so Win32 and Qt window coordinates use
-    desktop physical pixels. Safe to call more than once.
+    将进程设置为 DPI aware，让 Win32 和 Qt 窗口坐标使用桌面物理像素。
+    可以安全重复调用。
     """
     global _DPI_AWARENESS_MODE
     if _DPI_AWARENESS_MODE is not None:
@@ -33,7 +33,7 @@ def configure_process_dpi() -> str:
         return _DPI_AWARENESS_MODE
 
     try:
-        awareness_context = ctypes.c_void_p(-4)  # PER_MONITOR_AWARE_V2
+        awareness_context = ctypes.c_void_p(-4)  # 每显示器 DPI 感知 V2
         if ctypes.windll.user32.SetProcessDpiAwarenessContext(awareness_context):
             _DPI_AWARENESS_MODE = "per_monitor_v2"
             return _DPI_AWARENESS_MODE
@@ -41,7 +41,7 @@ def configure_process_dpi() -> str:
         pass
 
     try:
-        ctypes.windll.shcore.SetProcessDpiAwareness(2)  # PROCESS_PER_MONITOR_DPI_AWARE
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)  # 每显示器 DPI 感知
         _DPI_AWARENESS_MODE = "per_monitor_v1"
         return _DPI_AWARENESS_MODE
     except Exception:
@@ -68,7 +68,7 @@ def get_system_dpi():
     try:
         hdc = ctypes.windll.user32.GetDC(0)
         try:
-            return int(ctypes.windll.gdi32.GetDeviceCaps(hdc, 88))  # LOGPIXELSX
+            return int(ctypes.windll.gdi32.GetDeviceCaps(hdc, 88))  # 水平 DPI
         finally:
             ctypes.windll.user32.ReleaseDC(0, hdc)
     except Exception:

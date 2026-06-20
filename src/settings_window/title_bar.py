@@ -2,6 +2,8 @@ from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton
 from PyQt5.QtCore import Qt, QPoint
 from PyQt5.QtGui import QPainter, QLinearGradient, QColor, QPen, QPainterPath
 
+from src.settings_window.dpi_scaling import scale_px
+
 
 class AeroTitleBar(QWidget):
     """Royale Noir / Aero Black 风格标题栏"""
@@ -16,7 +18,8 @@ class AeroTitleBar(QWidget):
         self.setMouseTracking(True)
         self.setAutoFillBackground(False)
 
-        layout = QHBoxLayout(self)
+        self._layout = QHBoxLayout(self)
+        layout = self._layout
         layout.setContentsMargins(10, 0, 6, 0)
         layout.setSpacing(4)
 
@@ -36,6 +39,16 @@ class AeroTitleBar(QWidget):
 
     def set_title(self, title):
         self.title_label.setText(title)
+
+    def apply_dpi_scale(self, scale):
+        """让设置窗口标题栏跟随 Windows 缩放。"""
+        if abs(scale - 1.0) < 0.001:
+            return
+
+        self.setFixedHeight(scale_px(32, scale))
+        self._layout.setContentsMargins(scale_px(10, scale), 0, scale_px(6, scale), 0)
+        self._layout.setSpacing(scale_px(4, scale))
+        self.close_btn.setFixedSize(scale_px(26, scale), scale_px(20, scale))
 
     def paintEvent(self, event):
         painter = QPainter(self)
