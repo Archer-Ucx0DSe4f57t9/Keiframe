@@ -11,6 +11,14 @@ from src.settings_window.widgets import ColorInput, ThemedSpinBox, ThemedDoubleS
     # --- TABS ---
 class SettingsTabsBuilder:
     @staticmethod
+    def _create_hint_label(text, style_sheet=None):
+        label = QLabel(text)
+        label.setProperty("uiRole", "hint")
+        label.setWordWrap(True)
+        if style_sheet:
+            label.setStyleSheet(style_sheet)
+        return label
+    @staticmethod
     def create_general_tab(parent):
         tab = QWidget()
         layout = QFormLayout()
@@ -70,14 +78,12 @@ class SettingsTabsBuilder:
         gl_memo.setVerticalSpacing(10)
         gl_memo.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
-        hint_memo = QLabel(
+        hint_memo = SettingsTabsBuilder._create_hint_label(
             "笔记以{地图文件名称}.png形式存放在{根目录}/resources/memo/里面。可以自己拿画图或者photoshop做好喜欢的笔记命名好文件放memo目录里\n"
             "文件名只以地图名为准，例如机会渺茫-人虫和机会渺茫-神都会共用机会渺茫.png作为笔记。将来可能会加入支持一个地图针对不同指挥官使用不同图片\n"
             "解锁状态下点击📝按钮显示当前地图的的笔记，显示数秒后消失。\n"
             "也可以选择按快捷键，第一次按快捷键显示，再按一次快捷键消失。笔记显示时鼠标操作会穿过图片反应到游戏里面。"
         )
-        hint_memo.setWordWrap(True)
-        hint_memo.setStyleSheet("color: #b8b8b8; font-size: 10pt;")
         gl_memo.addRow(hint_memo)
         
         parent.add_row(gl_memo, "笔记透明度 (0-1):", 'MEMO_OPACITY', 'double', step=0.1)
@@ -124,14 +130,12 @@ class SettingsTabsBuilder:
         gl_artifact.setVerticalSpacing(10)
         gl_artifact.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
-        hint_mode = QLabel(
+        hint_mode = SettingsTabsBuilder._create_hint_label(
             "指示器变得不是严格灰色时：时间上更灵敏，但可能误判。\n"
             "指示器出现明显神器图标时：判断神器已经就绪更准确，但会有明显延迟。\n"
             "该设置会同时影响普通模式、周期模式和神器检测重置。目前建议周期模式使用后者更好匹配时间。\n目前状态判断只会在泽拉图存活时进行。"
             
         )
-        hint_mode.setWordWrap(True)
-        hint_mode.setStyleSheet("color: #a8a8a8; font-size: 10pt;")
         gl_artifact.addRow(hint_mode)
 
         parent.add_row(
@@ -145,13 +149,11 @@ class SettingsTabsBuilder:
             ]
         )
 
-        hint1 = QLabel(
+        hint1 = SettingsTabsBuilder._create_hint_label(
             "神器提醒周期只在110-180秒时生效。提醒周期不生效时会单纯按照顶部神器指示变成绿色时提示神器，会有固定几秒钟延迟。\n"
             "生效时会在顶部神器指示器变灰后固定时间后自动提醒，而不是等到顶部识别到有神器时提醒。也不会提醒第一个神器。\n"
             "此时既不会提醒第一个神器，在捡完最后一个神器后下个周期到时时，神器提醒会依旧保持到无神器发现（即指示器一直没变绿色）超时前。"
         )
-        hint1.setWordWrap(True)
-        hint1.setStyleSheet("color: #b8b8b8; font-size: 10pt;")
         gl_artifact.addRow(hint1)
 
         SettingsTabsBuilder._add_compact_row(parent, gl_artifact, "定时参数:", [
@@ -160,9 +162,7 @@ class SettingsTabsBuilder:
             ("提前倒计时（秒）:", 'ARTIFACT_TIMED_COUNTDOWN_ADVANCE_SECONDS', 'spin', {'max': 120}),
         ])
 
-        hint2 = QLabel("游戏画面左上角为基准点(0,0)，数字越大越靠近右/下")
-        hint2.setWordWrap(True)
-        hint2.setStyleSheet("color: #a8a8a8; font-size: 10pt; font-style: italic;")
+        hint2 = SettingsTabsBuilder._create_hint_label("游戏画面左上角为基准点(0,0)，数字越大越靠近右/下", "color: #a8a8a8; font-style: italic;")
         gl_artifact.addRow(hint2)
 
         SettingsTabsBuilder._add_compact_row(parent, gl_artifact, "坐标偏移:", [
@@ -190,12 +190,10 @@ class SettingsTabsBuilder:
         gl_supply.setVerticalSpacing(10)
         gl_supply.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
-        hint_supply = QLabel(
+        hint_supply = SettingsTabsBuilder._create_hint_label(
             "人口提醒会自动读取右上角人口数值，并在接近当前人口上限时显示提示。4分钟前和4分钟后可使用不同的剩余人口阈值，以适配游戏节奏。\n"
             "人口上限超过最高提醒上限，或者人口上限在排除人口上限列表时不会触发提醒。"
         )
-        hint_supply.setWordWrap(True)
-        hint_supply.setStyleSheet("color: #b8b8b8; font-size: 10pt;")
         gl_supply.addRow(hint_supply)
 
         parent.add_row(gl_supply, "启用人口提醒:", 'SUPPLY_ALERT_ENABLED', 'switch')
@@ -222,9 +220,7 @@ class SettingsTabsBuilder:
             ("最短间隔(秒):", 'SUPPLY_SOUND_MIN_INTERVAL_SECONDS', 'spin', {'max': 300}),
         ])
 
-        hint_supply_pos = QLabel("游戏画面左上角为基准点(0,0)，数字越大越靠近右/下。")
-        hint_supply_pos.setWordWrap(True)
-        hint_supply_pos.setStyleSheet("color: #a8a8a8; font-size: 10pt; font-style: italic;")
+        hint_supply_pos = SettingsTabsBuilder._create_hint_label("游戏画面左上角为基准点(0,0)，数字越大越靠近右/下。", "color: #a8a8a8; font-style: italic;")
         gl_supply.addRow(hint_supply_pos)
 
         SettingsTabsBuilder._add_compact_row(parent, gl_supply, "坐标偏移:", [
@@ -256,13 +252,12 @@ class SettingsTabsBuilder:
         io_gb = QGroupBox("数据备份与恢复 (Excel)")
         io_layout = QVBoxLayout(io_gb)
 
-        hint_label = QLabel(
+        hint_label = SettingsTabsBuilder._create_hint_label(
             "注意：导入 Excel 会直接覆盖数据库对应类型的全部旧数据（excel无记录则删除）。\n"
             "建议：若仅微调数据，请优先使用下方的“在线编辑”功能。\n"
             "建议提前备份resources/db内的map.db或者mutators.db文件，以防误操作导致数据丢失。"
         )
-        hint_label.setWordWrap(True)
-        hint_label.setStyleSheet("color: #d32f2f; font-weight: bold; margin-bottom: 5px;")
+        hint_label.setStyleSheet("color: #d32f2f; font-weight: bold;")
         io_layout.addWidget(hint_label)
 
         btn_container = QHBoxLayout()
@@ -405,8 +400,7 @@ class SettingsTabsBuilder:
         # 2. 提示框通用布局 (Toast Layout)
         gb_layout = QGroupBox("地图事件提示位置设置 (Map Event Toast Layout)")
         gl_layout = QFormLayout(gb_layout)
-        hint = QLabel("游戏画面左上角为基准点(0,0),数字越大越靠近右/下")
-        hint.setStyleSheet("color: gray; font-size: 10pt; font-style: italic;")
+        hint = SettingsTabsBuilder._create_hint_label("游戏画面左上角为基准点(0,0),数字越大越靠近右/下", "color: gray; font-style: italic;")
         gl_layout.addRow(hint)
         SettingsTabsBuilder._add_compact_row(parent, gl_layout, "坐标偏移:", [
             ("左侧 (X):", 'TOAST_OFFSET_X', 'spin', {'max': 3000}),
@@ -448,8 +442,7 @@ class SettingsTabsBuilder:
         # 3. 提示布局
         gb_layout = QGroupBox("因子图标消息设置 (Icon & Text Layout)")
         gl_layout = QFormLayout(gb_layout)
-        label_hint = QLabel("游戏画面左上角为基准点(0,0),数字越大越靠近右/下")
-        label_hint.setStyleSheet("color: gray; font-size: 10pt; font-style: italic;")
+        label_hint = SettingsTabsBuilder._create_hint_label("游戏画面左上角为基准点(0,0),数字越大越靠近右/下", "color: gray; font-style: italic;")
         gl_layout.addRow(label_hint)
         SettingsTabsBuilder._add_compact_row(parent, gl_layout, "坐标偏移:", [
             ("左侧 (X):", 'MUTATOR_ALERT_OFFSET_X', 'spin', {'max': 3000}),
@@ -488,8 +481,7 @@ class SettingsTabsBuilder:
         content = QWidget()
         layout = QFormLayout(content)
         
-        hint_label = QLabel("[ 高级设置 ] 修改此处可能导致识别失效，请谨慎操作！\n")
-        hint_label.setStyleSheet("color: #d32f2f; font-weight: bold; margin-bottom: 5px;")
+        hint_label = SettingsTabsBuilder._create_hint_label("[ 高级设置 ] 修改此处可能导致识别失效，请谨慎操作！\n", "color: #d32f2f; font-weight: bold;")
         layout.addRow(hint_label)
         
         # 种族因子识别区

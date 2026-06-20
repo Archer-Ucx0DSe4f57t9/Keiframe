@@ -10,6 +10,7 @@ from src import config
 from src.utils.fileutil import get_resources_dir
 from src.utils.logging_util import get_logger
 from src.utils import window_utils
+from src.utils.ui_coordinate_debug import log_qt_window_geometry
 
 logger = get_logger('memo_overlay')
 
@@ -143,6 +144,12 @@ class MemoOverlay(QWidget):
 
         # 6. 显示逻辑
         self.show() # 必须先show才能设置透明度
+        log_qt_window_geometry(
+            logger,
+            "memo_overlay",
+            self,
+            (int(sc2_x), int(sc2_y), int(sc2_w), int(sc2_h)),
+        )
         
         # 停止之前的动画
         if self.anim_group.state() == QSequentialAnimationGroup.Running:

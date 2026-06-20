@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import QLabel, QHBoxLayout
 from src.utils.fileutil import get_resources_dir
 import sys
 from src import config
+from src.utils.ui_coordinate_debug import log_qt_window_geometry
 
 from src.presentation_modules.sound_player import shared_sound_manager
 
@@ -16,7 +17,9 @@ class OutlinedLabel(QLabel):
         super().__init__(parent)
         self._outline_color = QColor(outline_color)
         self._outline_width = 1
-        self._font = QFont(config.FONT_PRIMARY, 16)
+        self._font = QFont(config.FONT_PRIMARY)
+        self._font.setPixelSize(16)
+        super().setFont(self._font)
         self._cached_pixmap = None
         self._cached_props = (None, None, None)  # (text, font.pointSize(), outline_width)
         self._vertical_offset = 0 # 从config读取，默认为0
@@ -28,7 +31,7 @@ class OutlinedLabel(QLabel):
 
     def setFontSize(self, font_size):
         f = QFont(self._font)
-        f.setPointSize(font_size)
+        f.setPixelSize(int(font_size))
         self.setFont(f)
 
     def setOutlineWidth(self, width):
@@ -291,6 +294,19 @@ class MessagePresenter(QLabel):
 
         if not self.isVisible():
             self.show()
+
+        if x is not None and y is not None:
+            try:
+                from src.utils.logging_util import get_logger
+                log_qt_window_geometry(
+                    get_logger(__name__),
+                    "message_presenter",
+                    self,
+                    (int(x), int(y), int(self.width()), int(self.height())),
+                )
+            except Exception:
+                pass
+
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, True)

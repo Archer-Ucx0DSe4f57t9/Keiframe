@@ -226,7 +226,7 @@ def setup_search_and_combo_box_and_drag_icon(window):
             border: none;
             border-radius: 5px;
             padding: 5px;
-            font-size: 9pt;
+            font-size: 9px;
         }
         QComboBox::drop-down {
             border: none;

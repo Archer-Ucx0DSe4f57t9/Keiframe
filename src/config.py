@@ -170,6 +170,7 @@ SUPPLY_ALERT_VERTICAL_OFFSET = -5
 
 # 调试模式配置
 debug_mode = False  # 设置为True启用调试模式 / Set to True to enable debug mode
+DPI_DEBUG_LOG = False  # 设置为True输出 Win32/Qt DPI 与坐标对照日志
 debug_time_factor = 5.0  # 调试模式下的时间流速因子 / Time flow factor in debug mode
 
 # 日志级别配置
