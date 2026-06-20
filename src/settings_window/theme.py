@@ -28,6 +28,12 @@ def build_settings_qss(font_px=12):
         padding-left: 2px;
     }}
 
+    QLabel[uiRole="hint"] {{
+        color: rgba(215, 215, 215, 190);
+        font-size: 10px;
+        background: transparent;
+    }}
+
     QFrame#contentArea {{
         background: transparent;
         border: none;
