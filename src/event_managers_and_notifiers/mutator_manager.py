@@ -514,7 +514,7 @@ class MutatorManager(QWidget):
                     if mutator_name == 'AggressiveDeployment' and game_state.enemy_race == 'Protoss':
                         config_name_to_load = 'AggressiveDeploymentProtoss'
                         self.logger.info(f"应用变式: {mutator_name} + {game_state.enemy_race } -> 加载 {config_name_to_load}")
-                    
+
                     # 同步 UI 状态（图标和阴影）
                     btn.setIcon(btn.original_icon)
                     # 重新应用阴影效果（如果需要）
@@ -527,7 +527,7 @@ class MutatorManager(QWidget):
 
                     # 重新加载配置 (核心步骤)
                     time_points = self.load_mutator_config(config_name_to_load)
-                    
+
                     if time_points:
                         self.logger.info(f"配置 '{config_name_to_load}' 已成功加载 {len(time_points)} 个时间点。")
                     else:
