@@ -82,6 +82,12 @@ class ArtifactNotifier:
     ARTIFACT_VALIDATE_MIN_START_SECOND = 10
     ARTIFACT_REQUIRED_IDLE_HITS = 3
 
+
+    # 初始激活成功提示：仅允许在 1 分 50 秒（110 秒）前触发
+    ARTIFACT_ACTIVATION_NOTICE_MAX_SECOND = 110
+    ARTIFACT_ACTIVATION_NOTICE_SECONDS = 5
+    ARTIFACT_ACTIVATION_NOTICE_TEXT = "神器提示模块已经激活"
+    
     # ===== 普通图像模式参数 =====
     # 连续多少个游戏秒检测到 not idle 才触发
     ARTIFACT_NOT_IDLE_TRIGGER_SECONDS = 1
@@ -163,6 +169,9 @@ class ArtifactNotifier:
 
 
     ARTIFACT_RUNTIME_CONFIG_KEYS = (
+        "ARTIFACT_ACTIVATION_NOTICE_MAX_SECOND",
+        "ARTIFACT_ACTIVATION_NOTICE_SECONDS",
+        "ARTIFACT_ACTIVATION_NOTICE_TEXT",
         "ARTIFACT_TIMED_TRIGGER_SECONDS",
         "ARTIFACT_TIMED_TRIGGER_NO_NOT_IDLE_TIMEOUT_SECONDS",
         "ARTIFACT_TIMED_COUNTDOWN_ADVANCE_SECONDS",
@@ -247,6 +256,11 @@ class ArtifactNotifier:
         self._force_recovery_start_second = None
         self._force_recovery_waiting_for_idle_first = False
         self._force_recovery_notice_until_second = None
+
+        # 初始验证通过后的激活成功提示；每局最多显示一次
+        self._activation_notice_until_second = None
+        self._activation_notice_shown = False
+
         self._current_overlay_kind = None
         
         # 定时模式：是否已经确认过本轮有效就绪态
@@ -335,6 +349,61 @@ class ArtifactNotifier:
         )
 
 
+    def _show_activation_notice(self, current_second):
+        """
+        初始验证通过后显示一次“神器提示模块已经激活”。
+
+        仅当验证通过时的游戏时间不晚于 110 秒才允许触发；
+        提示使用神器正式提醒的相同位置、颜色和图标，但不播放声音。
+        """
+        if self._activation_notice_shown:
+            return
+
+        max_second = int(self.ARTIFACT_ACTIVATION_NOTICE_MAX_SECOND)
+
+        if current_second > max_second:
+            self.logger.info(
+                f"ArtifactNotifier 已在 {current_second} 秒验证通过，"
+                f"超过激活提示上限 {max_second} 秒，不显示激活提示。"
+            )
+            return
+
+        duration = max(1, int(self.ARTIFACT_ACTIVATION_NOTICE_SECONDS))
+
+        self._activation_notice_shown = True
+        self._activation_notice_until_second = current_second + duration
+
+        self._show_message(
+            text=self.ARTIFACT_ACTIVATION_NOTICE_TEXT,
+            color=self.ARTIFACT_ALERT_COLOR,
+            sound_filename="",
+            kind="activation_notice",
+        )
+
+        self.logger.info(
+            f"显示神器模块激活提示，持续到游戏秒 "
+            f"{self._activation_notice_until_second}。"
+        )
+
+
+    def _maybe_expire_activation_notice(self, current_second):
+        """
+        到期后只隐藏仍然属于 activation_notice 的覆盖层。
+
+        如果期间正式神器提示已经覆盖了激活提示，
+        此处不会错误地把正式提示隐藏。
+        """
+        if self._current_overlay_kind != "activation_notice":
+            return
+
+        if self._activation_notice_until_second is None:
+            return
+
+        if current_second >= self._activation_notice_until_second:
+            self._hide_message()
+            self._activation_notice_until_second = None
+            self.logger.info("神器模块激活提示已自动隐藏。")
+
     def _maybe_expire_force_recovery_notice(self, current_second):
         """
         如果当前显示的是 force recovery 恢复提示，
@@ -376,6 +445,8 @@ class ArtifactNotifier:
             return
 
         is_idle = self._is_idle_color(color_rgb)
+
+        self._maybe_expire_activation_notice(current_second)
         self._maybe_expire_force_recovery_notice(current_second)
 
         # 只有真正需要判断 idle / not_idle 变化的状态，才去做头像门控
@@ -1141,15 +1212,19 @@ class ArtifactNotifier:
             if self._idle_seen_count >= self.ARTIFACT_REQUIRED_IDLE_HITS:
                 self._state = self.STATE_MONITORING
                 self.logger.info("ArtifactNotifier 验证通过，进入正式监控。")
+                self._show_activation_notice(current_second)
+
+            # 检测到 idle 后，无论是否已满 3 次，都必须在这里返回
             return
 
+        # 只有当前并非 idle 时，才判定初始验证失败
         if self._idle_seen_count < self.ARTIFACT_REQUIRED_IDLE_HITS:
             self._validation_locked = True
             self._state = self.STATE_DISABLED
             self.logger.info(
                 "ArtifactNotifier 验证失败：未达到 3 次紫蓝色检测，本局在 reset 前不启用。"
             )
-
+            
     def _get_current_sample_color(self):
         with state.screenshot_lock:
             game_screen = state.latest_screenshot

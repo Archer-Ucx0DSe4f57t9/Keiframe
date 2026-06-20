@@ -19,6 +19,9 @@ from src.db.mutator_daos import load_mutator_by_name,get_all_mutator_names,get_a
 
 
 class MutatorManager(QWidget):
+    MUTATOR_ACTIVATION_NOTICE_MAX_SECOND = 110
+    MUTATOR_ACTIVATION_NOTICE_SECONDS = 5
+    
     def __init__(self, parent=None, mutators_db=None):
         super().__init__(parent)
         self.logger = get_logger(__name__)
@@ -35,6 +38,15 @@ class MutatorManager(QWidget):
 
         # 增加一个字典来跟踪当前正在显示的提醒时间点，避免重复触发
         self.currently_alerting = {}
+        
+        # 因子识别成功后的短暂激活提示状态
+        self._activation_notice_pending = set()
+        self._activation_notice_until = {}
+        self._activation_notice_announced = set()
+
+        # 用于识别新一局以及离开游戏
+        self._last_alert_check_second = None
+        self._was_in_game = False
 
         self.init_mutator_ui()
         self.init_mutator_alerts()
@@ -151,9 +163,13 @@ class MutatorManager(QWidget):
 
             if mutator_name in self.active_mutator_time_points:
                 del self.active_mutator_time_points[mutator_name]
+
             if mutator_name in self.currently_alerting:
                 del self.currently_alerting[mutator_name]
+
+            self._clear_activation_notice_runtime(mutator_name)
             self.hide_mutator_alert(mutator_name)
+
 
     def load_mutator_config(self, mutator_name):
         """加载突变因子配置文件"""
@@ -169,20 +185,175 @@ class MutatorManager(QWidget):
             self.logger.error(traceback.format_exc())
             return []
 
+    def _reset_activation_notice_state(self, preserve_pending=False):
+        """新一局开始或离开当前对局后，清空一次性激活提示状态。"""
+        pending = (
+            set(self._activation_notice_pending)
+            if preserve_pending
+            else set()
+        )
+
+        self._activation_notice_pending.clear()
+        self._activation_notice_pending.update(pending)
+        self._activation_notice_until.clear()
+        self._activation_notice_announced.clear()
+
+
+    def _queue_activation_notice(self, mutator_name):
+        """
+        将自动识别成功的提醒型因子加入待显示队列。
+
+        手动点击按钮不会调用这里，因此不会因为手动开关按钮
+        显示“自动识别成功”的提示。
+        """
+        if mutator_name not in self.notify_mutator_names:
+            return
+
+        if mutator_name in self._activation_notice_pending:
+            return
+
+        if mutator_name in self._activation_notice_until:
+            return
+
+        self._activation_notice_pending.add(mutator_name)
+        self.logger.info(f"已登记 {mutator_name} 的因子提醒激活提示。")
+
+
+    def _clear_activation_notice_runtime(self, mutator_name):
+        """因子被取消时，清掉尚未显示或正在显示的短提示。"""
+        self._activation_notice_pending.discard(mutator_name)
+        self._activation_notice_until.pop(mutator_name, None)
+
+
+    def _build_activation_notice_message(self, mutator_name):
+        if mutator_name == "AggressiveDeploymentProtoss":
+            return "检测到敌方ai为神族，切换到部署神族。"
+
+        display_name = mutator_names_to_CHS.get(mutator_name) or mutator_name
+        display_name = str(display_name)
+
+        if display_name.endswith("因子"):
+            return f"{display_name}提醒已经激活"
+
+        return f"{display_name}因子提醒已经激活"
+
+
+    def _show_activation_notice_if_needed(
+        self,
+        mutator_name,
+        current_seconds
+    ):
+        """
+        显示或维持因子激活提示。
+
+        返回 True：
+            当前该因子的固定提醒行正在显示激活提示，
+            本轮不能继续执行普通倒计时显示或隐藏逻辑。
+        """
+        max_second = int(getattr(
+            config,
+            "MUTATOR_ACTIVATION_NOTICE_MAX_SECOND",
+            self.MUTATOR_ACTIVATION_NOTICE_MAX_SECOND,
+        ))
+
+        duration = max(1, int(getattr(
+            config,
+            "MUTATOR_ACTIVATION_NOTICE_SECONDS",
+            self.MUTATOR_ACTIVATION_NOTICE_SECONDS,
+        )))
+
+        if mutator_name in self._activation_notice_pending:
+            self._activation_notice_pending.discard(mutator_name)
+
+            # sync_mutator_toggles 同一局可能调用多次
+            if mutator_name in self._activation_notice_announced:
+                return False
+
+            self._activation_notice_announced.add(mutator_name)
+
+            if current_seconds <= max_second:
+                self._activation_notice_until[mutator_name] = (
+                    current_seconds + duration
+                )
+
+                self.logger.info(
+                    f"显示 {mutator_name} 激活提示，"
+                    f"current={current_seconds}, "
+                    f"until={self._activation_notice_until[mutator_name]}。"
+                )
+            else:
+                self.logger.info(
+                    f"{mutator_name} 在 {current_seconds} 秒识别成功，"
+                    f"超过激活提示上限 {max_second} 秒，不显示提示。"
+                )
+
+        until_second = self._activation_notice_until.get(mutator_name)
+
+        if until_second is None:
+            return False
+
+        if current_seconds >= until_second:
+            self._activation_notice_until.pop(mutator_name, None)
+            return False
+
+        self.show_mutator_alert(
+            self._build_activation_notice_message(mutator_name),
+            mutator_name=mutator_name,
+            time_remaining=None,
+            warning_sound_filename=None,
+        )
+
+        return True
+
     def check_alerts(self, current_seconds, is_in_game):
         """
         检查所有激活的突变因子，并持续更新倒计时提醒。
         此函数将由 qt_tui 中的 update_game_time 周期性调用。
         """
-        sc2_rect = get_sc2_window_geometry()
-        if not sc2_rect or is_in_game == False:
-            # 如果找不到SC2窗口，则隐藏所有提醒
-            for label in self.mutator_alert_labels.values():
-                label.hide()
+        try:
+            current_seconds = int(float(current_seconds))
+        except (TypeError, ValueError):
             return
 
-        for mutator_name, time_points_info in self.active_mutator_time_points.items():
+        sc2_rect = get_sc2_window_geometry()
+
+        if not sc2_rect or is_in_game == False:
+            for label in self.mutator_alert_labels.values():
+                label.hide()
+
+            # 真正从游戏返回菜单时才清理
+            if is_in_game == False and self._was_in_game:
+                self._reset_activation_notice_state()
+                self._last_alert_check_second = None
+
+            self._was_in_game = False
+            return
+
+        # 游戏时间回退说明进入了新一局
+        if (
+            self._last_alert_check_second is not None
+            and current_seconds < self._last_alert_check_second
+        ):
+            # 识别同步可能先于本轮 check_alerts 调用，
+            # 因此保留刚刚为新一局登记的 pending 提示。
+            self._reset_activation_notice_state(
+                preserve_pending=True
+            )
+
+        self._last_alert_check_second = current_seconds
+        self._was_in_game = True
+
+        for mutator_name, time_points_info in list(self.active_mutator_time_points.items()):
+            
+            #当前该因子的固定提醒行正在显示激活提示，本轮不能继续执行普通倒计时显示或隐藏逻辑。
+            if self._show_activation_notice_if_needed(
+                mutator_name,
+                current_seconds
+            ):
+                continue
+
             next_deployment_info = None
+            
             for deployment_seconds, content_text,sound_filename in time_points_info:
                 if deployment_seconds > current_seconds:
                     next_deployment_info = (deployment_seconds, content_text,sound_filename)
@@ -210,6 +381,7 @@ class MutatorManager(QWidget):
                 self.show_mutator_alert(message, mutator_name, time_remaining,warning_sound_filename)
             else:
                 self.hide_mutator_alert(mutator_name)
+
 
     def show_mutator_alert(self, message, mutator_name='deployment', time_remaining=None, warning_sound_filename=None):
         """
@@ -305,10 +477,21 @@ class MutatorManager(QWidget):
         根据识别器确认的突变因子列表，同步按钮的选中状态。
         confirmed_mutators: 识别器确认的突变因子名称列表 (e.g., ['propagator', 'deployment'])
         """
-        self.logger.info(f"同步突变因子按钮状态: {confirmed_mutators}")
+        
+        confirmed_mutators = list(confirmed_mutators or [])
+
+        self.logger.info(
+            f"同步突变因子按钮状态: {confirmed_mutators}"
+        )
+
 
         if 'AggressiveDeployment' in confirmed_mutators and game_state.enemy_race == 'Protoss':
             self.logger.info("检测到 AggressiveDeployment 且敌方种族为 Protoss，切换到 AggressiveDeploymentProtoss 变式。")
+            self.logger.info(
+                f"AggressiveDeploymentProtoss 状态："
+                f"in_mutators={'AggressiveDeploymentProtoss' in self.mutator_names}, "
+                f"in_notify={'AggressiveDeploymentProtoss' in self.notify_mutator_names}"
+            )
             confirmed_mutators.remove('AggressiveDeployment')
             confirmed_mutators.append('AggressiveDeploymentProtoss')
 
@@ -353,7 +536,15 @@ class MutatorManager(QWidget):
                     
                     # 更新活动配置
                     self.active_mutator_time_points[mutator_name] = time_points #字典形式，键为原始mutator_name，在识别到protoss时可以更新值
+                    # 自动识别成功且确实存在提醒配置时，登记激活提示
+                    if (
+                        time_points
+                        and self.is_muatator_required_to_notify(mutator_name)
+                    ):
+                        self._queue_activation_notice(mutator_name)
+
                     self.logger.debug(f"通过同步加载 {mutator_name} 配置。")
+
                 else:
                     # 同步 UI 状态 (灰色图标和清除阴影)
                     btn.setIcon(btn.gray_icon)
@@ -362,6 +553,8 @@ class MutatorManager(QWidget):
                     # 清除配置
                     if mutator_name in self.active_mutator_time_points:
                         del self.active_mutator_time_points[mutator_name]
+
+                    self._clear_activation_notice_runtime(mutator_name)
                     self.hide_mutator_alert(mutator_name)
         except Exception as e:
                 # 【捕获所有异常，并打印完整的堆栈信息】
