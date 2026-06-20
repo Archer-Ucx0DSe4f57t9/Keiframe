@@ -8,7 +8,11 @@ from src.map_handlers.map_event_manager import MapEventManager
 from src.map_handlers.malwarfare_event_manager import MapwarfareEventManager
 from src.map_handlers.malwarfare_map_handler import MalwarfareMapHandler
 from src.db.map_daos import load_map_by_name
-from src import config, game_state_service
+from src.ui.main_window_layout import (
+    apply_malwarfare_table_columns,
+    apply_standard_map_table_columns,
+)
+from src import game_state_service
 
 def handle_version_selection(window):
     """处理地图版本按钮选择事件 (原 TimerWindow.on_version_selected)"""
@@ -91,7 +95,6 @@ def handle_map_selection(window, map_name):
         else:
             window.logger.warning(f"未在下拉框中找到地图: {new_map}，继续加载原地图。")   
          
-    table_width = config.MAIN_WINDOW_WIDTH - config.MUTATOR_WIDTH
         
     # 根据地图名称实例化正确的事件管理器
     if map_name == '净网行动':
@@ -106,14 +109,7 @@ def handle_map_selection(window, map_name):
             window.malwarfare_handler.start()
         
         window.countdown_label.show()
-        window.table_area.setColumnCount(5)
-        window.table_area.setColumnWidth(0, 20) # Count
-        window.table_area.setColumnWidth(1, 40) # Time
-        window.table_area.setColumnWidth(2, int((table_width - 60) * 0.6)) # Event (宽列)
-        window.table_area.setColumnWidth(3, int((table_width - 60) * 0.4)) # Army/Note
-        window.table_area.setColumnWidth(4, 0) # Sound File (隐藏)
-        window.table_area.setColumnHidden(3,False)
-        window.table_area.setColumnHidden(4,True)
+        apply_malwarfare_table_columns(window.table_area)
 
     else:
         window.logger.info(f"使用标准地图 '{map_name}'，正在启用 MapEventManager。")
@@ -129,14 +125,7 @@ def handle_map_selection(window, map_name):
 
         window.countdown_label.hide()
         window.countdown_label.setText("")
-        window.table_area.setColumnCount(5) 
-        window.table_area.setColumnWidth(0, 40)          # Time
-        window.table_area.setColumnWidth(1, int((table_width - 40) * event_width_factor)) # Event
-        window.table_area.setColumnWidth(2, int((table_width - 40) * army_width_factor)) # Army/Note
-        window.table_area.setColumnWidth(3, 0)           # Sound File (隐藏)
-        window.table_area.setColumnWidth(4, 0)           # Hero Event (隐藏)
-        window.table_area.setColumnHidden(3,True)
-        window.table_area.setColumnHidden(4,True)
+        apply_standard_map_table_columns(window.table_area, event_width_factor, army_width_factor)
 
     # 处理地图版本按钮组的显示 (原有的版本检测逻辑)
     if '-' in map_name:

@@ -38,10 +38,17 @@ def mousePressEvent_handler(window, event):
     # 检查窗口是否处于可点击状态（非锁定状态）
     is_clickable = not window.testAttribute(Qt.WA_TransparentForMouseEvents)
     pos = event.pos()
-    icon_size = 25
-    drag_x = config.MAIN_WINDOW_WIDTH - icon_size - 5 
-    DRAG_AREA = QRect(drag_x, 0, 35, 35)
-    SEARCH_BOX_AREA = QRect(10, 5, 50, 30)
+    if hasattr(window, 'drag_icon_label'):
+        DRAG_AREA = window.drag_icon_label.geometry().adjusted(-2, -3, 2, 3)
+    else:
+        icon_size = 25
+        drag_x = config.MAIN_WINDOW_WIDTH - icon_size - 5
+        DRAG_AREA = QRect(drag_x, 0, 35, 35)
+
+    if hasattr(window, 'search_box'):
+        SEARCH_BOX_AREA = window.search_box.geometry()
+    else:
+        SEARCH_BOX_AREA = QRect(10, 5, 50, 30)
     
     if event.button() != Qt.LeftButton:
         event.ignore()

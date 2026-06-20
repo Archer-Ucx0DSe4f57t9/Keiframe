@@ -2,7 +2,7 @@
 import os
 from PyQt5.QtWidgets import (
     QWidget, QLabel, QComboBox, QHBoxLayout,
-    QPushButton, QHBoxLayout, QLineEdit, QApplication,
+    QPushButton, QLineEdit, QApplication,
     QHeaderView
 )
 from PyQt5.QtGui import QFont, QBrush, QColor
@@ -15,6 +15,13 @@ from src.db.map_daos import get_all_map_names
 from pypinyin import lazy_pinyin, Style
 from PyQt5.QtGui import QPixmap
 from src.utils.fileutil import get_resources_dir
+from src.ui.main_window_layout import (
+    apply_default_table_columns,
+    apply_table_row_height,
+    get_control_font_size,
+    get_top_layout_metrics,
+)
+from src.ui.main_window_menu import MainWindowMenuController
 
 # 辅助函数 1: 设置窗口样式
 def setup_window_style(window):
@@ -130,13 +137,10 @@ def setup_table_area(window):
     header.setStretchLastSection(False)
     header.setMinimumSectionSize(0)
     window.table_area.setGeometry(0, 65, config.MAIN_WINDOW_WIDTH-config.MUTATOR_WIDTH, config.TABLE_HEIGHT)
-    window.table_area.setColumnCount(4)
     window.table_area.horizontalHeader().setVisible(False)
-    window.table_area.setColumnWidth(0, 50)
-    window.table_area.setColumnWidth(1, config.MAIN_WINDOW_WIDTH-config.MUTATOR_WIDTH - 55)
-    window.table_area.setColumnWidth(2, 5)
-    window.table_area.setColumnWidth(3, 5)
+    apply_default_table_columns(window.table_area)
     window.table_area.verticalHeader().setVisible(False)
+    apply_table_row_height(window.table_area)
     window.table_area.setEditTriggers(QTableWidget.NoEditTriggers)
     window.table_area.setSelectionBehavior(QTableWidget.SelectRows)
     window.table_area.setShowGrid(False)
@@ -191,28 +195,43 @@ def setup_table_area(window):
 def setup_search_and_combo_box_and_drag_icon(window):
     """创建搜索框和地图下拉框"""
     # ... (搜索框和下拉框创建和样式代码) ... (保持与原文件一致)
+    metrics = get_top_layout_metrics(
+        config.MAIN_WINDOW_WIDTH,
+        getattr(window, 'logger', None),
+    )
+    control_font_size = get_control_font_size()
+
     window.search_box = QLineEdit(window.main_container)
     window.search_box.setPlaceholderText("搜索…")
-    window.search_box.setFixedSize(50, 30)
-    set_font_size(window.search_box, 9) # 使用统一的字体大小设置函数
+    window.search_box.setGeometry(
+        metrics['search_x'],
+        metrics['top_y'],
+        metrics['search_width'],
+        metrics['height'],
+    )
+    set_font_size(window.search_box, control_font_size) # 使用统一的字体大小设置函数
     window.search_box.setStyleSheet('''
         QLineEdit {
             color: white;
             background-color: rgba(50, 50, 50, 200);
             border: 1px solid gray;
             border-radius: 5px;
-            padding: 5px;
+            padding: 3px 5px;
         }
     ''')
-    window.search_box.move(10, 5)
-
     # 创建下拉框
     window.combo_box = QComboBox(window.main_container)
-    window.combo_box.setGeometry(60, 5, 100, 30)# 右移一点
-    set_font_size(window.combo_box, 9) # 使用统一的字体大小设置函数
+    window.combo_box.setGeometry(
+        metrics['combo_x'],
+        metrics['top_y'],
+        metrics['combo_width'],
+        metrics['height'],
+    )
+    set_font_size(window.combo_box, control_font_size) # 使用统一的字体大小设置函数
 
     # 设置下拉列表视图
     view = window.combo_box.view()
+    set_font_size(view, control_font_size)
     view.setStyleSheet("""
         background-color: rgba(43, 43, 43, 200);
         color: white;
@@ -225,8 +244,7 @@ def setup_search_and_combo_box_and_drag_icon(window):
             background-color: rgba(43, 43, 43, 200);
             border: none;
             border-radius: 5px;
-            padding: 5px;
-            font-size: 9px;
+            padding: 3px 5px;
         }
         QComboBox::drop-down {
             border: none;
@@ -262,13 +280,27 @@ def setup_search_and_combo_box_and_drag_icon(window):
     # 注意：搜索框的信号连接 (textChanged.connect) 需要保留在 TimerWindow 的 __init__ 中，以便访问内部函数。
     
     ####################
+    # 主菜单按钮
+    window.main_menu_controller = MainWindowMenuController(window, window.main_container)
+    window.main_menu_controller.apply_geometry(
+        metrics['menu_x'],
+        metrics['top_y'],
+        metrics['menu_width'],
+        metrics['height'],
+        metrics['menu_icon_size'],
+    )
+
+    ####################
     #拖拽图标相关
     window.drag_icon_label = QLabel(window.main_container)
-    # 计算位置：假设窗口宽度为 config.MAIN_WINDOW_WIDTH
-    # 我们将其放在最右侧，留出 2px 的边距
-    icon_size = 25
-    icon_x = config.MAIN_WINDOW_WIDTH - icon_size - 2
-    window.drag_icon_label.setGeometry(icon_x, 3, icon_size, icon_size) 
+    icon_size = min(metrics['drag_width'], metrics['height'])
+    window.drag_icon_label.setGeometry(
+        metrics['drag_x'],
+        3,
+        metrics['drag_width'],
+        metrics['height'],
+    )
+    window.drag_icon_label.setAlignment(Qt.AlignCenter)
 
     # 加载图片并保持比例
     icon_path = os.path.join(get_resources_dir('icons'), 'drag_cursor.png')
@@ -357,8 +389,6 @@ def setup_bottom_buttons(window):
     
     window.memo_btn = add_icon_button("📝", "笔记本")
     window.countdown_btn = add_icon_button("⏰", "自定义倒计时")
-    window.setting_btn = add_icon_button("⚙️", "设置界面") 
-    window.exit_btn = add_icon_button("🏃", "退出") 
 
 
     # --- 5. 处理废弃的 Replace Commander Button (隐藏占位) ---

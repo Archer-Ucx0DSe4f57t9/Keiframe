@@ -77,8 +77,9 @@ ALERT_SOUND_VOLUME = 90 # 音量大小（0-100正整数）
 # 突变因子提示位置配置
 MUTATOR_ICON_TRANSPARENCY = 0.7  # 突变因子图标透明度 / Mutator icon transparency
 
-# wiki url
-WIKI_URL = 'https://starcraft.huijiwiki.com/wiki/合作任务/'  # Wiki链接 / Wiki URL
+# urls
+WIKI_URL = 'https://starcraft.huijiwiki.com/wiki/合作任务'  # Wiki链接 / Wiki URL
+README_URL = 'https://www.kdocs.cn/l/cvCj6uEth9os' #说明链接
 
 # 笔记配置
 MEMO_OPACITY = 1.0        # 图片显示的透明度 (0.0 - 1.0)

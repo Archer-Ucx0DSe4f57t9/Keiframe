@@ -21,6 +21,7 @@ from src.event_managers_and_notifiers.supply_notifier import SupplyNotifier
 from src.utils.fileutil import get_project_root
 from src.db.db_manager import DBManager
 from src.db.map_daos import search_maps_by_keyword
+from src.ui.main_window_layout import apply_table_row_height, get_control_font_size
 
 #from src.settings_window import SettingsWindow
 from src.settings_window.settings_window import SettingsWindow
@@ -139,21 +140,15 @@ class TimerWindow(QMainWindow):
         if hasattr(self, 'countdown_btn'):
             self.countdown_btn.clicked.connect(self.trigger_countdown_selection)
         
-        #设置按钮功能
-        if hasattr(self, 'setting_btn'): 
-            self.setting_btn.clicked.connect(self.open_settings)
-            
         self.settings_window = None
-        
-        #退出按钮功能
-        if hasattr(self, 'exit_btn'): 
-            self.exit_btn.clicked.connect(self.safe_exit)
         
         # 初始化全局快捷键
         config_hotkeys.init_global_hotkeys(self)
         
         # 初始化神器提示模块
         self.artifact_notifier = ArtifactNotifier(self)
+        if hasattr(self, 'main_menu_controller'):
+            self.main_menu_controller.set_artifact_notifier(self.artifact_notifier)
         
         # 初始化补给提示模块
         self.supply_notifier = SupplyNotifier(self)
@@ -558,27 +553,28 @@ class TimerWindow(QMainWindow):
                         setattr(config, key, value)
                         # print(f"已更新配置: {key} = {value}")
             except Exception as e:
-                logger.error(f"加载用户配置失败: {e}")
+                active_logger = getattr(self, "logger", None)
+                if active_logger:
+                    active_logger.error(f"加载用户配置失败: {e}")
 
     def open_settings(self):
         """打开设置窗口"""
-        #每次点击按钮都创建一个全新的 SettingsWindow 实例
+        if self.settings_window is not None and self.settings_window.isVisible():
+            self.settings_window.raise_()
+            self.settings_window.activateWindow()
+            return
+
+        # 每次正常打开仍复用现有 SettingsWindow 创建和保存逻辑。
         self.settings_window = SettingsWindow(self)
-        # 连接设置保存信号到处理函数
         self.settings_window.settings_saved.connect(self.handle_settings_update)
-        
-        # 1. 打开模态窗口前，卸载全局快捷键
-        # 这能防止打字时的按键冲突导致的闪退，也能防止误触游戏快捷键
+
         config_hotkeys.unhook_global_hotkeys(self)
-        
-        # 2. 运行设置窗口 (阻塞直到关闭)
-        self.settings_window.exec_() 
-        
-        # 3. 关闭窗口后，重新注册全局快捷键
-        config_hotkeys.init_global_hotkeys(self)
-        
-        # 4. 重新应用可能修改了的配置
-        self.apply_user_settings()
+        try:
+            self.settings_window.exec_()
+        finally:
+            config_hotkeys.init_global_hotkeys(self)
+            self.apply_user_settings()
+            self.settings_window = None
 
     def handle_settings_update(self, new_settings):
         """
@@ -588,6 +584,20 @@ class TimerWindow(QMainWindow):
         # 1. 更新 config 内存中的值
         for key, value in new_settings.items():
             setattr(config, key, value)
+
+        control_font_size = get_control_font_size()
+        if hasattr(self, 'search_box'):
+            from src.utils.font_uitils import set_font_size
+            set_font_size(self.search_box, control_font_size)
+        if hasattr(self, 'combo_box'):
+            from src.utils.font_uitils import set_font_size
+            set_font_size(self.combo_box, control_font_size)
+            set_font_size(self.combo_box.view(), control_font_size)
+        if hasattr(self, 'table_area'):
+            apply_table_row_height(self.table_area)
+        if hasattr(self, 'main_menu_controller'):
+            self.main_menu_controller.apply_menu_metrics()
+            self.main_menu_controller.sync_artifact_menu_state()
         self.logger.info("配置已更新，部分功能已重载")
 
     def showEvent(self, event):
@@ -597,41 +607,59 @@ class TimerWindow(QMainWindow):
         
     def safe_exit(self):
         """关闭所有后台处理器和监听器"""
+        if getattr(self, '_safe_exiting', False):
+            return
+        self._safe_exiting = True
+
         try:
-            #1.关闭净网识别
+            game_state_service.state.app_closing = True
+
+            if hasattr(self, 'timer') and self.timer:
+                self.timer.stop()
+
             if hasattr(self, 'malwarfare_handler') and self.malwarfare_handler is not None:
                 self.logger.info("应用关闭，正在关闭 MalwarfareMapHandler。")
                 self.malwarfare_handler.shutdown()
                 self.malwarfare_handler = None
 
-            #2.关闭突变因子识别
             if hasattr(self, 'mutator_and_enemy_race_recognizer') and self.mutator_and_enemy_race_recognizer:
                 self.mutator_and_enemy_race_recognizer.shutdown()
                 self.logger.info("突变因子和种族识别器已关闭。")
-            
-            #清理神器自动识别
+
             if hasattr(self, 'artifact_notifier') and self.artifact_notifier:
                 self.artifact_notifier.shutdown()
                 self.logger.info("ArtifactNotifier 已关闭。")
-                
-            #清理补给自动识别
+
             if hasattr(self, 'supply_notifier') and self.supply_notifier:
                 self.supply_notifier.shutdown()
                 self.logger.info("SupplyNotifier 已关闭。")
 
-            #3.设置全局标志位，通知所有 asyncio 循环停止
-            game_state_service.state.app_closing = True
+            if hasattr(self, 'countdown_manager') and self.countdown_manager:
+                self.countdown_manager.clear_all_countdowns()
 
-            # 4.清理全局快捷
             config_hotkeys.unhook_global_hotkeys(self)
-            
-            #self.logger.info("清理完成，程序退出。")
-            QApplication.instance().quit()
-            
+
+            if hasattr(self, 'tray_manager') and self.tray_manager:
+                tray_icon = getattr(self.tray_manager, 'tray_icon', None)
+                if tray_icon is not None:
+                    tray_icon.hide()
+                    tray_icon.deleteLater()
+                    self.tray_manager.tray_icon = None
+
+            if hasattr(self, 'control_window') and self.control_window:
+                self.control_window.close()
+
+            if hasattr(self, 'db_manager') and self.db_manager:
+                self.db_manager.close_all()
+
+            app = QApplication.instance()
+            if app is not None:
+                app.quit()
+
         except Exception as e:
             self.logger.error(f'清理失败，无法正常退出: {str(e)}')
             self.logger.error(traceback.format_exc())
-
+            self._safe_exiting = False
 
     def closeEvent(self, event):
         """窗口关闭事件处理"""

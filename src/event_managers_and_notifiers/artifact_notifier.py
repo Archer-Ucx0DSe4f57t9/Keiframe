@@ -260,6 +260,11 @@ class ArtifactNotifier:
         # 初始验证通过后的激活成功提示；每局最多显示一次
         self._activation_notice_until_second = None
         self._activation_notice_shown = False
+        self._activation_confirmed = False
+        
+        # 主菜单是否手动开启了神器检测。
+        # 它与自动初始验证状态分开保存。
+        self._manual_detection_enabled = False
 
         self._current_overlay_kind = None
         
@@ -274,6 +279,126 @@ class ArtifactNotifier:
 
     def shutdown(self):
         self._hide_message()
+
+    def is_active(self):
+        """返回神器提醒当前是否处于会继续处理游戏时间的状态。"""
+        if bool(getattr(self, '_force_recovery_requested', False)):
+            return True
+
+        inactive_states = {
+            self.STATE_DISABLED,
+            self.STATE_FORCE_RECOVERY_DISABLED,
+            self.STATE_WAITING,
+        }
+        return getattr(self, '_state', None) not in inactive_states
+    
+    def set_active(self, active):
+        """启用或停止神器提醒，状态来源仍然是 ArtifactNotifier._state。"""
+        if active:
+            if self.is_active():
+                self.logger.info("ArtifactNotifier 已处于启用状态，跳过重复启用。")
+                return
+            self.reset()
+            self.logger.info("ArtifactNotifier 已通过主菜单启用。")
+            return
+
+        if not self.is_active():
+            self._hide_message()
+            self.logger.info("ArtifactNotifier 已处于停用状态，跳过重复停用。")
+            return
+
+        self.reset()
+        self._state = self.STATE_DISABLED
+        self._validation_locked = True
+        self._force_recovery_requested = False
+        self._hide_message()
+        self.logger.info("ArtifactNotifier 已通过主菜单停用。")
+
+    def set_manual_detection_enabled(self, enabled):
+        """
+        手动设置本局神器检测状态。
+
+        enabled=False：
+        - 立即停止本局神器检测；
+        - 清除菜单勾选；
+        - 直到手动重新开启或下一局 reset。
+
+        enabled=True：
+        - 立即将本局神器检测标记为启用；
+        - 菜单补回勾选；
+        - 请求进入 force recovery，重新开始神器检测。
+        """
+        enabled = bool(enabled)
+
+        # ===== 手动关闭 =====
+        if not enabled:
+            self._activation_confirmed = False
+            self._force_recovery_requested = False
+            self._force_recovery_start_second = None
+            self._force_recovery_waiting_for_idle_first = False
+            self._force_recovery_notice_until_second = None
+
+            self._validation_locked = True
+            self._state = self.STATE_DISABLED
+
+            self._not_idle_streak_seconds = 0
+            self._last_not_idle_second = None
+            self._idle_anchor_second = None
+            self._last_effective_ready_state = None
+
+            self._hide_message()
+
+            self.logger.info(
+                "ArtifactNotifier 已通过主菜单关闭，"
+                "本局神器检测已停用。"
+            )
+            return
+
+        # ===== 手动开启 =====
+        if self._activation_confirmed:
+            self.logger.info(
+                "ArtifactNotifier 已处于激活状态，"
+                "跳过重复开启。"
+            )
+            return
+
+        self._refresh_runtime_config()
+
+        # 菜单勾选和实际启用状态使用同一个字段。
+        self._activation_confirmed = True
+
+        # 手动重新启用时不重新走初始三次 idle 验证，
+        # 而是进入现有的 force recovery 流程。
+        self._validation_locked = True
+
+        self._force_recovery_start_second = None
+        self._force_recovery_waiting_for_idle_first = False
+        self._force_recovery_notice_until_second = None
+
+        self._not_idle_streak_seconds = 0
+        self._last_not_idle_second = None
+        self._idle_anchor_second = None
+        self._last_effective_ready_state = None
+
+        # 允许下一次更新即使还是相同游戏秒，也能处理恢复请求。
+        self._last_checked_second = -1
+
+        self._hide_message()
+        self.request_force_recovery()
+
+        self.logger.info(
+            "ArtifactNotifier 已通过主菜单重新激活，"
+            "等待进入 force recovery。"
+        )
+
+    def is_activation_confirmed(self):
+        """
+        返回本局神器提醒是否已经通过初始 idle 验证。
+
+        该状态仅在初始验证达到 ARTIFACT_REQUIRED_IDLE_HITS 后为 True。
+        reset、新游戏开始或手动停用后恢复为 False。
+        """
+        return bool(getattr(self, "_activation_confirmed", False))
 
     def request_force_recovery(self):
         """
@@ -745,6 +870,7 @@ class ArtifactNotifier:
                 and (current_second - self._timed_ready_alert_start_second) >= timeout_seconds
             ):
                 self._hide_message()
+                self._activation_confirmed = False
                 self._state = self.STATE_DISABLED
                 self._idle_anchor_second = None
                 self._timed_ready_seen_effective_ready = False
@@ -816,6 +942,7 @@ class ArtifactNotifier:
             self._force_recovery_start_second is not None
             and (current_second - self._force_recovery_start_second) >= max_seconds
         ):
+            self._activation_confirmed = False
             self._state = self.STATE_FORCE_RECOVERY_DISABLED
             self._force_recovery_start_second = None
             self._force_recovery_waiting_for_idle_first = False
@@ -1210,6 +1337,7 @@ class ArtifactNotifier:
             )
 
             if self._idle_seen_count >= self.ARTIFACT_REQUIRED_IDLE_HITS:
+                self._activation_confirmed = True
                 self._state = self.STATE_MONITORING
                 self.logger.info("ArtifactNotifier 验证通过，进入正式监控。")
                 self._show_activation_notice(current_second)
