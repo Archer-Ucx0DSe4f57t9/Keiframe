@@ -151,6 +151,100 @@ python -m src.main
 
 ```
 
+生成 Python 主程序发布目录：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build-keiframe.ps1
+```
+
+输出位于 `dist/Keiframe`，其中包含 `Keiframe.exe`、运行库、`resources` 和中文说明。
+
+## Windows 显示模式与全屏覆盖层
+
+Keiframe 的识别、计时、提醒和快捷键始终运行在 Python 主程序中。Xbox Game Bar
+小组件只负责把已有的 Qt 界面显示到 Direct3D 真全屏游戏之上，不会注入游戏
+进程，也不会修改游戏文件。
+
+- 窗口模式、窗口最大化：直接使用原来的 Qt 窗口，不需要 Game Bar。
+- 单屏真全屏：使用“Keiframe 全屏覆盖层”Game Bar 小组件。
+- 真全屏并有副屏：可把原来的 Qt 窗口手动拖到副屏，不需要 Game Bar。
+- 21:9 显示器运行居中的 16:9 游戏画面时，截图和识别自动排除左右黑边；Game
+  Bar 小组件也可以移动到黑边区域。
+
+### 首次安装 Game Bar 小组件
+
+只使用窗口模式或把 Qt 窗口放在副屏时，可以跳过本节。真全屏同屏显示需要：
+
+- Windows 10/11 和已安装的 Xbox Game Bar。
+- Visual Studio 2022。
+- “通用 Windows 平台开发”工作负载。
+- Windows 10 SDK 10.0.19041。
+
+在 Visual Studio 中打开
+`gamebar/Keiframe.GameBar/Keiframe.GameBar.csproj`，还原 NuGet 包，选择 `x64`
+后生成并部署项目。也可以在仓库根目录运行打包脚本：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\gamebar\build-gamebar.ps1
+```
+
+生成的无签名测试 MSIX 位于 `gamebar/artifacts/GameBar`。首次安装时，在管理员
+PowerShell 中手动安装：
+
+```powershell
+$packageDir = ".\gamebar\Keiframe.GameBar\AppPackages\Keiframe.GameBar_1.0.0.6_x64_Debug_Test"
+$dependencies = Get-ChildItem "$packageDir\Dependencies\x64\*.appx"
+Add-AppxPackage `
+  -Path "$packageDir\Keiframe.GameBar_1.0.0.6_x64_Debug.msix" `
+  -DependencyPath $dependencies.FullName `
+  -AllowUnsigned
+```
+
+更详细的构建和部署说明见
+[`gamebar/README.zh-CN.md`](gamebar/README.zh-CN.md)。
+
+### 正确启动顺序
+
+1. 完全退出旧的 Keiframe，避免后台存在两个 Python 进程。
+2. 启动《星际争霸 II》，进入需要使用的窗口或全屏模式。
+3. 真全屏时双击仓库根目录的 `启动Keiframe.bat`。脚本会启动 Python 主程序、
+   激活“Keiframe 全屏覆盖层”并打开 Xbox Game Bar。
+4. 窗口模式或只使用副屏 Qt 窗口时，也可以仅运行：
+
+```powershell
+.\.venv\Scripts\pythonw.exe -m src.main
+```
+
+### 首次使用和日常操作
+
+首次打开 Game Bar 小组件后：
+
+1. 点击小组件标题栏的固定图标。
+2. 点击 Game Bar 顶部工具栏的鼠标图标，开启“点透/单击浏览”。
+3. 按 `Esc` 关闭 Game Bar 编辑界面并回到游戏。
+
+点透开启后，小组件仍然显示，但其后面的《星际争霸 II》可以正常接收鼠标。
+微软的公开接口不允许小组件替用户强制开启点透，Game Bar 会记住这项设置。
+
+需要调整时，再双击 `启动Keiframe.bat` 或按 `Win+G`：
+
+- 拖动小组件标题栏可以移动位置；拖动边缘可以调整大小。
+- 点击小组件中的“切换锁定”，可以解锁或锁定 Keiframe 本体。
+- 点击小组件中的“关闭”或标题栏的 `X`，可以隐藏小组件。
+- 调整完成后确认点透已开启，再按 `Esc` 返回游戏。
+- 多显示器下可直接把原始 Qt 窗口拖到其他显示器；截图和识别仍从游戏窗口读取。
+
+### 常见问题
+
+- 小组件一直显示“等待 Keiframe”：确认 Python 主程序正在运行，并确认游戏处于
+  真全屏。窗口模式下应直接使用原始 Qt 窗口。
+- 小组件打开后看不见内容：先完全退出旧 Keiframe，再按照上面的启动顺序启动；
+  切换显示器后可以重新从 Game Bar 小组件菜单中激活它。
+- 小组件后面的游戏不能点击：开启 Game Bar 顶部工具栏的点透，然后按 `Esc`
+  返回游戏。
+- 需要退出 Keiframe：使用系统托盘图标的退出命令；单独关闭 Game Bar 小组件
+  只会隐藏全屏镜像，不会终止 Python 主程序。
+
 ----------
 
 ## 端口说明（6119）

@@ -189,6 +189,15 @@ class TimerWindow(QMainWindow):
             win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
                                   win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE)
 
+        self.fullscreen_overlay_bridge = None
+        if getattr(config, 'ENABLE_GAMEBAR_OVERLAY', True):
+            try:
+                from src.fullscreen_overlay.bridge import FullscreenOverlayBridge
+                self.fullscreen_overlay_bridge = FullscreenOverlayBridge(self)
+                self.fullscreen_overlay_bridge.start()
+            except Exception as exc:
+                self.logger.error(f"启动 Game Bar 全屏覆盖层失败: {exc}", exc_info=True)
+
         # 初始化时设置为锁定状态（不可点击）
         # 使用延迟调用，确保窗口已完全初始化
         QTimer.singleShot(100, lambda: app_window_manager.on_control_state_changed(self, False))
@@ -617,6 +626,9 @@ class TimerWindow(QMainWindow):
             if hasattr(self, 'timer') and self.timer:
                 self.timer.stop()
 
+            if hasattr(self, 'fullscreen_overlay_bridge') and self.fullscreen_overlay_bridge:
+                self.fullscreen_overlay_bridge.stop()
+
             if hasattr(self, 'malwarfare_handler') and self.malwarfare_handler is not None:
                 self.logger.info("应用关闭，正在关闭 MalwarfareMapHandler。")
                 self.malwarfare_handler.shutdown()
@@ -664,6 +676,9 @@ class TimerWindow(QMainWindow):
     def closeEvent(self, event):
         """窗口关闭事件处理"""
         try:
+            if hasattr(self, 'fullscreen_overlay_bridge') and self.fullscreen_overlay_bridge:
+                self.fullscreen_overlay_bridge.stop()
+
             if self.malwarfare_handler is not None:
                 self.logger.info("应用关闭，正在关闭 MalwarfareMapHandler。")
                 self.malwarfare_handler.shutdown()

@@ -8,6 +8,10 @@ import cv2
 #字体设置相关
 UI_FONT_SIZE = 12  # UI字体大小 / UI font size
 
+# 真全屏覆盖层：启动本地命名管道，供 Xbox Game Bar 小组件读取。
+# 未安装/未打开小组件时不会进行画面合成，也不会影响窗口模式。
+ENABLE_GAMEBAR_OVERLAY = True
+
 # === 字体相关配置 ===
 # 主 UI字体
 FONT_PRIMARY = None

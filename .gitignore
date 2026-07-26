@@ -20,6 +20,13 @@ ENV/
 .idea/
 .vscode/
 
+# Xbox Game Bar / UWP build output
+gamebar/**/bin/
+gamebar/**/obj/
+gamebar/**/AppPackages/
+gamebar/artifacts/
+gamebar/**/Assets/main_menu.png
+
 # Logs
 log/
 *.log
@@ -34,7 +41,6 @@ ext-exe/bin/
 src/monkey.js
 /src/map_handlers/debugpath/
 *.xlsx
-/tests
 /python/Lib
 /python/Scripts
 /废案
