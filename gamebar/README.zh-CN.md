@@ -18,11 +18,13 @@
 
 ## 正确启动和使用
 
-最简单的方式是双击仓库根目录的 `启动Keiframe.bat`。脚本会依次：
+按以下顺序启动：
 
-1. 启动 Keiframe Python 主程序（已经运行时不会重复启动）。
-2. 激活“Keiframe 全屏覆盖层”小组件。
-3. 打开 Xbox Game Bar，让小组件可以立即移动、固定或关闭。
+1. 完全退出旧的 Keiframe，避免后台存在两个主程序。
+2. 启动《星际争霸 II》并进入真全屏。
+3. 运行打包版 `dist/Keiframe/Keiframe.exe`，或者运行源码版
+   `.venv/Scripts/pythonw.exe -m src.main`。
+4. 按 `Win+G`，在小组件菜单中打开“Keiframe 全屏覆盖层”。
 
 首次使用还要做一次 Game Bar 自身的设置：
 
@@ -35,7 +37,7 @@
 只允许小组件读取开关状态，不允许小组件替用户强制开启；Game Bar 会记住用户
 的选择。
 
-需要调整小组件时，再双击 `启动Keiframe.bat` 打开 Game Bar：
+需要调整小组件时按 `Win+G`：
 
 - 拖动 Game Bar 标题栏可移动小组件。
 - 点击小组件内的“切换锁定”可切换 Keiframe 本体的锁定状态。
@@ -63,13 +65,18 @@ powershell -ExecutionPolicy Bypass -File .\gamebar\build-gamebar.ps1
 Debug 包使用 Windows 11 的无签名测试包机制，首次安装需要管理员 PowerShell：
 
 ```powershell
-$packageDir = ".\Keiframe.GameBar\AppPackages\Keiframe.GameBar_1.0.0.6_x64_Debug_Test"
+$packageDir = ".\gamebar\artifacts\GameBar\Keiframe.GameBar_1.0.0.6_x64_Debug_Test"
 $dependencies = Get-ChildItem "$packageDir\Dependencies\x64\*.appx"
 Add-AppxPackage `
   -Path "$packageDir\Keiframe.GameBar_1.0.0.6_x64_Debug.msix" `
   -DependencyPath $dependencies.FullName `
   -AllowUnsigned
 ```
+
+需要把包交给其他测试用户时，应提供完整的
+`Keiframe.GameBar_1.0.0.6_x64_Debug_Test` 目录，不能只发送其中的 MSIX，
+否则目标电脑可能缺少 `Dependencies\x64` 内的运行库。Windows 10 应使用可信
+证书签名的包，不能使用上述 Windows 11 无签名测试安装方式。
 
 部署成功后：
 

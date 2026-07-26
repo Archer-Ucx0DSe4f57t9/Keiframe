@@ -159,6 +159,11 @@ powershell -ExecutionPolicy Bypass -File .\build-keiframe.ps1
 
 输出位于 `dist/Keiframe`，其中包含 `Keiframe.exe`、运行库、`resources` 和中文说明。
 
+打包版固定从 `Keiframe.exe` 所在目录读取 `settings.json`，即默认路径为
+`dist/Keiframe/settings.json`。新生成的发布目录不会复制开发者的个人配置；
+文件不存在时程序使用内置默认值，用户在设置窗口保存后会在 EXE 同目录创建它。
+因此不要把发布目录放进普通用户没有写入权限的位置（例如 `Program Files`）。
+
 ## Windows 显示模式与全屏覆盖层
 
 Keiframe 的识别、计时、提醒和快捷键始终运行在 Python 主程序中。Xbox Game Bar
@@ -179,7 +184,8 @@ Keiframe 的识别、计时、提醒和快捷键始终运行在 Python 主程序
 
 只使用窗口模式或把 Qt 窗口放在副屏时，可以跳过本节。真全屏同屏显示需要：
 
-- Windows 10/11 和已安装的 Xbox Game Bar。
+- Windows 10/11 和已安装的 Xbox Game Bar；本节的无签名安装命令仅适用于
+  Windows 11，Windows 10 应使用可信签名包。
 - Visual Studio 2022。
 - “通用 Windows 平台开发”工作负载。
 - Windows 10 SDK 10.0.19041。
@@ -193,10 +199,11 @@ powershell -ExecutionPolicy Bypass -File .\gamebar\build-gamebar.ps1
 ```
 
 生成的无签名测试 MSIX 位于 `gamebar/artifacts/GameBar`。首次安装时，在管理员
-PowerShell 中手动安装：
+PowerShell 中手动安装。分发给其他测试用户时需要提供整个 `_Test` 目录，
+不能只提供其中的 MSIX：
 
 ```powershell
-$packageDir = ".\gamebar\Keiframe.GameBar\AppPackages\Keiframe.GameBar_1.0.0.6_x64_Debug_Test"
+$packageDir = ".\gamebar\artifacts\GameBar\Keiframe.GameBar_1.0.0.6_x64_Debug_Test"
 $dependencies = Get-ChildItem "$packageDir\Dependencies\x64\*.appx"
 Add-AppxPackage `
   -Path "$packageDir\Keiframe.GameBar_1.0.0.6_x64_Debug.msix" `
@@ -211,13 +218,20 @@ Add-AppxPackage `
 
 1. 完全退出旧的 Keiframe，避免后台存在两个 Python 进程。
 2. 启动《星际争霸 II》，进入需要使用的窗口或全屏模式。
-3. 真全屏时双击仓库根目录的 `启动Keiframe.bat`。脚本会启动 Python 主程序、
-   激活“Keiframe 全屏覆盖层”并打开 Xbox Game Bar。
-4. 窗口模式或只使用副屏 Qt 窗口时，也可以仅运行：
+3. 启动 Keiframe 主程序。打包版运行：
+
+```powershell
+.\dist\Keiframe\Keiframe.exe
+```
+
+源码版运行：
 
 ```powershell
 .\.venv\Scripts\pythonw.exe -m src.main
 ```
+
+4. 真全屏时按 `Win+G`，在小组件菜单中打开“Keiframe 全屏覆盖层”。窗口模式、
+   窗口最大化或只使用副屏 Qt 窗口时，不需要打开 Game Bar 小组件。
 
 ### 首次使用和日常操作
 
@@ -230,7 +244,7 @@ Add-AppxPackage `
 点透开启后，小组件仍然显示，但其后面的《星际争霸 II》可以正常接收鼠标。
 微软的公开接口不允许小组件替用户强制开启点透，Game Bar 会记住这项设置。
 
-需要调整时，再双击 `启动Keiframe.bat` 或按 `Win+G`：
+需要调整时按 `Win+G`：
 
 - 拖动小组件标题栏可以移动位置；拖动边缘可以调整大小。
 - 点击小组件中的“切换锁定”，可以解锁或锁定 Keiframe 本体。

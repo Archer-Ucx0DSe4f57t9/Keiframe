@@ -51,6 +51,7 @@ src/monkey.js
 /Keiframe_Release_v1.02
 /.venv
 settings.json
+/启动Keiframe.bat
 
 #project embeddable required
 !/python/*.pyd
