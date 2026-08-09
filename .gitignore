@@ -46,8 +46,13 @@ src/monkey.js
 /.venv
 settings.json
 
+# Keep this focused unit test visible while the large screenshot fixtures stay ignored.
+/tests/*
+
 #project embeddable required
 !/python/*.pyd
 !/python/*.dll
 /python/share
 /.vs
+/debug
+/tests

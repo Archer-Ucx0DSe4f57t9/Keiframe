@@ -1,5 +1,7 @@
 from dataclasses import asdict, dataclass
 
+from src import config
+
 
 @dataclass
 class CradleOfDeathWaveState:
@@ -13,7 +15,6 @@ class CradleOfDeathWaveState:
 
 
 class CradleOfDeathWaveManager:
-    ALERT_LEAD_SECONDS = 30
     EVENT_NAME = "偷车波次"
 
     STATUS_PENDING = "pending"
@@ -78,20 +79,18 @@ class CradleOfDeathWaveManager:
             if wave.status in (self.STATUS_COMPLETED, self.STATUS_CANCELLED_BY_NEXT_PHASE):
                 continue
 
-            seconds_until_wave = wave.target_game_second - current_game_second
-
-            if seconds_until_wave <= 0:
+            time_diff = wave.target_game_second - current_game_second
+            if time_diff <= 0:
                 self._remove_alert(wave.alert_id)
                 wave.status = self.STATUS_COMPLETED
                 continue
 
-            if seconds_until_wave <= self.ALERT_LEAD_SECONDS:
+            if time_diff <= self._alert_lead_seconds():
                 wave.status = self.STATUS_ALERTING
-                message = self._build_message(seconds_until_wave, wave.army_strength)
                 self.toast_manager.show_map_countdown_alert(
                     wave.alert_id,
-                    seconds_until_wave,
-                    message,
+                    time_diff,
+                    self._build_message(time_diff, wave.army_strength),
                     is_in_game,
                 )
 
@@ -128,8 +127,11 @@ class CradleOfDeathWaveManager:
     def _build_alert_id(self, phase, wave_index):
         return f"cradle_of_death_phase_{phase}_wave_{wave_index}"
 
-    def _build_message(self, seconds_until_wave, army_strength):
-        return f"{seconds_until_wave}秒后  {self.EVENT_NAME}    {army_strength}"
+    def _build_message(self, time_diff, army_strength):
+        return f"{time_diff:0>2}秒后  {self.EVENT_NAME}    {army_strength}"
+
+    def _alert_lead_seconds(self):
+        return int(config.MAP_ALERT_SECONDS)
 
     def _log_debug(self, message):
         if self.logger and hasattr(self.logger, "debug"):
