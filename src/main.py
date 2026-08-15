@@ -2,7 +2,7 @@
 import os
 import sys
 from datetime import datetime, timedelta
-from src.utils.fileutil import get_project_root, get_resources_dir
+from src.utils.fileutil import get_project_root, get_resources_dir, get_log_file_path
 
 # 检查当前目录是否存在config.py文件，如果存在则添加当前目录到sys.path
 src_dir = os.path.join(get_project_root(), "src")
@@ -85,7 +85,7 @@ def setup_mixed_fonts(app):
 
 
 def main():
-    rotate_log_file('Keiframe.log')
+    rotate_log_file(get_log_file_path())
     logging_util.setup_logger()
 
 
