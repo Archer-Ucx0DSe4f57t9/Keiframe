@@ -1,202 +1,128 @@
 # KeiFrame
 
-[简体中文](README.zh-CN.md)
+KeiFrame 是一个面向《星际争霸 II》合作模式的 Windows 桌面辅助工具。它读取本机游戏客户端公开的 `127.0.0.1:6119` 状态接口，并结合屏幕截图、OpenCV 模板匹配和 PyQt5 覆盖层，展示地图时间线并提供事件提醒。
 
-[![Deepwiki wiki](https://img.shields.io/badge/DeepWiki-wiki-blue)](https://deepwiki.com/Archer-Ucx0DSe4f57t9/Keiframe)  
+本仓库是开发者向源码仓库。普通用户发行版与使用说明维护在[金山文档](https://www.kdocs.cn/l/cvCj6uEth9os)。当前界面和提醒文本主要面向简体中文用户。
 
-[![License](https://img.shields.io/github/license/Archer-Ucx0DSe4f57t9/keiframe)](https://github.com/Archer-Ucx0DSe4f57t9/keiframe/blob/main/LICENSE)
+> KeiFrame 不修改游戏文件、不注入游戏进程，也不读取受保护的游戏内存。图像识别只处理本机游戏窗口截图。
 
+## 主要能力
 
-KeiFrame is a timeline-driven event reminder engine for StarCraft II Co-op missions.
+- 从 SC2 本机 6119 API 获取游戏时间、玩家列表和游戏内/外状态。
+- 根据玩家数据自动识别合作任务地图，也允许手动搜索和切换地图。
+- 从 SQLite 时间线加载地图事件与突变事件，显示下一事件并提前弹出提示。
+- 识别敌方种族和突变因子；按配置显示图标、文字与音频提醒。
+- 提供自定义倒计时、地图笔记、泽拉图神器提醒和补给提醒。
+- 对“净网行动”使用画面文字模板识别处理动态倒计时。
+- 对部分存在分支的地图使用小地图红点检测自动选择版本，用户可手动覆盖。
+- 提供设置窗口、全局快捷键、系统托盘和可锁定的置顶窗口。
 
-Currenly, all notification messages are written in Simplified Chinese only.
+## 运行要求
 
-This repository contains the developer-focused source version of the project.  
-End-user distributions and usage documentation are maintained separately at https://www.kdocs.cn/l/cvCj6uEth9os (Simplified Chinese only).
+- Windows 10/11。项目依赖 Win32 窗口句柄、全局快捷键、DPI 和屏幕捕获能力，不保证能在 macOS 或 Linux 运行。
+- Python 3.10 为当前随项目分发的嵌入式运行时基线。
+- 《星际争霸 II》客户端；自动读取对局状态时需要本机 `127.0.0.1:6119` 可用。
 
-Maintained by Archer
+## 从源码运行
 
----
+在仓库根目录使用 PowerShell：
 
-## Overview
-
-KeiFrame evolved from `sc2timer` with structural refactoring and extended event handling.
-
-The project focuses on:
-
-- Timeline abstraction
-- Event-driven reminder logic
-- Configurable rendering layer
-- Audio notification pipeline
-- Extensible data definitions
-
-The software does NOT modify game files, inject processes, or access protected resources.
-
----
-
-## Architecture
-
-### Timeline Engine
-- SQLite-based time definitions
-- Countdown lifecycle management
-- Event dispatch system
-
-### Presentation Layer
-- GUI configuration
-- Font and color customization
-- Overlay message rendering
-
-### Audio Layer
-- Custom audio playback
-- Event-trigger mapping
-
-All mission data is decoupled from core engine logic.
-
----
-
-## Project Structure
-
-For specific functionalities of different project modules, we recommend clicking the deepwiki at the top. However, please note that both of them may contain numerous inaccuracies regarding the game's specific features.
-```
-
-Keiframe/
-├── src/                              │   ├── main.py                       # Application entry point
-│   ├── config.py                     # Central configuration (overridden by settings.json)
-│   ├── config_hotkeys.py             # Hotkey binding configuration
-│   ├── qt_gui.py                     # Main Qt window and signal/slot connections
-│   ├── control_window.py             # Lock/unlock control panel
-│   ├── game_state_service.py         # Game state monitoring via port 6119
-│   ├── game_time_handler.py          # Time flow management
-│   ├── language_manager.py           # Multi-language support (EN/ZH)
-│   ├── memo_overlay.py               # Map notes overlay with animations
-│   ├── countdown_manager.py          # Concurrent timer management
-│   ├── db/                           # Database layer
-│   │   ├── db_manager.py             # SQLite connection management
-│   │   ├── daos.py                   # Data Access Objects base classes
-│   │   ├── map_daos.py               # Map data operations
-│   │   ├── mutator_daos.py           # Mutator data operations
-│   │   └── enemy_comp_daos.py        # Enemy composition data operations
-│   ├── map_handlers/                 # Map identification and event management
-│   │   ├── map_processor.py          # Map template loader and processor
-│   │   ├── IdentifyMap.py            # Map identification logic
-│   │   ├── map_event_manager.py      # Generic map event scheduling
-│   │   ├── map_loader.py             # Map configuration loading
-│   │   ├── malwarfare_map_handler.py # Image recognition module for Malwarfare
-│   │   ├── malwarfare_event_manager.py # Malwarfare-specific events manager
-│   │   └── malwarfate_ocr_processor.py # OCR text recognition processor for Malwarfare
-│   ├── mutaor_handlers/              # Mutator and race recognition
-│   │   ├── mutator_and_enemy_race_recognizer.py # Template matching recognizer
-│   │   └── mutator_manager.py        # Mutator data management
-│   ├── output/                       # Output and presentation layer
-│   │   ├── message_presenter.py      # Alert text rendering with outlines
-│   │   ├── toast_manager.py          # Toast notification management
-│   │   └── sound_player.py           # Audio playback system
-│   ├── settings_window/              # Configuration UI
-│   │   ├── settings_window.py        # Main settings dialog
-│   │   ├── tabs.py                   # Settings tab organization
-│   │   ├── widgets.py                # Custom UI widgets
-│   │   ├── setting_data_handler.py   # Settings data management
-│   │   └── complex_inputs.py         # Complex input components
-│   ├── ui_setup.py                   # UI initialization helpers
-│   ├── app_window_manager.py         # Window management utilities
-│   ├── tray_manager.py               # System tray icon and menu
-│   ├── troop_util.py                 # Troop-related utilities
-│   └── utils/                        # Utility modules
-│       ├── fileutil.py               # File path operations
-│       ├── logging_util.py           # Logging configuration
-│       ├── math_utils.py             # Mathematical calculations
-│       ├── font_uitils.py            # Font loading and management
-│       ├── window_utils.py           # Window positioning utilities
-│       ├── data_validator.py         # Data validation helpers
-│       ├── debug_utils.py            # Debug utilities
-│       └── excel_utils.py            # Excel file operations
-├── resources/                        # Runtime resources
-│   ├── db/                           # SQLite database files
-│   │   ├── maps.db                   # Map data database
-│   │   ├── mutators.db               # Mutator data database
-│   │   ├── enemies.db                # Enemy composition database
-│   │   └── db_backups/               # Database backup files
-│   ├── enemy_comps/                  # Enemy composition CSV files
-│   ├── templates/                    # Recognition templates
-│   │   ├── en_blue/ en_green/ en_orange/ en_yellow/
-│   │   ├── zh_blue/ zh_green/ zh_orange/ zh_yellow/
-│   │   ├── races/                    # Race icon templates
-│   │   └── mutators/                 # Mutator icon templates
-│   ├── icons/                        # Application icons
-│   ├── fonts/                        # Custom font files
-│   ├── sounds/                       # Alert sound files
-│   ├── memo/                         # Map note images
-│   └── troops/                       # Troop icon resources
-├── python/                           # Embedded Python environment
-├── requirements.txt                  # Python dependencies
-├── settings.json                     # User settings override
-└── build-keiframe.bat                # Windows build script
-
-
-```
-
----
-
-## Development Setup
-
-```bash
-git clone https://github.com/<your-github>/keiframe.git
-cd keiframe
-
+```powershell
 python -m venv .venv
-
-# Windows
-.venv\Scripts\activate
-# macOS / Linux
-source .venv/bin/activate
-
-pip install -r requirements.txt
-
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
 python -m src.main
-
 ```
 
-----------
+必须从仓库根目录启动，项目使用 `src.*` 绝对导入，资源路径也以项目根目录为基准。根目录 `requirements.txt` 是开发环境的宽松依赖清单；`src/requirements.txt` 是另一份版本化清单，两者目前并不完全一致。
 
-## Port (6119)
+首次运行会使用 `src/config.py` 中的默认配置。本地设置由根目录的 `settings.json` 覆盖，该文件属于用户状态并已被 Git 忽略。
 
-Default listening port: `6119`
+## 项目结构
 
-If binding fails:
+```text
+Keiframe/
+├── src/
+│   ├── main.py                         # 进程入口、日志、DPI 与 QApplication
+│   ├── qt_gui.py                       # 主窗口和各运行时组件的装配中心
+│   ├── game_state_service.py           # 6119 轮询、截图和共享游戏状态
+│   ├── game_readers/                   # 底层画面识别器
+│   ├── map_handlers/                   # 地图时间线、分支和特殊地图状态机
+│   ├── event_managers_and_notifiers/   # 倒计时、突变、神器和补给提醒
+│   ├── presentation_modules/           # Toast、文字覆盖层和声音播放
+│   ├── settings_window/                # 设置、校验及 Excel 导入导出界面
+│   ├── ui/                             # 主窗口布局与菜单
+│   ├── db/                             # SQLite 连接和 DAO
+│   └── utils/                          # 路径、日志、DPI、窗口等工具
+├── resources/
+│   ├── db/                             # 地图、突变和敌方组成数据库
+│   ├── templates/                      # 图像识别模板
+│   ├── memo/                           # 地图笔记图片
+│   ├── icons/ fonts/ sounds/           # UI 与提醒资源
+│   └── enemy_comps/ troops/            # 敌方组成和兵种数据
+├── tests/                              # 单元测试、调试脚本与截图样本
+├── python/                             # Windows 嵌入式 Python 运行时
+├── Keiframe.spec                       # PyInstaller 配置
+└── build-keiframe.bat                  # Windows 发布目录构建脚本
+```
 
--   Ensure the port is not occupied
-    
--   Run the following commands` (Windows, admin required)
-    ```bash
-    stop winnat
-    netsh int ipv4 add excludedportrange protocol=tcp startport=6119 numberofports=1
-	net start winnat
-    ```
-----------
+更完整的项目语境见 [`context.md`](context.md)，运行时模块和数据流见 [`architecture.md`](architecture.md)。参与开发或使用自动化代理前，请先阅读 [`AGENTS.md`](AGENTS.md)。
 
-## Contributing
+## 数据与配置
 
--   Keep mission data separate from engine logic
-    
--   Avoid hardcoded behavior
-    
--   Maintain modular structure
-    
--   Open an issue before major refactoring
-    
+- `resources/db/maps.db`：地图、搜索关键词和地图事件时间线。
+- `resources/db/mutators.db`：突变因子元数据和提醒时间线。
+- `resources/db/enemies.db`：敌方组成分级数据；当前主窗口未打开该数据库连接。
+- `resources/templates/`：突变、种族、补给、小地图和特殊地图识别模板。
+- `settings.json`：用户本地覆盖配置，不应提交。
 
-----------
+设置窗口支持地图/突变时间线的 Excel 导入导出。导入会覆盖涉及对象的原有数据库记录，修改数据前应先保留对应数据库备份。
 
-## License
+## 验证
 
-MIT License
+文档或纯 Python 修改完成后，至少运行：
 
-See `LICENSE` for details.
+```powershell
+python -m compileall -q src
+python -m unittest tests.test_cradle_of_death_phase_detector tests.test_cradle_of_death_wave_manager
+git diff --check
+```
 
-----------
+不要直接运行无筛选的 `unittest discover` 或 `pytest tests`：`tests/` 中包含依赖真实窗口、6119 API、截图样本或人工观察的调试脚本。
 
-## Credits
+图像识别、DPI、全局快捷键和覆盖层位置仍需要在 Windows 与实际游戏环境中手工验证。测试时应记录分辨率、Windows 缩放、游戏语言、ROI 和识别阈值。
 
-Originally based on `sc2timer` from ylkangpeter
+## 打包
 
-Refactored and maintained by Archer.
+仅在确实需要生成发布包时运行：
+
+```powershell
+.\build-keiframe.bat
+```
+
+脚本会递归清理 `build/` 和 `dist/`，调用项目内嵌 Python 的 PyInstaller，然后将 `resources/`、使用说明和端口修复脚本复制到版本化发布目录。生成物不应提交到仓库。
+
+## 6119 端口
+
+无法读取游戏状态时，先确认 SC2 正在运行，并检查 `http://127.0.0.1:6119/game/` 与 `/ui/` 是否可访问。仓库中的 `端口修复.bat` 会以管理员权限调整 Windows 网络配置；仅在理解其影响且确实需要时运行。
+
+## 当前限制
+
+- 依赖 Windows、SC2 窗口和固定屏幕区域；不同分辨率、语言、UI 缩放或游戏更新可能降低识别率。
+- `resources/` 是运行时必需内容，源码运行和发布目录都必须保持其结构。
+- “死亡摇篮”倒计时、阶段和偷车波次组件已存在并有核心单元测试，但当前尚未接入主窗口的地图选择与生命周期流程。
+- README 只描述当前源码行为；普通用户操作流程以发行版使用说明为准。
+
+## 贡献
+
+- 保持画面读取、业务状态机、提醒展示和持久化边界清晰。
+- 新地图逻辑放在 `map_handlers/`，底层识别放在 `game_readers/`，不要继续把地图特例堆入主窗口。
+- 不写死开发机路径；统一使用 `src.utils.fileutil` 解析运行时路径。
+- 后台线程不得直接操作 Qt 控件，应通过信号、槽或主线程定时器传递结果。
+- 保留历史公开名称的兼容性，避免与任务无关的大范围重命名或格式化。
+
+## License 与致谢
+
+项目采用 [MIT License](LICENSE)。
+
+KeiFrame 基于 ylkangpeter 的 `sc2timer` 项目继续开发，由 Archer 维护。

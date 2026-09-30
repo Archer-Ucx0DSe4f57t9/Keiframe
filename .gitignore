@@ -51,3 +51,4 @@ settings.json
 !/python/*.dll
 /python/share
 /.vs
+/debug
