@@ -41,6 +41,7 @@ class GlobalState:
         self.latest_screenshot = None  # 存储BGR格式的numpy数组
         self.screenshot_timestamp = 0
         self.scale_factor = 1.0        # 基于1920宽度的缩放比例
+        self.viewport_geometry = None  # 桌面坐标中的 16:9 游戏视口
         self.screenshot_lock = threading.Lock() # 用于保护截图数据的读写安全
         
         # 消息播报状态
@@ -218,12 +219,17 @@ def _capture_game_screen(sct):
         # 3. 颜色空间转换 BGRA -> BGR
         game_screen_bgr = cv2.cvtColor(img_array, cv2.COLOR_BGRA2BGR)
         
-        # 4. 重缩放图片大小（临时手段）
+        # 4. 所有识别器统一使用固定的 1920x1080 坐标系。
+        # get_sc2_window_geometry 已经裁出居中的 16:9 游戏视口。
         target_w = 1920
-        target_h = int(h * (1920.0 / w)) # 保持纵横比
-
-        if w != target_w:
-            game_screen_bgr = cv2.resize(game_screen_bgr, (target_w, target_h), interpolation=cv2.INTER_AREA)
+        target_h = 1080
+        if (w, h) != (target_w, target_h):
+            interpolation = cv2.INTER_AREA if w > target_w or h > target_h else cv2.INTER_LINEAR
+            game_screen_bgr = cv2.resize(
+                game_screen_bgr,
+                (target_w, target_h),
+                interpolation=interpolation,
+            )
 
         current_scale = 1.0
         
@@ -234,6 +240,7 @@ def _capture_game_screen(sct):
         with state.screenshot_lock:
             state.latest_screenshot = game_screen_bgr
             state.scale_factor = current_scale
+            state.viewport_geometry = sc2_rect
             state.screenshot_timestamp = time.perf_counter()
         logger.info("截图成功更新全局状态")
     except Exception as e:

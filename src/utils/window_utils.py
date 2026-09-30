@@ -2,6 +2,7 @@ import win32gui
 import win32con
 import win32api
 
+from src.utils.game_viewport import centered_aspect_crop
 from src.utils.logging_util import get_logger
 
 logger = get_logger('window_utils')
@@ -30,44 +31,90 @@ class WindowHandleManager:
 
 manager = WindowHandleManager()
 
-#获取窗口内容区的左上角和坐标
-def get_sc2_window_geometry() -> object:
+
+def get_sc2_client_geometry():
+    """获取 SC2 原始客户区在桌面上的物理像素坐标。"""
     hwnd = manager.get_hwnd()
     try:
         if hwnd:
-            # 内容区大小（如果为窗口模式不含边框+标题栏）
             content_rect = win32gui.GetClientRect(hwnd)
-            
             content_left_top = win32gui.ClientToScreen(hwnd, (content_rect[0], content_rect[1]))
             content_right_bottom = win32gui.ClientToScreen(hwnd, (content_rect[2], content_rect[3]))
-            
+
             x = content_left_top[0]
             y = content_left_top[1]
             w = content_right_bottom[0] - x
             h = content_right_bottom[1] - y
             return x, y, w, h
     except Exception as e:
-        logger.warning(f"获取'星际争霸2'窗口几何信息失败: {e}")
+        logger.warning(f"获取'星际争霸2'客户区几何信息失败: {e}")
     return None
 
-#判断是不是全屏游戏
+
+def get_sc2_window_geometry():
+    """
+    获取供识别和覆盖层使用的 16:9 游戏视口。
+
+    真全屏时 Windows 会把 SC2 客户区暴露为游戏分辨率（例如
+    2560x1440），因此这里会原样返回。无边框或窗口化运行在带鱼屏时，
+    则返回客户区正中央的 16:9 区域，自动排除两侧区域。
+    """
+    client_geometry = get_sc2_client_geometry()
+    if not client_geometry:
+        return None
+
+    viewport = centered_aspect_crop(client_geometry)
+    return viewport.as_tuple() if viewport else None
+
+
 def is_sc2_fullscreen():
     hwnd = manager.get_hwnd()
-    # 获取窗口矩形
-    rect = win32gui.GetWindowRect(hwnd)  # (left, top, right, bottom)
-    win_width = rect[2] - rect[0]
-    win_height = rect[3] - rect[1]
+    if not hwnd:
+        return False
 
-    # 获取屏幕分辨率
-    screen_width = win32api.GetSystemMetrics(0)
-    screen_height = win32api.GetSystemMetrics(1)
+    try:
+        rect = win32gui.GetWindowRect(hwnd)
+        monitor = _get_monitor_rect(hwnd)
+        if not monitor:
+            return False
 
-    # 判断是否和屏幕一样大
-    return win_width == screen_width and win_height == screen_height
+        # 独占全屏会改变显示模式；此时 MonitorFromWindow 返回的正是
+        # 游戏分辨率。使用所在显示器而不是主屏幕可兼容多显示器。
+        tolerance = 2
+        return all(
+            abs(actual - expected) <= tolerance
+            for actual, expected in zip(rect, monitor)
+        )
+    except Exception as e:
+        logger.warning(f"判断'星际争霸2'全屏状态失败: {e}")
+        return False
+
+
+def get_sc2_monitor_geometry():
+    """Return the desktop rectangle of the monitor currently hosting SC2."""
+    hwnd = manager.get_hwnd()
+    if not hwnd:
+        return None
+    try:
+        return _get_monitor_rect(hwnd)
+    except Exception as e:
+        logger.warning(f"获取'星际争霸2'所在显示器失败: {e}")
+        return None
+
+
+def _get_monitor_rect(hwnd):
+    """返回指定窗口所在显示器的桌面矩形。"""
+    monitor = win32api.MonitorFromWindow(hwnd, win32con.MONITOR_DEFAULTTONEAREST)
+    if not monitor:
+        return None
+    info = win32api.GetMonitorInfo(monitor)
+    return tuple(info["Monitor"])
 
 #判断是不是无边框窗口，以标题栏为准
 def get_window_style():
     hwnd = manager.get_hwnd()
+    if not hwnd:
+        return False
     style = win32gui.GetWindowLong(hwnd, win32con.GWL_STYLE)
 
     has_titlebar = bool(style & win32con.WS_CAPTION)#有没有标题栏
@@ -80,6 +127,8 @@ def get_window_style():
 #判断游戏窗口是否已经激活
 def is_game_active() -> bool:
     hwnd = manager.get_hwnd()
+    if not hwnd:
+        return False
     # 1. 获取当前前景窗口的句柄
     foreground_hwnd = win32gui.GetForegroundWindow()
 
