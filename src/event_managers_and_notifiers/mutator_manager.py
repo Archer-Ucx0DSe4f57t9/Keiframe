@@ -16,15 +16,31 @@ from src.presentation_modules.message_presenter import MessagePresenter
 from src.utils.window_utils import get_sc2_window_geometry
 from src.game_state_service import state as game_state
 from src.db.mutator_daos import load_mutator_by_name,get_all_mutator_names,get_all_notify_mutator_names
+from src.game_readers.enemy_composition_unit_advisor import (
+    get_enemy_composition_unit_advisor,
+)
 
 
 class MutatorManager(QWidget):
     MUTATOR_ACTIVATION_NOTICE_MAX_SECOND = 110
     MUTATOR_ACTIVATION_NOTICE_SECONDS = 5
     
-    def __init__(self, parent=None, mutators_db=None):
+    def __init__(self, parent=None, mutators_db=None, advisor=None):
         super().__init__(parent)
         self.logger = get_logger(__name__)
+
+        try:
+            self.enemy_composition_unit_advisor = (
+                advisor
+                if advisor is not None
+                else get_enemy_composition_unit_advisor()
+            )
+        except Exception as exc:
+            self.logger.error(
+                f'初始化 Enemy Composition unit advisor 失败: {exc}'
+            )
+            self.enemy_composition_unit_advisor = None
+        self._advisor_error_logged = False
 
         self.mutators_db = mutators_db
         self.mutator_names = get_all_mutator_names(self.mutators_db)
@@ -50,6 +66,27 @@ class MutatorManager(QWidget):
 
         self.init_mutator_ui()
         self.init_mutator_alerts()
+
+    def _get_attention_units(self, content_to_show):
+        """Return optional unit advice without affecting the base alert."""
+
+        if self.enemy_composition_unit_advisor is None:
+            return None
+
+        try:
+            attention_units = self.enemy_composition_unit_advisor.get_attention_units(
+                game_state.enemy_composition,
+                content_to_show,
+            )
+            self._advisor_error_logged = False
+            return attention_units
+        except Exception as exc:
+            if not self._advisor_error_logged:
+                self.logger.error(
+                    f'Enemy Composition unit advisor 查询失败: {exc}'
+                )
+                self._advisor_error_logged = True
+            return None
 
     def init_mutator_ui(self):
         """初始化突变因子按钮UI"""
@@ -373,6 +410,9 @@ class MutatorManager(QWidget):
                 if (mutator_name == "AggressiveDeploymentProtoss" or mutator_name == "AggressiveDeployment"):
                     #部署因子涉及到强度信息
                      message = f"{int(time_remaining)}秒后：{mutator_names_to_CHS.get(mutator_name)} 强度：{content_to_show}"
+                     attention_units = self._get_attention_units(content_to_show)
+                     if attention_units:
+                         message += f" 注意单位: {attention_units}"
                 else:
                     #其他因子只涉及到数量，风暴不由mutatormanager播报
                     message = f"{int(time_remaining)}秒后：{mutator_names_to_CHS.get(mutator_name)}*{content_to_show} "

@@ -74,6 +74,7 @@ Keiframe/
 - `resources/db/maps.db`：地图、搜索关键词和地图事件时间线。
 - `resources/db/mutators.db`：突变因子元数据和提醒时间线。
 - `resources/db/enemies.db`：敌方组成分级数据；当前主窗口未打开该数据库连接。
+- `resources/enemy_comps/*.csv`：已确认敌方组成的 t1~t7 注意单位资料；提醒管理器通过共享 Advisor 一次性加载，并按英文或中文组成名查询。
 - `src/game_readers/enemy_composition_catalog.py`：19 条敌方组成的 canonical English、已验证中文名、种族和 OCR aliases；这是生产识别与展示的唯一 catalog source of truth。
 - `resources/templates/`：突变、种族、补给、小地图和特殊地图识别模板。
 - `settings.json`：用户本地覆盖配置，不应提交。

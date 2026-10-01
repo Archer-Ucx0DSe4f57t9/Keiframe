@@ -152,6 +152,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 - `mutator_and_enemy_race_recognizer.py`：模板匹配敌方种族和突变图标。
 - `enemy_composition_recognizer.py`：在共享截图上检测敌方组成 tooltip，收集标题 crop 并通过 OCR/匹配确认 canonical English 名称；由 `TimerWindow` 装配，并由 `EnemyCompositionScheduler` 接入已有视觉识别循环。
 - `enemy_composition_catalog.py`：生产使用的 19 条 canonical English、已验证中文名、种族和 aliases 的唯一来源。
+- `enemy_composition_unit_advisor.py`：启动时一次性读取 `resources/enemy_comps/*.csv`，为英文/中文组成名建立同一份 t1~t7 注意单位 lookup；只消费确认后的状态，不参与 OCR。
 - `ppocr_opencv_provider.py`：使用本地 addon 中的 PP-OCRv5 recognition model，通过 OpenCV DNN 在进程内只初始化一次；缺少 model/dict 时只禁用敌方组成识别。
 - `ocr_provider.py`：提供与识别器解耦的 OCRProvider 接口；其中的 RapidOCR provider 和 Tesseract provider 仅用于 benchmark、开发测试和回归比较，不进入生产装配。
 - `white_supply_recognizer.py`：从白色 UI 数字读取当前/最大补给。
@@ -165,7 +166,8 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 `src/event_managers_and_notifiers/`
 
 - `countdown_manager.py`：用户自定义倒计时的选择、并发限制与更新。
-- `mutator_manager.py`：突变按钮、数据库时间线与突变提醒。
+- `mutator_manager.py`：突变按钮、数据库时间线与突变提醒；仅为 `AggressiveDeployment` 两个变体按当前确认的敌方组成追加注意单位。
+- `map_event_manager.py`：标准地图事件时间线、颜色和 Toast；只从 army 列文本追加可选注意单位。
 - `artifact_notifier.py`：基于游戏时间和画面状态的泽拉图神器提醒。
 - `enemy_composition_notifier.py`：在主线程显示无 icon、无声音的中英文 Enemy Composition 名称。
 - `supply_notifier.py`：补给识别、阈值判断和闪烁/声音节流。
@@ -223,6 +225,12 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
   -> MapEventManager 比较当前秒与地图时间线
   -> ToastManager / SoundManager 展示提醒
 ```
+
+标准地图事件和部署突变在构造提醒文本时读取最新的
+`GlobalState.enemy_composition`，通过共享的
+`EnemyCompositionUnitAdvisor` 做内存 lookup。组成尚未确认、没有匹配资料、tier
+为空或同一文本包含多个 tier 时，原始提醒照常显示且不追加内容；后续正常刷新
+会自动使用新确认的组成。
 
 ### 5.3 画面识别提醒
 

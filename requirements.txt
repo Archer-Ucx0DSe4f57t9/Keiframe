@@ -10,5 +10,3 @@ pypinyin
 pywin32
 PyInstaller
 rapidfuzz
-rapidocr==3.9.2
-onnxruntime==1.24.1
