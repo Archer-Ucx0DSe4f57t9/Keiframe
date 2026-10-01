@@ -51,7 +51,7 @@ KeiFrame 是《星际争霸 II》合作模式的局内信息辅助工具。它�
 `src.game_state_service.state` 是运行时共享事实的中心，包括：
 
 - `game_time`、`current_game_id`、`is_in_game` 和 `current_selected_map`。
-- `enemy_race`、`active_mutators`、`troop` 与预留的敌方组成字段。
+- `enemy_race`、`active_mutators`、`troop` 与确认后的 canonical English `enemy_composition`。
 - `latest_screenshot`、时间戳、缩放信息和截图锁。
 - `message_presenter_triggered` 与 `app_closing` 生命周期标志。
 

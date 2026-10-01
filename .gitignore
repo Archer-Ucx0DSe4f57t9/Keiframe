@@ -35,6 +35,9 @@ src/monkey.js
 /src/map_handlers/debugpath/
 *.xlsx
 /tests
+!/tests/
+/tests/*
+!/tests/manual_enemy_composition_runtime_integration.py
 /python/Lib
 /python/Scripts
 /废案

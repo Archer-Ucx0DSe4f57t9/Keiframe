@@ -2,6 +2,67 @@
 import time
 import traceback
 
+from src.game_readers.enemy_composition_recognizer import EnemyCompositionState
+
+
+def update_enemy_composition_recognizer(window, game_time_seconds):
+    """Feed one copied shared screenshot to the passive composition recognizer."""
+
+    recognizer = getattr(window, 'enemy_composition_recognizer', None)
+    game_state = getattr(window, 'game_state', None)
+    if recognizer is None or game_state is None:
+        return
+    if not getattr(game_state, 'is_in_game', False):
+        return
+
+    enemy_race = getattr(game_state, 'enemy_race', None)
+    if enemy_race is None or not str(enemy_race).strip():
+        return
+
+    # Copy only the frame and timestamp while holding the existing lock.
+    # Detection, OCR, and matching must run after the lock is released.
+    with game_state.screenshot_lock:
+        screenshot = (
+            game_state.latest_screenshot.copy()
+            if game_state.latest_screenshot is not None
+            else None
+        )
+        screenshot_timestamp = game_state.screenshot_timestamp
+
+    if screenshot is None:
+        return
+
+    previous_state = recognizer.state
+    try:
+        result = recognizer.update(
+            image_bgr=screenshot,
+            timestamp=screenshot_timestamp,
+            game_time_seconds=game_time_seconds,
+            enemy_race=enemy_race,
+        )
+    except Exception:
+        window.logger.exception("Enemy composition recognizer update failed")
+        return
+
+    if (
+        previous_state == EnemyCompositionState.SEARCHING
+        and result.state == EnemyCompositionState.COLLECTING
+    ):
+        window.logger.info("Enemy composition tooltip detected")
+
+    if (
+        result.state == EnemyCompositionState.CONFIRMED
+        and result.enemy_composition
+        and game_state.enemy_composition != result.enemy_composition
+    ):
+        # Only the recognizer's canonical English result is published.  Raw
+        # OCR text and intermediate matches stay inside the recognizer.
+        game_state.enemy_composition = result.enemy_composition
+        window.logger.info(
+            "Enemy composition confirmed: %s",
+            result.enemy_composition,
+        )
+
 def update_game_time(window):
     """更新游戏时间显示和处理地图/突变事件 (原 TimerWindow.update_game_time)"""
     window.logger.debug('开始更新游戏时间')
@@ -113,6 +174,10 @@ def update_game_time(window):
                 if is_new_game_second and hasattr(window, 'mutator_and_enemy_race_recognizer'):
                     window.logger.debug(f'尝试推送到因子识别器时间 {current_seconds}')
                     window.mutator_and_enemy_race_recognizer.update_game_time(current_seconds)
+
+                # 敌方组成识别器消费最新共享截图；它自身不创建后台线程。
+                if hasattr(window, 'enemy_composition_recognizer'):
+                    update_enemy_composition_recognizer(window, game_time)
 
                 # ===神器提醒相关 ===
                 if is_new_game_second and hasattr(window, 'artifact_notifier'):

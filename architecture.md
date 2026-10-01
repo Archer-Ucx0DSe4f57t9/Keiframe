@@ -62,6 +62,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 | 游戏检查线程 | `TimerWindow._run_async_game_scheduler()` | 运行 asyncio 循环、轮询 6119、调度截图 | 通过 `progress_signal` 通知主线程 |
 | 截图 asyncio task | `game_state_service.check_for_new_game_scheduler()` | 约每 0.1 秒捕获活动 SC2 窗口并更新共享截图 | 只写 `GlobalState`，使用锁 |
 | 突变/种族识别线程 | `Mutator_and_enemy_race_recognizer` | 从共享截图识别敌方种族和突变图标 | 通过 Qt signal 返回结果 |
+| 敌方组成被动更新 | `game_time_handler.update_game_time()` | 使用锁内复制、锁外处理的最新截图执行 tooltip 检测、OCR 和匹配 | 仅确认后写入 `GlobalState.enemy_composition` |
 | 净网行动识别线程 | `MalwarfareMapHandler` | 识别颜色文字、倒计时、暂停和节点 | 主线程轮询其最新结构化数据 |
 | 小地图红点 worker | `MinimapRedDotDetector` | 按监控规则分析共享截图 | `MapVariantAutoResolver` 查询结果并切图 |
 | 死亡摇篮识别线程 | `CradleOfDeathMapHandler` | 识别倒计时并产生阶段事件 | 当前尚未由主窗口创建或消费 |
@@ -70,6 +71,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 
 - `GlobalState.latest_screenshot`、时间戳和缩放信息在 `screenshot_lock` 下读写。
 - 识别器应在锁内复制截图，随后释放锁再做耗时计算。
+- `EnemyCompositionRecognizer` 是被动 update 组件，由 Qt 主线程的游戏时间更新调用；它不创建自己的后台线程，且只在 tooltip 连续确认后执行 OCR。
 - 后台线程不能直接修改 Qt 控件。
 - 退出时先设置 `state.app_closing`，再停止识别器和专用 handler，最后关闭数据库连接和 Qt 窗口。
 
@@ -147,6 +149,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 `src/game_readers/` 的主要组件：
 
 - `mutator_and_enemy_race_recognizer.py`：模板匹配敌方种族和突变图标。
+- `enemy_composition_recognizer.py`：在共享截图上检测敌方组成 tooltip，收集标题 crop 并通过 OCR/匹配确认 canonical English 名称；由 `TimerWindow` 装配，在 `game_time_handler` 中被动更新。
 - `white_supply_recognizer.py`：从白色 UI 数字读取当前/最大补给。
 - `minimap_red_dot_detector.py`：对小地图局部区域进行多帧红点跟踪与评分。
 - `cradle_of_death_countdown_recognizer.py`：读取“死亡摇篮”局内倒计时；当前属于未接入组件。
@@ -228,6 +231,14 @@ mss 捕获 SC2 窗口
   -> MessagePresenter / Toast / 声音
 ```
 
+```text
+敌方组成 tooltip 的共享截图
+  -> EnemyCompositionRecognizer 被动收集连续 title crop
+  -> tooltip 确认后执行 OCR 与 race 限定匹配
+  -> canonical English composition
+  -> GlobalState.enemy_composition（仅 CONFIRMED 写入）
+```
+
 ### 5.4 净网行动
 
 ```text
@@ -253,6 +264,7 @@ mss 捕获 SC2 窗口
 
 - 后台服务发出 `reset_game_info`。
 - 清除识别确认、倒计时、提醒和地图分支状态。
+- 清除敌方组成识别器及 `GlobalState.enemy_composition`。
 - 下一次地图识别重新加载时间线。
 
 ### 应用退出

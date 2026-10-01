@@ -13,6 +13,10 @@ from src.map_handlers import map_loader
 from src.map_handlers.map_variant_auto_resolver import MapVariantAutoResolver
 from src.presentation_modules.toast_manager import ToastManager
 from src.game_readers.mutator_and_enemy_race_recognizer import Mutator_and_enemy_race_recognizer
+from src.game_readers.enemy_composition_matcher import EnemyCompositionMatcher
+from src.game_readers.enemy_composition_panel_detector import detect_enemy_composition_panel
+from src.game_readers.enemy_composition_recognizer import EnemyCompositionRecognizer
+from src.game_readers.ocr_provider import TesseractOCRProvider
 from src.memo_overlay import MemoOverlay
 from src.event_managers_and_notifiers.artifact_notifier import ArtifactNotifier
 from src.event_managers_and_notifiers.countdown_manager import CountdownManager
@@ -85,6 +89,26 @@ class TimerWindow(QMainWindow):
         self._last_dispatch_game_second = None
         self.drag_position = QPoint(0, 0)
         self.game_state = game_state_service.state
+
+        # 敌方组成识别器是被动 update 模型，不创建独立线程。
+        # Tesseract 不可用时保留识别器装配，让主程序仍可启动并记录原因。
+        self.enemy_composition_matcher = EnemyCompositionMatcher()
+        self.enemy_composition_panel_detector = detect_enemy_composition_panel
+        try:
+            self.enemy_composition_ocr_provider = TesseractOCRProvider("eng+chi_sim")
+        except (FileNotFoundError, OSError, ValueError) as exc:
+            self.enemy_composition_ocr_provider = None
+            self.logger.warning(
+                "Enemy composition OCR provider unavailable: %s",
+                exc,
+            )
+
+        self.enemy_composition_recognizer = EnemyCompositionRecognizer(
+            panel_detector=self.enemy_composition_panel_detector,
+            ocr_provider=self.enemy_composition_ocr_provider,
+            matcher=self.enemy_composition_matcher,
+        )
+        self.logger.info("Enemy composition recognizer initialized")
 
         # 添加一个标志来追踪地图选择的来源
         self.manual_map_selection = False
@@ -391,9 +415,14 @@ class TimerWindow(QMainWindow):
             if hasattr(self, 'mutator_and_enemy_race_recognizer') and self.mutator_and_enemy_race_recognizer:
                  self.mutator_and_enemy_race_recognizer.reset_and_start() # 调用识别器的重置和启动方法
 
+            if hasattr(self, 'enemy_composition_recognizer') and self.enemy_composition_recognizer:
+                self.enemy_composition_recognizer.reset()
+                self.logger.info("Enemy composition recognizer reset")
+
             # 清除全局状态中的种族和突变因子
             game_state_service.state.enemy_race = None
             game_state_service.state.active_mutators = None
+            game_state_service.state.enemy_composition = None
             self._last_dispatch_game_second = None
             
             # 清空自定义倒计时

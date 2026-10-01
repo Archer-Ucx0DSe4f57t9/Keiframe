@@ -9,6 +9,7 @@ pandas==3.0.0
 Pillow==12.1.1
 pynput==1.8.1
 pypinyin==0.55.0
+rapidfuzz==3.14.3
 PyQt5==5.15.11
 skimage==0.0
 win32gui==221.6

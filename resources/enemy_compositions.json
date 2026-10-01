@@ -1,0 +1,154 @@
+[
+  {
+    "canonical": "Machines of War",
+    "race": "Terran",
+    "aliases": [
+      "Machines of War",
+      "战争机械团"
+    ]
+  },
+  {
+    "canonical": "Shadow Tech",
+    "race": "Terran",
+    "aliases": [
+      "Shadow Tech",
+      "暗影科技团"
+    ]
+  },
+  {
+    "canonical": "Classic Infantry",
+    "race": "Terran",
+    "aliases": [
+      "Classic Infantry",
+      "旧世步兵团"
+    ]
+  },
+  {
+    "canonical": "Classic Mech",
+    "race": "Terran",
+    "aliases": [
+      "Classic Mech",
+      "旧世机械团"
+    ]
+  },
+  {
+    "canonical": "Dominion Battlegroup",
+    "race": "Terran",
+    "aliases": [
+      "Dominion Battlegroup",
+      "帝国战斗群"
+    ]
+  },
+  {
+    "canonical": "Raiding Party",
+    "race": "Terran",
+    "aliases": [
+      "Raiding Party",
+      "突击团"
+    ]
+  },
+  {
+    "canonical": "Devouring Scourge",
+    "race": "Zerg",
+    "aliases": [
+      "Devouring Scourge",
+      "遮天蔽日"
+    ]
+  },
+  {
+    "canonical": "Ravaging Infestation",
+    "race": "Zerg",
+    "aliases": [
+      "Ravaging Infestation",
+      "肆虐扩散"
+    ]
+  },
+  {
+    "canonical": "Invasionary Swarm",
+    "race": "Zerg",
+    "aliases": [
+      "Invasionary Swarm",
+      "侵略虫群"
+    ]
+  },
+  {
+    "canonical": "Broodling Corruption",
+    "race": "Zerg",
+    "aliases": [
+      "Broodling Corruption",
+      "滋生腐化"
+    ]
+  },
+  {
+    "canonical": "Explosive Threats",
+    "race": "Zerg",
+    "aliases": [
+      "Explosive Threats",
+      "爆炸威胁"
+    ]
+  },
+  {
+    "canonical": "Hope of the Khalai",
+    "race": "Protoss",
+    "aliases": [
+      "Hope of the Khalai",
+      "卡莱的希望"
+    ]
+  },
+  {
+    "canonical": "Shadow Disruption",
+    "race": "Protoss",
+    "aliases": [
+      "Shadow Disruption",
+      "暗影袭扰"
+    ]
+  },
+  {
+    "canonical": "Fleet of the Matriarch",
+    "race": "Protoss",
+    "aliases": [
+      "Fleet of the Matriarch",
+      "族长之军"
+    ]
+  },
+  {
+    "canonical": "Vanguard of Aiur",
+    "race": "Protoss",
+    "aliases": [
+      "Vanguard of Aiur",
+      "艾尔先锋"
+    ]
+  },
+  {
+    "canonical": "Towering Walkers",
+    "race": "Protoss",
+    "aliases": [
+      "Towering Walkers",
+      "步战机甲"
+    ]
+  },
+  {
+    "canonical": "Masters and Machines",
+    "race": "Protoss",
+    "aliases": [
+      "Masters and Machines",
+      "大师机械"
+    ]
+  },
+  {
+    "canonical": "Disruptive Artillery",
+    "race": "Protoss",
+    "aliases": [
+      "Disruptive Artillery",
+      "袭扰炮击"
+    ]
+  },
+  {
+    "canonical": "Siege of Storms",
+    "race": "Protoss",
+    "aliases": [
+      "Siege of Storms",
+      "风暴迫临"
+    ]
+  }
+]
