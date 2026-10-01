@@ -168,6 +168,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 - `countdown_manager.py`：用户自定义倒计时的选择、并发限制与更新。
 - `mutator_manager.py`：突变按钮、数据库时间线与突变提醒；仅为 `AggressiveDeployment` 两个变体按当前确认的敌方组成追加注意单位。
 - `map_event_manager.py`：标准地图事件时间线、颜色和 Toast；只从 army 列文本追加可选注意单位。
+- 地图 Toast 与突变提醒 manager 各自维护 warning 状态、现实时间 QTimer 闪烁相位和一次性 warning 音效；`MessagePresenter` 只接收最终文字与颜色。
 - `artifact_notifier.py`：基于游戏时间和画面状态的泽拉图神器提醒。
 - `enemy_composition_notifier.py`：在主线程显示无 icon、无声音的中英文 Enemy Composition 名称。
 - `supply_notifier.py`：补给识别、阈值判断和闪烁/声音节流。
@@ -280,6 +281,7 @@ mss 捕获 SC2 窗口
 
 - 后台服务发出 `reset_game_info`。
 - 清除识别确认、倒计时、提醒和地图分支状态。
+- 清除地图 Toast 与突变提醒 manager 的 warning 闪烁状态和定时器。
 - 清除敌方组成识别器及 `GlobalState.enemy_composition`。
 - 清除 `EnemyCompositionNotifier` 的当前 overlay 和本局已提示标志；下一局允许再次提示。
 - 下一次地图识别重新加载时间线。

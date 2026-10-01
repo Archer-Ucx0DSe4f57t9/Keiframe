@@ -63,7 +63,7 @@ class EnemyCompositionConfig:
     minimum_vote_lead: int = 1
     match_score_threshold: float = 70.0
     match_margin_threshold: float = 30.0
-    game_time_expiry_seconds: float = 300.0
+    game_time_expiry_seconds: float = 500.0
 
     def __post_init__(self) -> None:
         if self.panel_found_streak_required < 1:

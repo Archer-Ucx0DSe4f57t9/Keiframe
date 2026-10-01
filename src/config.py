@@ -59,6 +59,10 @@ MAP_ALERT_WARNING_THRESHOLD_SECONDS = 10  # 倒计时转为警告颜色的阈值
 MAP_ALERT_NORMAL_COLOR = 'rgb(239, 255, 238)'  # 倒计时提醒的正常颜色
 MAP_ALERT_WARNING_COLOR = 'rgb(255, 0, 0)'  # 倒计时提醒的警告颜色
 
+# warning 阶段颜色闪烁配置。闪烁使用现实时间，不跟随游戏时间速度变化。
+WARNING_FLASH_ENABLED = True
+WARNING_FLASH_INTERVAL_MS = 500
+
 # 突变因子提醒配置
 MUTATOR_ALERT_SECONDS = 49  # 突变因子提前提醒时间（秒）/ Mutation factor alert time (in seconds)，我还没做多重提醒，最长间隔就是49秒
 MUTATOR_WARNING_THRESHOLD_SECONDS = 10  # 倒计时转为警告颜色的阈值（秒）

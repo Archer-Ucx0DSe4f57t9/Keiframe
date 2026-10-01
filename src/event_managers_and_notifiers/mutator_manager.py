@@ -2,9 +2,10 @@
 import asyncio
 import os
 import traceback
+import time
 
 import win32gui
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtCore import Qt, QSize, QTimer
 from PyQt5.QtGui import QIcon, QPixmap, QColor, QPainter
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton, QGraphicsDropShadowEffect
 
@@ -54,6 +55,10 @@ class MutatorManager(QWidget):
 
         # 增加一个字典来跟踪当前正在显示的提醒时间点，避免重复触发
         self.currently_alerting = {}
+        self.warning_flash_states = {}
+        self.warning_flash_timer = QTimer(self)
+        self.warning_flash_timer.setInterval(self._warning_flash_interval_ms())
+        self.warning_flash_timer.timeout.connect(self._on_warning_flash_timeout)
         
         # 因子识别成功后的短暂激活提示状态
         self._activation_notice_pending = set()
@@ -66,6 +71,96 @@ class MutatorManager(QWidget):
 
         self.init_mutator_ui()
         self.init_mutator_alerts()
+
+    @staticmethod
+    def _warning_flash_enabled():
+        return bool(getattr(config, 'WARNING_FLASH_ENABLED', True))
+
+    @staticmethod
+    def _warning_flash_interval_ms():
+        return max(1, int(getattr(config, 'WARNING_FLASH_INTERVAL_MS', 500)))
+
+    def _start_warning_flash_timer(self):
+        if not self._warning_flash_enabled():
+            return
+
+        interval_ms = self._warning_flash_interval_ms()
+        if self.warning_flash_timer.interval() != interval_ms:
+            self.warning_flash_timer.setInterval(interval_ms)
+        if not self.warning_flash_timer.isActive():
+            self.warning_flash_timer.start()
+
+    def _stop_warning_flash_timer_if_idle(self):
+        if not self.warning_flash_states or not self._warning_flash_enabled():
+            self.warning_flash_timer.stop()
+
+    @staticmethod
+    def _alert_is_visible(alert):
+        is_visible = getattr(alert, 'isVisible', None)
+        if not callable(is_visible):
+            return True
+        try:
+            return bool(is_visible())
+        except Exception:
+            return True
+
+    @staticmethod
+    def _state_color(state):
+        if state.get('show_warning_color', False):
+            return state['warning_color']
+        return state['normal_color']
+
+    def _refresh_warning_alert(self, mutator_name, state):
+        alert = self.mutator_alert_labels.get(mutator_name)
+        if alert is None or not self._alert_is_visible(alert):
+            return
+
+        alert.update_message(
+            state['message'],
+            self._state_color(state),
+            x=state['x'],
+            y=state['y'],
+            width=state['width'],
+            height=state['height'],
+            font_size=state['font_size'],
+            sound_filename=None,
+            vertical_offset=state['vertical_offset'],
+        )
+        alert.setFixedHeight(state['height'])
+        alert.adjustSize()
+
+    def _on_warning_flash_timeout(self):
+        """按现实时间切换每个突变事件的 warning 显示颜色。"""
+        if not self._warning_flash_enabled():
+            for mutator_name, state in self.warning_flash_states.items():
+                state['show_warning_color'] = True
+                self._refresh_warning_alert(mutator_name, state)
+            self.warning_flash_timer.stop()
+            return
+
+        now = time.monotonic()
+        interval_seconds = self._warning_flash_interval_ms() / 1000.0
+        for mutator_name, state in list(self.warning_flash_states.items()):
+            if not state.get('warning_active', False):
+                self.warning_flash_states.pop(mutator_name, None)
+                continue
+
+            if now < state.get('next_toggle_time', now):
+                continue
+
+            state['show_warning_color'] = not state.get('show_warning_color', False)
+            state['next_toggle_time'] = now + interval_seconds
+            self._refresh_warning_alert(mutator_name, state)
+
+        self._stop_warning_flash_timer_if_idle()
+
+    def _clear_warning_flash_state(self, mutator_name):
+        self.warning_flash_states.pop(mutator_name, None)
+        self._stop_warning_flash_timer_if_idle()
+
+    def _clear_warning_flash_states(self):
+        self.warning_flash_states.clear()
+        self.warning_flash_timer.stop()
 
     def _get_attention_units(self, content_to_show):
         """Return optional unit advice without affecting the base alert."""
@@ -358,6 +453,9 @@ class MutatorManager(QWidget):
             for label in self.mutator_alert_labels.values():
                 label.hide()
 
+            if is_in_game == False:
+                self._clear_warning_flash_states()
+
             # 真正从游戏返回菜单时才清理
             if is_in_game == False and self._was_in_game:
                 self._reset_activation_notice_state()
@@ -371,6 +469,7 @@ class MutatorManager(QWidget):
             self._last_alert_check_second is not None
             and current_seconds < self._last_alert_check_second
         ):
+            self._clear_warning_flash_states()
             # 识别同步可能先于本轮 check_alerts 调用，
             # 因此保留刚刚为新一局登记的 pending 提示。
             self._reset_activation_notice_state(
@@ -418,19 +517,38 @@ class MutatorManager(QWidget):
                     message = f"{int(time_remaining)}秒后：{mutator_names_to_CHS.get(mutator_name)}*{content_to_show} "
 
 
-                self.show_mutator_alert(message, mutator_name, time_remaining,warning_sound_filename)
+                self.show_mutator_alert(
+                    message,
+                    mutator_name,
+                    time_remaining,
+                    warning_sound_filename,
+                    event_key=next_deployment_time,
+                )
             else:
                 self.hide_mutator_alert(mutator_name)
 
 
-    def show_mutator_alert(self, message, mutator_name='deployment', time_remaining=None, warning_sound_filename=None):
+    def show_mutator_alert(
+        self,
+        message,
+        mutator_name='deployment',
+        time_remaining=None,
+        warning_sound_filename=None,
+        event_key=None,
+    ):
         """
         显示/更新突变因子提醒，并根据剩余时间动态改变颜色。
         """
+        if time_remaining is not None and time_remaining <= 0:
+            self.hide_mutator_alert(mutator_name)
+            return
+
         sc2_rect = get_sc2_window_geometry()
 
         if not sc2_rect:
-            self.hide_mutator_alert(mutator_name)
+            alert = self.mutator_alert_labels.get(mutator_name)
+            if alert is not None:
+                alert.hide()
             return
 
         sc2_x, sc2_y, sc2_width, sc2_height = sc2_rect
@@ -468,14 +586,58 @@ class MutatorManager(QWidget):
                 or alert_label.width() != sc2_width or alert_label.height() != line_height):
             alert_label.move(alert_label_x, alert_label_y)
 
-        # 动态更新文本、颜色和字体大小
-        text_color = config.MUTATOR_NORMAL_COLOR
+        # 动态更新文本和颜色。warning 相位、事件切换和音效状态由本 manager 保存。
+        normal_color = config.MUTATOR_NORMAL_COLOR
+        warning_color = config.MUTATOR_WARNING_COLOR
+        warning_active = (
+            time_remaining is not None
+            and time_remaining > 0
+            and time_remaining <= config.MUTATOR_WARNING_THRESHOLD_SECONDS
+        )
 
-        if time_remaining is not None and time_remaining <= config.MUTATOR_WARNING_THRESHOLD_SECONDS:
-            text_color = config.MUTATOR_WARNING_COLOR
-            sound_filename = warning_sound_filename
+        sound_filename = None
+        if warning_active:
+            state_event_key = event_key if event_key is not None else mutator_name
+            state = self.warning_flash_states.get(mutator_name)
+            if state is None or state.get('event_key') != state_event_key:
+                flash_enabled = self._warning_flash_enabled()
+                state = {
+                    'event_key': state_event_key,
+                    'warning_active': True,
+                    'show_warning_color': not flash_enabled,
+                    'next_toggle_time': time.monotonic() + (
+                        self._warning_flash_interval_ms() / 1000.0
+                    ),
+                    'sound_played': False,
+                }
+                self.warning_flash_states[mutator_name] = state
+
+            state.update({
+                'warning_active': True,
+                'message': message,
+                'normal_color': normal_color,
+                'warning_color': warning_color,
+                'x': alert_label_x,
+                'y': alert_label_y,
+                'width': sc2_width,
+                'height': line_height,
+                'font_size': font_size,
+                'vertical_offset': getattr(config, 'MUTATOR_VERTICAL_OFFSET', 0),
+            })
+
+            if not self._warning_flash_enabled():
+                state['show_warning_color'] = True
+                self.warning_flash_timer.stop()
+            else:
+                self._start_warning_flash_timer()
+
+            text_color = self._state_color(state)
+            if not state['sound_played'] and warning_sound_filename:
+                sound_filename = warning_sound_filename
+                state['sound_played'] = True
         else:
-            sound_filename = None
+            self._clear_warning_flash_state(mutator_name)
+            text_color = normal_color
 
         # 传递计算好的 font_size
         alert_label.update_message(
@@ -492,8 +654,23 @@ class MutatorManager(QWidget):
 
     def hide_mutator_alert(self, mutator_name):
         """隐藏突变因子提醒"""
+        self._clear_warning_flash_state(mutator_name)
         if mutator_name in self.mutator_alert_labels:
             self.mutator_alert_labels[mutator_name].hide()
+
+    def reset(self):
+        """清理本局 warning 状态和正在显示的突变提醒。"""
+        self._clear_warning_flash_states()
+        self.currently_alerting.clear()
+        self._reset_activation_notice_state()
+        self._last_alert_check_second = None
+        self._was_in_game = False
+        for label in self.mutator_alert_labels.values():
+            label.hide()
+
+    def shutdown(self):
+        """停止 warning 闪烁定时器并清理提醒。"""
+        self.reset()
 
     def get_current_screen(self):
         return self.parent().get_current_screen()

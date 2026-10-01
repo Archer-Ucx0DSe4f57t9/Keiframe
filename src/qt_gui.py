@@ -504,6 +504,9 @@ class TimerWindow(QMainWindow):
             if hasattr(self, 'enemy_composition_notifier') and self.enemy_composition_notifier:
                 self.enemy_composition_notifier.reset()
 
+            if hasattr(self, 'mutator_manager') and self.mutator_manager:
+                self.mutator_manager.reset()
+
             # 清除全局状态中的种族和突变因子
             game_state_service.state.enemy_race = None
             game_state_service.state.active_mutators = None
@@ -735,6 +738,12 @@ class TimerWindow(QMainWindow):
             if hasattr(self, 'timer') and self.timer:
                 self.timer.stop()
 
+            if hasattr(self, 'toast_manager') and self.toast_manager:
+                self.toast_manager.shutdown()
+
+            if hasattr(self, 'mutator_manager') and self.mutator_manager:
+                self.mutator_manager.shutdown()
+
             if hasattr(self, 'malwarfare_handler') and self.malwarfare_handler is not None:
                 self.logger.info("应用关闭，正在关闭 MalwarfareMapHandler。")
                 self.malwarfare_handler.shutdown()
@@ -786,6 +795,12 @@ class TimerWindow(QMainWindow):
     def closeEvent(self, event):
         """窗口关闭事件处理"""
         try:
+            if hasattr(self, 'toast_manager') and self.toast_manager:
+                self.toast_manager.shutdown()
+
+            if hasattr(self, 'mutator_manager') and self.mutator_manager:
+                self.mutator_manager.shutdown()
+
             if self.malwarfare_handler is not None:
                 self.logger.info("应用关闭，正在关闭 MalwarfareMapHandler。")
                 self.malwarfare_handler.shutdown()
