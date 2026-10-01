@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass
 from enum import Enum
+import time
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -56,9 +57,9 @@ class EnemyCompositionConfig:
     """All temporal, vote, and matching thresholds used by the recognizer."""
 
     panel_found_streak_required: int = 3
-    max_crops: int = 6
-    minimum_valid_results: int = 3
-    minimum_votes: int = 3
+    max_crops: int = 3
+    minimum_valid_results: int = 2
+    minimum_votes: int = 2
     minimum_vote_lead: int = 1
     match_score_threshold: float = 70.0
     match_margin_threshold: float = 30.0
@@ -164,6 +165,7 @@ class EnemyCompositionRecognizer:
         self._match_results: List[MatchResult] = []
         self._votes: Counter[str] = Counter()
         self._ocr_processed_count = 0
+        self._ocr_started = False
         self._processed_timestamps: List[Any] = []
         self._state_history: List[EnemyCompositionState] = [self._state]
 
@@ -222,6 +224,7 @@ class EnemyCompositionRecognizer:
         self._match_results.clear()
         self._votes.clear()
         self._ocr_processed_count = 0
+        self._ocr_started = False
         self._processed_timestamps.clear()
         self._state_history = [self._state]
 
@@ -268,11 +271,21 @@ class EnemyCompositionRecognizer:
                 self._discard_incomplete_collection()
             return self._snapshot()
 
+        was_first_panel_detection = self._panel_found_streak == 0
         if self._state == EnemyCompositionState.SEARCHING:
             self._set_state(EnemyCompositionState.COLLECTING)
 
         self._panel_found_streak += 1
         self._append_crop(image_bgr, detection)
+
+        if was_first_panel_detection:
+            logger.debug(
+                "[EnemyComposition] PANEL_FOUND timestamp=%s state=%s streak=%s crops=%s",
+                self._format_timestamp(timestamp),
+                self._state.value,
+                self._panel_found_streak,
+                len(self._collected_crops),
+            )
 
         if (
             self._state == EnemyCompositionState.COLLECTING
@@ -281,6 +294,11 @@ class EnemyCompositionRecognizer:
         ):
             self._panel_confirmed = True
             self._set_state(EnemyCompositionState.CONFIRMING)
+            logger.debug(
+                "[EnemyComposition] PANEL_CONFIRMED timestamp=%s crops=%s",
+                self._format_timestamp(timestamp),
+                len(self._collected_crops),
+            )
             self._process_pending_ocr(enemy_race)
         elif self._state == EnemyCompositionState.CONFIRMING:
             # The initial three samples are normally enough.  If OCR produced
@@ -289,6 +307,18 @@ class EnemyCompositionRecognizer:
             self._process_pending_ocr(enemy_race)
 
         return self._snapshot()
+
+    def _format_timestamp(self,timestamp: Any) -> str:
+        try:
+            seconds = float(timestamp)
+        except (TypeError, ValueError):
+            return str(timestamp)
+
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        secs = seconds % 60
+
+        return f"{hours:02d}:{minutes:02d}:{secs:06.3f}"
 
     def _snapshot(self) -> EnemyCompositionRecognition:
         return EnemyCompositionRecognition(
@@ -383,19 +413,53 @@ class EnemyCompositionRecognizer:
     def _process_pending_ocr(self, enemy_race: str) -> None:
         if self._ocr_provider is None:
             return
+        if self._ocr_processed_count >= len(self._collected_crops):
+            return
+
+        if not self._ocr_started:
+            self._ocr_started = True
+            logger.debug(
+                "[EnemyComposition] OCR_START crops=%s",
+                len(self._collected_crops),
+            )
 
         while self._ocr_processed_count < len(self._collected_crops):
             crop = self._collected_crops[self._ocr_processed_count]
             self._ocr_processed_count += 1
+            crop_index = self._ocr_processed_count
+            ocr_start = time.perf_counter()
             try:
                 raw_result = self._call_ocr_provider(crop)
-                composition_text = self._extract_composition_text(raw_result)
-                self._ocr_results.append(composition_text)
-                match = self._match_composition(composition_text, enemy_race)
             except Exception as exc:  # OCR is an optional failure point.
-                logger.debug("Enemy-composition OCR/matching failed: %s", exc)
+                logger.debug("Enemy-composition OCR failed: %s", exc)
+                logger.debug(
+                    "[EnemyComposition] OCR_CROP index=%s elapsed_ms=%.1f",
+                    crop_index,
+                    (time.perf_counter() - ocr_start) * 1000,
+                )
                 self._ocr_results.append("")
                 match = MatchResult()
+            else:
+                logger.debug(
+                    "[EnemyComposition] OCR_CROP index=%s elapsed_ms=%.1f",
+                    crop_index,
+                    (time.perf_counter() - ocr_start) * 1000,
+                )
+                try:
+                    composition_text = self._extract_composition_text(raw_result)
+                    self._ocr_results.append(composition_text)
+                    match = self._match_composition(composition_text, enemy_race)
+
+                    logger.debug(
+                        "[EnemyComposition] MATCH best=%s score=%s margin=%s",
+                        match.best,
+                        match.score,
+                        match.margin,
+                    )
+                except Exception as exc:  # Matching is an optional failure point.
+                    logger.debug("Enemy-composition matching failed: %s", exc)
+                    self._ocr_results.append("")
+                    match = MatchResult()
 
             self._match_results.append(match)
             if self._is_confident_match(match):
@@ -481,6 +545,9 @@ class EnemyCompositionRecognizer:
     def _try_confirm(self) -> None:
         if self._state == EnemyCompositionState.CONFIRMED:
             return
+        # The D4.1 defaults require two confident votes for the same
+        # canonical composition; custom configs can still retain a longer
+        # vote policy.
         if len(self._valid_match_results) < self.config.minimum_valid_results:
             return
 
@@ -496,6 +563,10 @@ class EnemyCompositionRecognizer:
 
         self._enemy_composition = winner
         self._set_state(EnemyCompositionState.CONFIRMED)
+        logger.info(
+            "Enemy composition confirmed: %s",
+            self._enemy_composition,
+        )
 
     def _candidates_for_race(self, enemy_race: str) -> Sequence[Candidate]:
         if enemy_race in self._candidates_by_race:
@@ -521,6 +592,7 @@ class EnemyCompositionRecognizer:
         self._panel_found_streak = 0
         self._collected_crops.clear()
         self._ocr_processed_count = 0
+        self._ocr_started = False
         self._set_state(EnemyCompositionState.SEARCHING)
 
 

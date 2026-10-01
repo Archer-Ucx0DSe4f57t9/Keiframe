@@ -36,6 +36,7 @@ class Mutator_and_enemy_race_recognizer:
         self._thread = None
         self._current_game_time = 0.0
         self.logger = get_logger(__name__)
+        self._enemy_composition_scheduler = None
 
         # 加载模板
 
@@ -143,6 +144,10 @@ class Mutator_and_enemy_race_recognizer:
         self.logger.info(f"已经接收到游戏时间{game_time_seconds}")
         self._current_game_time = game_time_seconds
 
+    def set_enemy_composition_scheduler(self, scheduler):
+        """Attach a passive scheduler to this existing perception loop."""
+        self._enemy_composition_scheduler = scheduler
+
     def _scan_for_races(self, screenshot_gray, scale_factor):
         """在截图中扫描并更新种族识别状态。"""
         if not self.race_templates: return
@@ -242,11 +247,18 @@ class Mutator_and_enemy_race_recognizer:
         
         last_game_screen_time_stamp = 0.0
         while self._running:
+            if self._enemy_composition_scheduler is not None:
+                self._enemy_composition_scheduler.update()
+
             # 检查所有任务是否都已完成
             if self.race_detection_complete and self.mutator_detection_complete:
-                self.logger.info("所有识别任务已完成，进入等待状态。")
-                self._running = False # 设置标志位以表明我们想停止
-                continue
+                if (
+                    self._enemy_composition_scheduler is None
+                    or self._enemy_composition_scheduler.is_finished()
+                ):
+                    self.logger.info("所有识别任务已完成，进入等待状态。")
+                    self._running = False # 设置标志位以表明我们想停止
+                    continue
 
             # 条件：已超过 60 秒 AND 突变因子检测未完成
             if self._current_game_time >= 60 and not self.mutator_detection_complete:

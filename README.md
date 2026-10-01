@@ -12,6 +12,7 @@ KeiFrame 是一个面向《星际争霸 II》合作模式的 Windows 桌面辅�
 - 根据玩家数据自动识别合作任务地图，也允许手动搜索和切换地图。
 - 从 SQLite 时间线加载地图事件与突变事件，显示下一事件并提前弹出提示。
 - 识别敌方种族和突变因子；按配置显示图标、文字与音频提醒。
+- 在可选 PP-OCRv5 addon 可用时识别敌方组成，并以无声文字提示名称；没有 addon 时该识别功能单独禁用。
 - 提供自定义倒计时、地图笔记、泽拉图神器提醒和补给提醒。
 - 对“净网行动”使用画面文字模板识别处理动态倒计时。
 - 对部分存在分支的地图使用小地图红点检测自动选择版本，用户可手动覆盖。
@@ -48,7 +49,7 @@ Keiframe/
 │   ├── game_state_service.py           # 6119 轮询、截图和共享游戏状态
 │   ├── game_readers/                   # 底层画面识别器
 │   ├── map_handlers/                   # 地图时间线、分支和特殊地图状态机
-│   ├── event_managers_and_notifiers/   # 倒计时、突变、神器和补给提醒
+│   ├── event_managers_and_notifiers/   # 倒计时、突变、神器、补给和敌方组成提醒
 │   ├── presentation_modules/           # Toast、文字覆盖层和声音播放
 │   ├── settings_window/                # 设置、校验及 Excel 导入导出界面
 │   ├── ui/                             # 主窗口布局与菜单
@@ -73,6 +74,7 @@ Keiframe/
 - `resources/db/maps.db`：地图、搜索关键词和地图事件时间线。
 - `resources/db/mutators.db`：突变因子元数据和提醒时间线。
 - `resources/db/enemies.db`：敌方组成分级数据；当前主窗口未打开该数据库连接。
+- `src/game_readers/enemy_composition_catalog.py`：19 条敌方组成的 canonical English、已验证中文名、种族和 OCR aliases；这是生产识别与展示的唯一 catalog source of truth。
 - `resources/templates/`：突变、种族、补给、小地图和特殊地图识别模板。
 - `settings.json`：用户本地覆盖配置，不应提交。
 
@@ -100,7 +102,7 @@ git diff --check
 .\build-keiframe.bat
 ```
 
-脚本会递归清理 `build/` 和 `dist/`，调用项目内嵌 Python 的 PyInstaller，然后将 `resources/`、使用说明和端口修复脚本复制到版本化发布目录。生成物不应提交到仓库。
+脚本会递归清理 `build/` 和 `dist/`，调用项目内嵌 Python 的 PyInstaller，然后将除 `resources/ocr/ppocrv5/` 外的运行时资源复制到主发布目录，并在 `dist/KeiFrame_PP-OCRv5_Addon/` 生成独立 OCR addon。主程序没有 addon 时仍可启动，但敌方组成识别会被禁用；安装 addon 后重启即可启用。生成物不应提交到仓库。
 
 ## 6119 端口
 
@@ -109,6 +111,7 @@ git diff --check
 ## 当前限制
 
 - 依赖 Windows、SC2 窗口和固定屏幕区域；不同分辨率、语言、UI 缩放或游戏更新可能降低识别率。
+- 敌方组成识别依赖独立 PP-OCRv5 addon；真实游戏中的 tooltip、覆盖层位置、5 秒隐藏和 DPI 组合仍需手工验收。
 - `resources/` 是运行时必需内容，源码运行和发布目录都必须保持其结构。
 - “死亡摇篮”倒计时、阶段和偷车波次组件已存在并有核心单元测试，但当前尚未接入主窗口的地图选择与生命周期流程。
 - README 只描述当前源码行为；普通用户操作流程以发行版使用说明为准。

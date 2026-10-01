@@ -5,7 +5,7 @@ Keeping them in ``src`` gives the runtime recognizer and the offline harness
 one implementation of text normalization and RapidFuzz ranking.
 
 This module has no screenshot, game-state, or Qt dependency. Its default
-matcher loads the small production JSON catalog through the resource loader;
+matcher loads the production Python catalog through the compatibility loader;
 tests can still inject an in-memory candidate mapping.
 """
 

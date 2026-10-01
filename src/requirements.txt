@@ -1,5 +1,4 @@
 aiohttp==3.13.3
-easyocr==1.7.2
 keyboard==0.13.5
 mss==10.1.0
 numpy==2.4.2

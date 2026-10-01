@@ -16,9 +16,13 @@ from src.game_readers.mutator_and_enemy_race_recognizer import Mutator_and_enemy
 from src.game_readers.enemy_composition_matcher import EnemyCompositionMatcher
 from src.game_readers.enemy_composition_panel_detector import detect_enemy_composition_panel
 from src.game_readers.enemy_composition_recognizer import EnemyCompositionRecognizer
-from src.game_readers.ocr_provider import TesseractOCRProvider
+from src.game_readers.enemy_composition_scheduler import EnemyCompositionScheduler
+from src.game_readers.ppocr_opencv_provider import OpenCVDNNPPOCRv5Provider
 from src.memo_overlay import MemoOverlay
 from src.event_managers_and_notifiers.artifact_notifier import ArtifactNotifier
+from src.event_managers_and_notifiers.enemy_composition_notifier import (
+    EnemyCompositionNotifier,
+)
 from src.event_managers_and_notifiers.countdown_manager import CountdownManager
 from src.event_managers_and_notifiers.supply_notifier import SupplyNotifier
 
@@ -30,11 +34,36 @@ from src.ui.main_window_layout import apply_table_row_height, get_control_font_s
 #from src.settings_window import SettingsWindow
 from src.settings_window.settings_window import SettingsWindow
 
+
+def create_production_enemy_composition_ocr_provider(logger):
+    """Initialize the optional OpenCV DNN PP-OCRv5 backend once.
+
+    Enemy Composition is optional at runtime: a missing dependency, model,
+    dictionary, or failed OpenCV initialization must not prevent the rest of
+    KeiFrame from starting. The caller keeps the returned instance for the
+    lifetime of ``TimerWindow``; game resets only reset recognizer state.
+    """
+
+    try:
+        provider = OpenCVDNNPPOCRv5Provider()
+    except Exception as exc:  # Optional OCR must not break the main window.
+        reason = str(exc) or type(exc).__name__
+        logger.warning(
+            "Enemy Composition OCR addon unavailable: %s",
+            reason,
+        )
+        return None
+
+    logger.info("Enemy Composition OpenCV PP-OCRv5 backend initialized")
+    return provider
+
+
 class TimerWindow(QMainWindow):
     # 创建信号用于地图更新
     progress_signal = QtCore.pyqtSignal(list)
     toggle_artifact_signal = pyqtSignal()
     mutator_and_enemy_race_recognition_signal = QtCore.pyqtSignal(dict)
+    enemy_composition_confirmed_signal = QtCore.pyqtSignal(str)
     
 
     # 定义信号，用于线程安全地激活各种快捷键
@@ -49,6 +78,44 @@ class TimerWindow(QMainWindow):
     def _run_async_game_scheduler(self, progress_signal):
         """在新线程中启动 asyncio 事件循环"""
         asyncio.run(game_state_service.check_for_new_game_scheduler(progress_signal))
+
+    def _initialize_enemy_composition_recognition(self):
+        """Assemble the optional production Enemy Composition pipeline once."""
+
+        self.enemy_composition_matcher = EnemyCompositionMatcher()
+        self.enemy_composition_panel_detector = detect_enemy_composition_panel
+        self.enemy_composition_ocr_provider = (
+            create_production_enemy_composition_ocr_provider(self.logger)
+        )
+        self.enemy_composition_recognizer = None
+        self.enemy_composition_scheduler = None
+
+        if self.enemy_composition_ocr_provider is None:
+            # Explicitly detach any previous scheduler if this method is ever
+            # reused by a caller; no frame should reach a disabled pipeline.
+            self.mutator_and_enemy_race_recognizer.set_enemy_composition_scheduler(
+                None
+            )
+            self.logger.info("Enemy composition recognition disabled")
+            return
+
+        self.enemy_composition_recognizer = EnemyCompositionRecognizer(
+            panel_detector=self.enemy_composition_panel_detector,
+            ocr_provider=self.enemy_composition_ocr_provider,
+            matcher=self.enemy_composition_matcher,
+        )
+        confirmation_signal = getattr(self, "enemy_composition_confirmed_signal", None)
+        confirmation_callback = getattr(confirmation_signal, "emit", None)
+        self.enemy_composition_scheduler = EnemyCompositionScheduler(
+            recognizer=self.enemy_composition_recognizer,
+            game_state=self.game_state,
+            logger=self.logger,
+            confirmation_callback=confirmation_callback,
+        )
+        self.mutator_and_enemy_race_recognizer.set_enemy_composition_scheduler(
+            self.enemy_composition_scheduler
+        )
+        self.logger.info("Enemy composition recognizer initialized")
 
 
     def __init__(self):
@@ -72,7 +139,6 @@ class TimerWindow(QMainWindow):
         
         # 初始化突变因子和种族识别器
         self.mutator_and_enemy_race_recognizer = Mutator_and_enemy_race_recognizer(recognition_signal = self.mutator_and_enemy_race_recognition_signal)
-        self.mutator_and_enemy_race_recognizer.reset_and_start() # 启动识别线程
 
         # 设置窗口属性以支持DPI缩放
         self.setAttribute(Qt.WA_DontCreateNativeAncestors)
@@ -90,25 +156,20 @@ class TimerWindow(QMainWindow):
         self.drag_position = QPoint(0, 0)
         self.game_state = game_state_service.state
 
-        # 敌方组成识别器是被动 update 模型，不创建独立线程。
-        # Tesseract 不可用时保留识别器装配，让主程序仍可启动并记录原因。
-        self.enemy_composition_matcher = EnemyCompositionMatcher()
-        self.enemy_composition_panel_detector = detect_enemy_composition_panel
-        try:
-            self.enemy_composition_ocr_provider = TesseractOCRProvider("eng+chi_sim")
-        except (FileNotFoundError, OSError, ValueError) as exc:
-            self.enemy_composition_ocr_provider = None
-            self.logger.warning(
-                "Enemy composition OCR provider unavailable: %s",
-                exc,
-            )
-
-        self.enemy_composition_recognizer = EnemyCompositionRecognizer(
-            panel_detector=self.enemy_composition_panel_detector,
-            ocr_provider=self.enemy_composition_ocr_provider,
-            matcher=self.enemy_composition_matcher,
+        # The notifier and its signal connection are created before the
+        # perception worker starts.  A worker may emit the signal, but the
+        # connected slot below runs in this TimerWindow's Qt main thread.
+        self.enemy_composition_notifier = EnemyCompositionNotifier(self)
+        self.enemy_composition_confirmed_signal.connect(
+            self.handle_enemy_composition_confirmed,
+            Qt.QueuedConnection,
         )
-        self.logger.info("Enemy composition recognizer initialized")
+
+        # 敌方组成识别器是被动 update 模型，不创建独立线程。
+        # OCR addon 不可用时不创建 composition recognizer/scheduler；这样只
+        # 禁用敌方组成识别，不会在 perception loop 中持续触发失败调用。
+        self._initialize_enemy_composition_recognition()
+        self.mutator_and_enemy_race_recognizer.reset_and_start() # 启动识别线程
 
         # 添加一个标志来追踪地图选择的来源
         self.manual_map_selection = False
@@ -388,6 +449,29 @@ class TimerWindow(QMainWindow):
         event.ignore()
         self.hide()
 
+    @QtCore.pyqtSlot(str)
+    def handle_enemy_composition_confirmed(self, canonical_composition):
+        """Render a worker confirmation on the Qt main thread only."""
+
+        if getattr(self, '_safe_exiting', False):
+            return
+        if not canonical_composition:
+            return
+
+        # The scheduler publishes GlobalState before emitting the signal.  A
+        # reset can be queued concurrently; checking the published fact here
+        # prevents a stale queued confirmation from showing in the next game.
+        if getattr(self.game_state, 'enemy_composition', None) != canonical_composition:
+            self.logger.debug(
+                "Ignoring stale Enemy Composition confirmation: %s",
+                canonical_composition,
+            )
+            return
+
+        notifier = getattr(self, 'enemy_composition_notifier', None)
+        if notifier is not None:
+            notifier.show(canonical_composition)
+
     def handle_progress_update(self, data):
         """处理进度更新信号"""
         action = data[0]
@@ -411,19 +495,24 @@ class TimerWindow(QMainWindow):
         #新游戏时清除所有原有的计时器
         elif action == 'reset_game_info':
             self.logger.info('收到新游戏信号，正在重置识别器和游戏状态')
-            # 重置识别器状态，并重新开始扫描
-            if hasattr(self, 'mutator_and_enemy_race_recognizer') and self.mutator_and_enemy_race_recognizer:
-                 self.mutator_and_enemy_race_recognizer.reset_and_start() # 调用识别器的重置和启动方法
-
-            if hasattr(self, 'enemy_composition_recognizer') and self.enemy_composition_recognizer:
-                self.enemy_composition_recognizer.reset()
+            if hasattr(self, 'enemy_composition_scheduler') and self.enemy_composition_scheduler:
+                self.enemy_composition_scheduler.reset()
                 self.logger.info("Enemy composition recognizer reset")
+            elif hasattr(self, 'enemy_composition_recognizer') and self.enemy_composition_recognizer:
+                self.enemy_composition_recognizer.reset()
+
+            if hasattr(self, 'enemy_composition_notifier') and self.enemy_composition_notifier:
+                self.enemy_composition_notifier.reset()
 
             # 清除全局状态中的种族和突变因子
             game_state_service.state.enemy_race = None
             game_state_service.state.active_mutators = None
             game_state_service.state.enemy_composition = None
             self._last_dispatch_game_second = None
+
+            # 重置识别器状态，并重新开始扫描
+            if hasattr(self, 'mutator_and_enemy_race_recognizer') and self.mutator_and_enemy_race_recognizer:
+                 self.mutator_and_enemy_race_recognizer.reset_and_start() # 调用识别器的重置和启动方法
             
             # 清空自定义倒计时
             if hasattr(self, 'countdown_manager') and self.countdown_manager:
@@ -659,6 +748,10 @@ class TimerWindow(QMainWindow):
                 self.artifact_notifier.shutdown()
                 self.logger.info("ArtifactNotifier 已关闭。")
 
+            if hasattr(self, 'enemy_composition_notifier') and self.enemy_composition_notifier:
+                self.enemy_composition_notifier.shutdown()
+                self.logger.info("EnemyCompositionNotifier 已关闭。")
+
             if hasattr(self, 'supply_notifier') and self.supply_notifier:
                 self.supply_notifier.shutdown()
                 self.logger.info("SupplyNotifier 已关闭。")
@@ -710,6 +803,10 @@ class TimerWindow(QMainWindow):
             if hasattr(self, 'artifact_notifier') and self.artifact_notifier:
                 self.artifact_notifier.shutdown()
                 self.logger.info("ArtifactNotifier 已关闭。")
+
+            if hasattr(self, 'enemy_composition_notifier') and self.enemy_composition_notifier:
+                self.enemy_composition_notifier.shutdown()
+                self.logger.info("EnemyCompositionNotifier 已关闭。")
                 
             #清理补给自动识别
             if hasattr(self, 'supply_notifier') and self.supply_notifier:

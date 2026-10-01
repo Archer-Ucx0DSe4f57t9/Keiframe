@@ -45,7 +45,7 @@ flowchart LR
 2. 在导入主要 PyQt UI 模块之前配置 Windows DPI awareness 与 Qt 固定物理像素环境变量。
 3. 设置 Qt 的高 DPI、原生对话框和原生控件相关属性。
 4. 配置日志、加载主 UI 字体并创建 `QApplication`。
-5. 创建 `TimerWindow`。
+5. 创建 `TimerWindow`；装配时只尝试一次加载可选的 OpenCV DNN PP-OCRv5 addon。
 6. `TimerWindow` 打开地图和突变数据库连接，加载 `settings.json` 覆盖配置。
 7. 装配 UI、Toast、地图分支解析器、识别器、倒计时、神器和补给提醒。
 8. 注册全局快捷键、创建托盘与控制窗。
@@ -62,7 +62,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 | 游戏检查线程 | `TimerWindow._run_async_game_scheduler()` | 运行 asyncio 循环、轮询 6119、调度截图 | 通过 `progress_signal` 通知主线程 |
 | 截图 asyncio task | `game_state_service.check_for_new_game_scheduler()` | 约每 0.1 秒捕获活动 SC2 窗口并更新共享截图 | 只写 `GlobalState`，使用锁 |
 | 突变/种族识别线程 | `Mutator_and_enemy_race_recognizer` | 从共享截图识别敌方种族和突变图标 | 通过 Qt signal 返回结果 |
-| 敌方组成被动更新 | `game_time_handler.update_game_time()` | 使用锁内复制、锁外处理的最新截图执行 tooltip 检测、OCR 和匹配 | 仅确认后写入 `GlobalState.enemy_composition` |
+| 敌方组成被动更新 | 复用 `Mutator_and_enemy_race_recognizer` 的 perception loop | 使用锁内复制、锁外处理的最新截图执行 tooltip 检测、OCR 和匹配 | 确认后写入 `GlobalState.enemy_composition`，再通过 Qt signal 交给主线程 notifier |
 | 净网行动识别线程 | `MalwarfareMapHandler` | 识别颜色文字、倒计时、暂停和节点 | 主线程轮询其最新结构化数据 |
 | 小地图红点 worker | `MinimapRedDotDetector` | 按监控规则分析共享截图 | `MapVariantAutoResolver` 查询结果并切图 |
 | 死亡摇篮识别线程 | `CradleOfDeathMapHandler` | 识别倒计时并产生阶段事件 | 当前尚未由主窗口创建或消费 |
@@ -71,7 +71,8 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 
 - `GlobalState.latest_screenshot`、时间戳和缩放信息在 `screenshot_lock` 下读写。
 - 识别器应在锁内复制截图，随后释放锁再做耗时计算。
-- `EnemyCompositionRecognizer` 是被动 update 组件，由 Qt 主线程的游戏时间更新调用；它不创建自己的后台线程，且只在 tooltip 连续确认后执行 OCR。
+- `EnemyCompositionRecognizer` 是被动 update 组件，由已有视觉识别循环中的 `EnemyCompositionScheduler` 调用；它不创建自己的后台线程，且只在 tooltip 连续确认后执行 OCR。
+- `EnemyCompositionScheduler` 只发出确认回调/Qt signal，不直接操作 `MessagePresenter`；`EnemyCompositionNotifier` 在 Qt 主线程拥有独立 presenter，按 catalog 和当前语言显示一次、持续 5 秒并在 reset/shutdown 时清理。
 - 后台线程不能直接修改 Qt 控件。
 - 退出时先设置 `state.app_closing`，再停止识别器和专用 handler，最后关闭数据库连接和 Qt 窗口。
 
@@ -149,7 +150,10 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 `src/game_readers/` 的主要组件：
 
 - `mutator_and_enemy_race_recognizer.py`：模板匹配敌方种族和突变图标。
-- `enemy_composition_recognizer.py`：在共享截图上检测敌方组成 tooltip，收集标题 crop 并通过 OCR/匹配确认 canonical English 名称；由 `TimerWindow` 装配，在 `game_time_handler` 中被动更新。
+- `enemy_composition_recognizer.py`：在共享截图上检测敌方组成 tooltip，收集标题 crop 并通过 OCR/匹配确认 canonical English 名称；由 `TimerWindow` 装配，并由 `EnemyCompositionScheduler` 接入已有视觉识别循环。
+- `enemy_composition_catalog.py`：生产使用的 19 条 canonical English、已验证中文名、种族和 aliases 的唯一来源。
+- `ppocr_opencv_provider.py`：使用本地 addon 中的 PP-OCRv5 recognition model，通过 OpenCV DNN 在进程内只初始化一次；缺少 model/dict 时只禁用敌方组成识别。
+- `ocr_provider.py`：提供与识别器解耦的 OCRProvider 接口；其中的 RapidOCR provider 和 Tesseract provider 仅用于 benchmark、开发测试和回归比较，不进入生产装配。
 - `white_supply_recognizer.py`：从白色 UI 数字读取当前/最大补给。
 - `minimap_red_dot_detector.py`：对小地图局部区域进行多帧红点跟踪与评分。
 - `cradle_of_death_countdown_recognizer.py`：读取“死亡摇篮”局内倒计时；当前属于未接入组件。
@@ -163,6 +167,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 - `countdown_manager.py`：用户自定义倒计时的选择、并发限制与更新。
 - `mutator_manager.py`：突变按钮、数据库时间线与突变提醒。
 - `artifact_notifier.py`：基于游戏时间和画面状态的泽拉图神器提醒。
+- `enemy_composition_notifier.py`：在主线程显示无 icon、无声音的中英文 Enemy Composition 名称。
 - `supply_notifier.py`：补给识别、阈值判断和闪烁/声音节流。
 
 `src/presentation_modules/`
@@ -233,10 +238,13 @@ mss 捕获 SC2 窗口
 
 ```text
 敌方组成 tooltip 的共享截图
-  -> EnemyCompositionRecognizer 被动收集连续 title crop
+  -> Mutator_and_enemy_race_recognizer perception loop
+  -> EnemyCompositionScheduler 被动收集连续 title crop
   -> tooltip 确认后执行 OCR 与 race 限定匹配
   -> canonical English composition
   -> GlobalState.enemy_composition（仅 CONFIRMED 写入）
+  -> enemy_composition_confirmed_signal
+  -> Qt 主线程 EnemyCompositionNotifier / MessagePresenter（白色、5 秒、无声音）
 ```
 
 ### 5.4 净网行动
@@ -265,6 +273,7 @@ mss 捕获 SC2 窗口
 - 后台服务发出 `reset_game_info`。
 - 清除识别确认、倒计时、提醒和地图分支状态。
 - 清除敌方组成识别器及 `GlobalState.enemy_composition`。
+- 清除 `EnemyCompositionNotifier` 的当前 overlay 和本局已提示标志；下一局允许再次提示。
 - 下一次地图识别重新加载时间线。
 
 ### 应用退出

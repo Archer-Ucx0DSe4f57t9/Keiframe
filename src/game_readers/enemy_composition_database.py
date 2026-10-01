@@ -1,36 +1,36 @@
-"""Validated access to the production enemy-composition catalog.
+"""Compatibility accessors for the production Enemy Composition catalog.
 
-The catalog is a small runtime resource rather than test data. Keeping its
-loading and validation here lets the matcher and offline tools share exactly
-the same canonical names, races, and verified aliases.
+The runtime catalog now lives in :mod:`enemy_composition_catalog`.  This
+module keeps the old loader API used by offline benchmark scripts.  The
+optional JSON path is an explicit legacy/fixture override; production callers
+without a path always receive the Python catalog.
 """
 
 from __future__ import annotations
 
 import json
 import unicodedata
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
+from src.game_readers.enemy_composition_catalog import (
+    ENEMY_COMPOSITION_CATALOG,
+    EnemyCompositionEntry,
+    SUPPORTED_RACES,
+)
 from src.utils.fileutil import get_resources_dir
 
 
-SUPPORTED_RACES = ("Terran", "Zerg", "Protoss")
 RESOURCE_FILENAME = "enemy_compositions.json"
 
-
-@dataclass(frozen=True)
-class EnemyCompositionRecord:
-    """One production composition and its verified display aliases."""
-
-    canonical: str
-    race: str
-    aliases: Tuple[str, ...]
+# Existing benchmark code imports this historical name.  The alias keeps that
+# API stable while making the catalog entry's display_zh field available to
+# new callers.
+EnemyCompositionRecord = EnemyCompositionEntry
 
 
 def get_default_resource_path() -> Path:
-    """Return the resource path in source and PyInstaller layouts."""
+    """Return the retained legacy JSON path for explicit fixture use."""
 
     resources_dir = get_resources_dir()
     if not resources_dir:
@@ -50,21 +50,10 @@ def _require_non_empty_string(value: Any, field_name: str, index: int) -> str:
     return value.strip()
 
 
-def load_enemy_compositions(
-    resource_path: Optional[Union[str, Path]] = None,
-) -> Tuple[EnemyCompositionRecord, ...]:
-    """Load and validate the complete production catalog.
+def _load_legacy_json(resource_path: Union[str, Path]) -> Tuple[EnemyCompositionRecord, ...]:
+    """Load an explicitly requested JSON fixture with the old schema."""
 
-    The JSON shape is intentionally simple and reviewable:
-
-    ``[{"canonical": "...", "race": "...", "aliases": ["..."]}]``
-
-    Every canonical name must be present in its aliases. This makes the
-    English form and every verified localized form available to the matcher,
-    while the result of a match always remains the canonical English name.
-    """
-
-    path = Path(resource_path) if resource_path is not None else get_default_resource_path()
+    path = Path(resource_path)
     with path.open("r", encoding="utf-8") as handle:
         payload = json.load(handle)
 
@@ -105,26 +94,41 @@ def load_enemy_compositions(
             seen_aliases.add(alias_key)
             clean_aliases.append(clean_alias)
 
-        if _normalized_key(canonical) not in seen_aliases:
+        canonical_key = _normalized_key(canonical)
+        if canonical_key not in seen_aliases:
             raise ValueError(
                 f"enemy composition entry {index} aliases must include canonical"
             )
-
-        canonical_key = _normalized_key(canonical)
         if canonical_key in seen_canonical:
             raise ValueError(
                 f"duplicate canonical composition {canonical!r} at entry {index}"
             )
+
+        display_zh = next(
+            (alias for alias in clean_aliases if not alias.isascii()),
+            canonical,
+        )
         seen_canonical[canonical_key] = index
         records.append(
             EnemyCompositionRecord(
-                canonical=canonical,
+                canonical_en=canonical,
+                display_zh=display_zh,
                 race=race,
                 aliases=tuple(clean_aliases),
             )
         )
 
     return tuple(records)
+
+
+def load_enemy_compositions(
+    resource_path: Optional[Union[str, Path]] = None,
+) -> Tuple[EnemyCompositionRecord, ...]:
+    """Return the production catalog, or an explicit legacy JSON fixture."""
+
+    if resource_path is None:
+        return ENEMY_COMPOSITION_CATALOG
+    return _load_legacy_json(resource_path)
 
 
 def records_by_race(
