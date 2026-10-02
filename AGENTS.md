@@ -40,7 +40,8 @@ python -m src.main
 ## 目录职责
 
 - `src/main.py`：日志轮换、进程 DPI 初始化、Qt 属性和 `QApplication` 创建。DPI 配置必须早于主要 PyQt UI 导入。
-- `src/qt_gui.py`：`TimerWindow`，负责装配服务、识别器、管理器、Qt 信号和退出生命周期。
+- `src/qt_gui.py`：`TimerWindow`，负责 Qt 信号槽、窗口事件和公开兼容入口；运行时装配与生命周期同步委托给 `AppRuntime`。
+- `src/app_runtime.py`：普通组合类，按既有顺序装配服务、识别器和管理器，并执行对局重置及两条既有退出清理路径；组件仍由 `TimerWindow` 持有。
 - `src/game_state_service.py`：6119 API 轮询、SC2 窗口截图与共享 `GlobalState`。它只应维护事实状态，不承载 UI 展示。
 - `src/game_readers/`：底层图像识别。尽量输出结构化识别结果，不直接控制界面。
 - `src/map_handlers/`：地图加载、事件调度、地图分支和地图专属状态机。
@@ -69,13 +70,13 @@ python -m src.main
 - 后台线程或异步任务不得直接修改 Qt 控件；使用现有 Qt 信号、槽或主线程定时器。
 - 长耗时截图、OCR、网络轮询和模板匹配不能阻塞 GUI 主线程。
 - 访问 `game_state_service.state.latest_screenshot` 等共享可变状态时沿用 `screenshot_lock`；读图后尽快释放锁。
-- 新后台任务必须尊重 `state.app_closing`，提供幂等的 `reset()` / `shutdown()`，并在 `TimerWindow.safe_exit()` 中接入清理。
+- 新后台任务必须尊重 `state.app_closing`，提供幂等的 `reset()` / `shutdown()`，并在 `AppRuntime` 的相应重置或退出路径中接入清理。
 - 新游戏和离开游戏会触发 `reset_game_info`。新增有局内状态的组件必须接入重置链路，避免跨局残留。
 
 ### 模块边界
 
 - 新地图逻辑优先放在 `map_handlers/`，图像识别放在 `game_readers/`，提醒编排放在 `event_managers_and_notifiers/`，渲染放在 `presentation_modules/`。
-- `src/qt_gui.py` 只做装配和信号协调，避免继续累积地图专属算法。
+- `src/qt_gui.py` 只保留 Qt 信号协调、兼容入口和窗口交互；运行时装配放在 `src/app_runtime.py`，两处都避免继续累积地图专属算法。
 - 识别器不要读写表格、Toast 或数据库；状态机不要自行截屏；展示组件不要决定业务触发条件。
 - `CradleOfDeathMapHandler`、阶段检测器和波次管理器当前尚未接入主流程。若完成接入，必须同时处理地图切换、新局重置和安全退出，并补充集成验证。
 - `src/map_handlers/map_processor.py` 当前没有进入主装配路径。修改前先确认它是待用组件还是历史代码，不要默认把它当作当前数据源。

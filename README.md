@@ -45,7 +45,8 @@ python -m src.main
 Keiframe/
 ├── src/
 │   ├── main.py                         # 进程入口、日志、DPI 与 QApplication
-│   ├── qt_gui.py                       # 主窗口和各运行时组件的装配中心
+│   ├── qt_gui.py                       # 主窗口、Qt 信号槽和兼容入口
+│   ├── app_runtime.py                  # 运行时装配、对局重置和退出清理
 │   ├── game_state_service.py           # 6119 轮询、截图和共享游戏状态
 │   ├── game_readers/                   # 底层画面识别器
 │   ├── map_handlers/                   # 地图时间线、分支和特殊地图状态机

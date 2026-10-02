@@ -35,7 +35,7 @@ flowchart LR
 - `game_readers` 识别画面，不推进 Qt 界面。
 - `map_handlers` 和提醒管理器决定何时触发。
 - `presentation_modules` 只负责把结果显示或播放出来。
-- `TimerWindow` 是装配中心，不应成为所有业务算法的容器。
+- `AppRuntime` 负责运行时装配，`TimerWindow` 保留 Qt 边界；两者都不应成为业务算法的容器。
 
 ## 2. 启动顺序
 
@@ -45,21 +45,22 @@ flowchart LR
 2. 在导入主要 PyQt UI 模块之前配置 Windows DPI awareness 与 Qt 固定物理像素环境变量。
 3. 设置 Qt 的高 DPI、原生对话框和原生控件相关属性。
 4. 配置日志、加载主 UI 字体并创建 `QApplication`。
-5. 创建 `TimerWindow`；装配时只尝试一次加载可选的 OpenCV DNN PP-OCRv5 addon。
-6. `TimerWindow` 打开地图和突变数据库连接，加载 `settings.json` 覆盖配置。
-7. 装配 UI、Toast、地图分支解析器、识别器、倒计时、神器和补给提醒。
+5. 创建 `TimerWindow`；窗口先保存普通组合对象 `AppRuntime`，再由它启动装配；装配时只尝试一次加载可选的 OpenCV DNN PP-OCRv5 addon。
+6. `AppRuntime` 打开地图和突变数据库连接，加载 `settings.json` 覆盖配置。
+7. `AppRuntime` 按原顺序装配 UI、Toast、地图分支解析器、识别器、倒计时、神器和补给提醒，组件仍保存为 `TimerWindow` 属性并沿用原 Qt parent。
 8. 注册全局快捷键、创建托盘与控制窗。
 9. 启动后台游戏状态线程，并由 Qt 定时器每 200 ms 调用 `game_time_handler.update_game_time()`。
 10. 加载地图列表中的第一张地图并显示置顶主窗口。
 
 DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能导致 Windows 缩放和坐标基准不一致。
+游戏检查线程仍按既有顺序早于 `progress_signal` 和种族/突变信号连接启动；本轮只迁移创建位置，没有调整这一时序。
 
 ## 3. 线程与调度模型
 
 | 执行上下文 | 创建位置 | 主要职责 | 与 UI 的交互 |
 | --- | --- | --- | --- |
 | Qt 主线程 | `src/main.py` | 窗口、表格、定时分发、状态机更新和展示 | 直接操作 Qt 控件 |
-| 游戏检查线程 | `TimerWindow._run_async_game_scheduler()` | 运行 asyncio 循环、轮询 6119、调度截图 | 通过 `progress_signal` 通知主线程 |
+| 游戏检查线程 | `AppRuntime` 创建，入口仍为 `TimerWindow._run_async_game_scheduler()` | 运行 asyncio 循环、轮询 6119、调度截图 | 通过 `progress_signal` 通知主线程 |
 | 截图 asyncio task | `game_state_service.check_for_new_game_scheduler()` | 约每 0.1 秒捕获活动 SC2 窗口并更新共享截图 | 只写 `GlobalState`，使用锁 |
 | 突变/种族识别线程 | `Mutator_and_enemy_race_recognizer` | 从共享截图识别敌方种族和突变图标 | 通过 Qt signal 返回结果 |
 | 敌方组成被动更新 | 复用 `Mutator_and_enemy_race_recognizer` 的 perception loop | 使用锁内复制、锁外处理的最新截图执行 tooltip 检测、OCR 和匹配 | 确认后写入 `GlobalState.enemy_composition`，再通过 Qt signal 交给主线程 notifier |
@@ -88,16 +89,23 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 `src/qt_gui.py`
 
 - 维护 `TimerWindow` 及其 Qt 信号。
-- 装配数据库、UI、地图管理器和各类提醒器，并保留识别结果的 Qt 信号槽与生命周期入口。
-- 响应 `update_map` 与 `reset_game_info`。
+- 保留识别结果的 Qt 信号槽、公开兼容入口、窗口/鼠标/显示事件和少量直接交互。
+- 分发 `update_map`；将 `reset_game_info`、显式退出和窗口关闭清理同步委托给 `AppRuntime`。
 - 保留地图/版本选择的 Qt 槽入口、快捷键信号入口、设置入口、识别入口和安全退出，具体协调委托给组合式控制器。
+
+`src/app_runtime.py`
+
+- 普通组合类 `AppRuntime` 只在构造时保存 `TimerWindow` 引用，不作为 Qt parent，也不另存组件或退出标志。
+- 按既有顺序装配数据库、配置、识别器、UI、定时器、快捷键、提醒器、游戏检查线程、控制窗和初始地图。
+- 承担原对局重置流程，并分别保留显式 `safe_exit` 与实际窗口 `closeEvent` 的清理范围、顺序和异常边界。
+- 所有组件和可变状态继续由 `TimerWindow.xxx` 持有，所有 Qt 连接继续指向窗口槽或原回调。
 
 `src/recognition_controller.py`
 
 - 在原启动阶段装配可选的敌方组成 OCR provider、matcher、recognizer 和 scheduler。
 - 过滤已确认敌方组成的空结果、过期结果和退出阶段结果，再同步转发给主线程 notifier。
 - 按原顺序协调敌方种族、当前地图重载、已有突变状态与新突变结果。
-- 不拥有 Qt 信号、线程或定时器；`enemy_composition_*` 实例、识别器启停、新局重置与安全退出仍由 `TimerWindow` 持有和驱动。
+- 不拥有 Qt 信号、线程或定时器；`enemy_composition_*` 实例仍由 `TimerWindow` 持有，识别器启停、新局重置与退出清理由 `AppRuntime` 按原生命周期驱动。
 
 `src/settings_window/settings_controller.py`
 
@@ -169,7 +177,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 `src/game_readers/` 的主要组件：
 
 - `mutator_and_enemy_race_recognizer.py`：模板匹配敌方种族和突变图标。
-- `enemy_composition_recognizer.py`：在共享截图上检测敌方组成 tooltip，收集标题 crop 并通过 OCR/匹配确认 canonical English 名称；由 `RecognitionController` 在 `TimerWindow` 原启动点装配，并由 `EnemyCompositionScheduler` 接入已有视觉识别循环。
+- `enemy_composition_recognizer.py`：在共享截图上检测敌方组成 tooltip，收集标题 crop 并通过 OCR/匹配确认 canonical English 名称；由 `RecognitionController` 在 `AppRuntime` 保留的原启动点装配，并由 `EnemyCompositionScheduler` 接入已有视觉识别循环。
 - `enemy_composition_catalog.py`：生产使用的 19 条 canonical English、已验证中文名、种族和 aliases 的唯一来源。
 - `enemy_composition_unit_advisor.py`：启动时一次性读取 `resources/enemy_comps/*.csv`，为英文/中文组成名建立同一份 t1~t7 注意单位 lookup；只消费确认后的状态，不参与 OCR。
 - `ppocr_opencv_provider.py`：使用本地 addon 中的 PP-OCRv5 recognition model，通过 OpenCV DNN 在进程内只初始化一次；缺少 model/dict 时只禁用敌方组成识别。
@@ -232,7 +240,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
   -> 创建普通或特殊地图管理器
 ```
 
-`reset_game_info` 会重置突变/种族识别器、敌方状态、自定义倒计时、地图分支解析器、神器、补给和所有 Toast。新增跨局组件必须加入此链路。
+`TimerWindow.handle_progress_update()` 将 `reset_game_info` 同步委托给 `AppRuntime`；后者会重置突变/种族识别器、敌方状态、自定义倒计时、地图分支解析器、神器、补给和所有 Toast。新增跨局组件必须加入此链路。
 
 ### 5.2 标准地图提醒
 
@@ -307,7 +315,12 @@ mss 捕获 SC2 窗口
 
 ### 应用退出
 
-`TimerWindow.safe_exit()` 设置 `state.app_closing`，停止地图 handler、识别器、notifier 和热键，关闭数据库与窗口。任何新增后台组件都必须有可重复调用的关闭逻辑，并在此处登记。
+生命周期仍保留两条既有关闭路径：
+
+- 托盘或菜单调用 `TimerWindow.safe_exit()`，同步委托 `AppRuntime.safe_exit()`。该路径使用 `_safe_exiting` 防重入，设置 `state.app_closing`，停止主 timer，并按原顺序清理 Toast、manager、地图 handler、识别器、notifier、倒计时、热键、托盘和控制窗，关闭数据库后调用 `QApplication.quit()`；中途异常会停止后续清理并恢复 `_safe_exiting`。
+- 窗口关闭事件调用 `AppRuntime.cleanup_on_close()`，随后无论清理是否失败都进入父类 `closeEvent`。该路径保留可选 `global_listener` 清理，但不新增 `app_closing`、主 timer 停止、倒计时/托盘/控制窗/数据库清理或 `QApplication.quit()`。
+
+这两条路径目前并未统一，也不代表已有退出竞态或资源泄漏已解决。任何新增后台组件仍需明确应接入哪条路径。
 
 ## 7. 扩展方式
 
@@ -324,7 +337,7 @@ mss 捕获 SC2 窗口
 2. 在 `map_handlers/` 实现状态机或事件管理器。
 3. 在 `map_loader` 中按地图创建、重置和关闭。
 4. 在 `game_time_handler` 中以合适频率消费结构化结果。
-5. 在 `reset_game_info` 与 `safe_exit` 中接入生命周期。
+5. 在 `AppRuntime.reset_game_info` 与相应退出路径中接入生命周期。
 6. 优先为纯状态机编写不依赖 Qt 和真实截图的单元测试。
 
 ### 新增提醒类型
@@ -336,7 +349,7 @@ mss 捕获 SC2 窗口
 
 ## 8. 当前技术债与风险
 
-- `TimerWindow` 仍承担较多装配和业务协调，新增功能应避免继续扩大其算法职责。
+- `AppRuntime` 已从 `TimerWindow` 提取运行时装配、对局重置和退出清理；窗口仍保留 Qt 槽和少量交互，两者的属性契约主要依靠约定。
 - 共享 `GlobalState` 简化了读写，但类型与所有权主要靠约定；新增字段必须明确唯一写入者。
 - 标准化到 1920 宽只能解决部分分辨率差异，ROI 仍会受纵横比、语言、UI 布局和游戏更新影响。
 - 根目录与 `src/` 的依赖清单不一致，开发环境和嵌入式发布环境可能出现版本差异。

@@ -26,6 +26,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src import game_state_service  # noqa: E402
+from src.app_runtime import AppRuntime  # noqa: E402
 from src.game_readers.enemy_composition_matcher import (  # noqa: E402
     EnemyCompositionMatcher,
 )
@@ -206,6 +207,7 @@ def main() -> int:
             _last_dispatch_game_second=42,
             time_label=SimpleNamespace(setText=lambda _text: None),
         )
+        window.app_runtime = AppRuntime(window)
         TimerWindow.handle_progress_update(window, ["reset_game_info"])
         assert first_recognizer.state == EnemyCompositionState.SEARCHING
         assert state.enemy_composition is None

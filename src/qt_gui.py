@@ -1,31 +1,13 @@
-import sys
-import traceback
-import threading, asyncio
-from PyQt5.QtWidgets import (QMainWindow, QApplication,QMessageBox)
-from src.control_window import ControlWindow
-from PyQt5.QtCore import Qt, QTimer, QPoint, pyqtSignal
+from PyQt5.QtWidgets import QMainWindow, QApplication
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5 import QtCore
 
-from src import  config, ui_setup, game_state_service, config_hotkeys, game_time_handler, app_window_manager, language_manager
+from src import config, ui_setup, game_state_service, app_window_manager, language_manager
+from src.app_runtime import AppRuntime
 from src.map_handlers import map_loader
-from src.map_handlers.map_variant_auto_resolver import MapVariantAutoResolver
-from src.settings_window.settings_controller import SettingsController
-from src.ui.map_selection_controller import MapSelectionController
 from src.recognition_controller import (
-    RecognitionController,
     create_production_enemy_composition_ocr_provider,
 )
-from src.presentation_modules.toast_manager import ToastManager
-from src.game_readers.mutator_and_enemy_race_recognizer import Mutator_and_enemy_race_recognizer
-from src.memo_overlay import MemoOverlay
-from src.event_managers_and_notifiers.artifact_notifier import ArtifactNotifier
-from src.event_managers_and_notifiers.enemy_composition_notifier import (
-    EnemyCompositionNotifier,
-)
-from src.event_managers_and_notifiers.countdown_manager import CountdownManager
-from src.event_managers_and_notifiers.supply_notifier import SupplyNotifier
-
-from src.db.db_manager import DBManager
 
 
 class TimerWindow(QMainWindow):
@@ -47,7 +29,7 @@ class TimerWindow(QMainWindow):
 
     def _run_async_game_scheduler(self, progress_signal):
         """在新线程中启动 asyncio 事件循环"""
-        asyncio.run(game_state_service.check_for_new_game_scheduler(progress_signal))
+        return self.app_runtime.run_async_game_scheduler(progress_signal)
 
     def _initialize_enemy_composition_recognition(self):
         self.recognition_controller.initialize_enemy_composition_recognition()
@@ -55,171 +37,8 @@ class TimerWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        
-        # 初始化数据库管理器
-        self.db_manager = DBManager()
-        # 获取数据库连接
-        self.maps_db = self.db_manager.get_maps_conn()
-        self.mutators_db = self.db_manager.get_mutators_conn()
-        #self.enemies_db = self.db_manager.get_enemies_conn()#暂不可用
-        
-        #在最开始安全地初始化 control_window 为 None
-        # 万一在真正创建前触发了 moveEvent，它可以通过 hasattr() 或 try/except 优雅地失败。
-        self.control_window = None
-        self.settings_controller = SettingsController(self)
-        
-        #启动时加载用户自定义配置 (这步最好放在程序入口最开始)
-        self.apply_user_settings()
-
-        #self.mutator_manager在ui_setup中创建
-        
-        # 初始化突变因子和种族识别器
-        self.mutator_and_enemy_race_recognizer = Mutator_and_enemy_race_recognizer(recognition_signal = self.mutator_and_enemy_race_recognition_signal)
-
-        # 设置窗口属性以支持DPI缩放
-        self.setAttribute(Qt.WA_DontCreateNativeAncestors)
-        self.setAttribute(Qt.WA_NativeWindow)
-        
-        # 初始化日志记录器
-        from src.utils.logging_util import get_logger
-        self.logger = get_logger(__name__)
-        self.logger.info('Keiframe 启动')
-
-        
-        # 初始化状态
-        self.current_time = ""
-        self._last_dispatch_game_second = None
-        self.drag_position = QPoint(0, 0)
-        self.game_state = game_state_service.state
-        self.recognition_controller = RecognitionController(
-            self,
-            game_state=self.game_state,
-        )
-
-        # The notifier and its signal connection are created before the
-        # perception worker starts.  A worker may emit the signal, but the
-        # connected slot below runs in this TimerWindow's Qt main thread.
-        self.enemy_composition_notifier = EnemyCompositionNotifier(self)
-        self.enemy_composition_confirmed_signal.connect(
-            self.handle_enemy_composition_confirmed,
-            Qt.QueuedConnection,
-        )
-
-        # 敌方组成识别器是被动 update 模型，不创建独立线程。
-        # OCR addon 不可用时不创建 composition recognizer/scheduler；这样只
-        # 禁用敌方组成识别，不会在 perception loop 中持续触发失败调用。
-        self._initialize_enemy_composition_recognition()
-        self.mutator_and_enemy_race_recognizer.reset_and_start() # 启动识别线程
-
-        # 添加一个标志来追踪地图选择的来源
-        self.manual_map_selection = False
-
-        #初始化地图管理模块
-        self.toast_manager = ToastManager(self)
-        self.map_event_manager = None
-        self.is_map_Malwarfare = False
-        self.malwarfare_handler = None
-        
-        # 添加一个标志来控制是否需启用自动地图版本切换
-        self.auto_map_variant_switching = False
-        self.map_selection_controller = MapSelectionController(self)
-        self.map_variant_auto_resolver = MapVariantAutoResolver(self, self.logger)
-        # 初始化UI
-        self.init_ui()
-
-        # 初始化定时器
-        self.timer = QTimer()
-        self.timer.timeout.connect(lambda: game_time_handler.update_game_time(self))
-        self.timer.start(200)  # 自动开始更新，每200毫秒更新一次
-
-        # 连接表格区域的双击事件
-        self.table_area.mouseDoubleClickEvent = self.on_text_double_click
-
-        # 初始化系统托盘
-        self.init_tray()
-
-        # 搜索框的信号连接
-        if hasattr(self, 'map_list'): # 确保 setup_search_and_combo_box_and_drag_icon 已创建 map_list
-            self.setup_search_box_connections(self.map_list)
-
-        self.ctrl_pressed = False
-        self.is_temp_unlocked = False 
-        '''
-        # [新增] 实例化监听器并连接信号
-        self.global_listener = GlobalKeyListener(parent=self)
-        self.global_listener.ctrl_state_changed.connect(self.set_ctrl_state)
-        self.global_listener.start_listening()
-        '''
-        
-        #笔记按钮功能
-        self.memo_overlay = MemoOverlay()
-        if hasattr(self, 'memo_btn'):
-            self.memo_btn.clicked.connect(lambda: self.show_memo('temp'))#temp模式防止遮住导致按不了按钮
-        #连接信号到槽 (为了解决线程安全问题)
-        self.memo_signal.connect(self.show_memo)
-        self.countdown_hotkey_signal.connect(self.process_countdown_hotkey_logic)
-        self.map_switch_signal.connect(self.process_map_switch_logic)
-        self.lock_signal.connect(self.process_lock_logic)
-        
-        #倒计时按钮功能
-        self.countdown_manager = CountdownManager(self, self.toast_manager)
-        if hasattr(self, 'countdown_btn'):
-            self.countdown_btn.clicked.connect(self.trigger_countdown_selection)
-        
-        self.settings_window = None
-        
-        # 初始化全局快捷键
-        config_hotkeys.init_global_hotkeys(self)
-        
-        # 初始化神器提示模块
-        self.artifact_notifier = ArtifactNotifier(self)
-        if hasattr(self, 'main_menu_controller'):
-            self.main_menu_controller.set_artifact_notifier(self.artifact_notifier)
-        
-        # 初始化补给提示模块
-        self.supply_notifier = SupplyNotifier(self)
-        
-         # 启动游戏检查线程
-        self.game_check_thread = threading.Thread(target=self._run_async_game_scheduler, args=(self.progress_signal,), daemon=True)
-        self.game_check_thread.start()
-
-        # 创建控制窗体
-        self.control_window = ControlWindow()
-        self.control_window.move(self.x(), self.y() - self.control_window.height())
-
-        # 连接控制窗口的状态改变信号
-        self.control_window.state_changed.connect(lambda unlocked: app_window_manager.on_control_state_changed(self,unlocked))
-
-        # 监听主窗口位置变化
-        self.windowHandle().windowStateChanged.connect(lambda: app_window_manager.update_control_window_position(self))
-
-        # 连接信号到处理函数
-        self.progress_signal.connect(self.handle_progress_update)
-
-        #连接突变因子和种族识
-        self.mutator_and_enemy_race_recognition_signal.connect(self.handle_mutator_and_enemy_race_recognition_update)
-
-        #延迟开启主控制界面
-        QTimer.singleShot(50, self.show_control_window)
-
-        # 强制加载第一个地图
-        if hasattr(self, 'map_list') and self.map_list:
-            map_loader.handle_map_selection(self, self.map_list[0])
-
-        # 显示窗口并强制置顶
-        self.show()
-        if sys.platform == 'win32':
-            import win32gui
-            import win32con
-            hwnd = int(self.winId())
-            win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                                  win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE)
-
-        # 初始化时设置为锁定状态（不可点击）
-        # 使用延迟调用，确保窗口已完全初始化
-        QTimer.singleShot(100, lambda: app_window_manager.on_control_state_changed(self, False))
-
-
+        self.app_runtime = AppRuntime(self)
+        self.app_runtime.initialize()
 
     def get_current_screen(self):
         """获取当前窗口所在的显示器"""
@@ -312,11 +131,6 @@ class TimerWindow(QMainWindow):
         """处理控制窗口状态改变事件"""
         app_window_manager.on_control_state_changed(self,unlocked)
 
-    def closeEvent(self, event):
-        """关闭事件"""
-        event.ignore()
-        self.hide()
-
     @QtCore.pyqtSlot(str)
     def handle_enemy_composition_confirmed(self, canonical_composition):
         self.recognition_controller.handle_enemy_composition_confirmed(
@@ -332,49 +146,7 @@ class TimerWindow(QMainWindow):
 
         #新游戏时清除所有原有的计时器
         elif action == 'reset_game_info':
-            self.logger.info('收到新游戏信号，正在重置识别器和游戏状态')
-            if hasattr(self, 'enemy_composition_scheduler') and self.enemy_composition_scheduler:
-                self.enemy_composition_scheduler.reset()
-                self.logger.info("Enemy composition recognizer reset")
-            elif hasattr(self, 'enemy_composition_recognizer') and self.enemy_composition_recognizer:
-                self.enemy_composition_recognizer.reset()
-
-            if hasattr(self, 'enemy_composition_notifier') and self.enemy_composition_notifier:
-                self.enemy_composition_notifier.reset()
-
-            if hasattr(self, 'mutator_manager') and self.mutator_manager:
-                self.mutator_manager.reset()
-
-            # 清除全局状态中的种族和突变因子
-            game_state_service.state.enemy_race = None
-            game_state_service.state.active_mutators = None
-            game_state_service.state.enemy_composition = None
-            self._last_dispatch_game_second = None
-
-            # 重置识别器状态，并重新开始扫描
-            if hasattr(self, 'mutator_and_enemy_race_recognizer') and self.mutator_and_enemy_race_recognizer:
-                 self.mutator_and_enemy_race_recognizer.reset_and_start() # 调用识别器的重置和启动方法
-            
-            # 清空自定义倒计时
-            if hasattr(self, 'countdown_manager') and self.countdown_manager:
-                self.countdown_manager.clear_all_countdowns()
-
-            # 重置自动地图版本切换器状态
-            if hasattr(self, "map_variant_auto_resolver"):
-                self.map_variant_auto_resolver.reset()
-
-
-            # 清理神器自动识别残留
-            if hasattr(self, 'artifact_notifier') and self.artifact_notifier:
-                self.artifact_notifier.reset()
-
-            # 清理补给自动识别残留
-            if hasattr(self, 'supply_notifier') and self.supply_notifier:
-                self.supply_notifier.reset()
-
-            # 清除所有残留的 Toast（包括地图事件）
-            if hasattr(self, 'toast_manager') and self.toast_manager:
-                self.toast_manager.clear_all_alerts()
+            self.app_runtime.reset_game_info()
 
 
     def on_version_selected(self):
@@ -495,112 +267,9 @@ class TimerWindow(QMainWindow):
         
     def safe_exit(self):
         """关闭所有后台处理器和监听器"""
-        if getattr(self, '_safe_exiting', False):
-            return
-        self._safe_exiting = True
-
-        try:
-            game_state_service.state.app_closing = True
-
-            if hasattr(self, 'timer') and self.timer:
-                self.timer.stop()
-
-            if hasattr(self, 'toast_manager') and self.toast_manager:
-                self.toast_manager.shutdown()
-
-            if hasattr(self, 'mutator_manager') and self.mutator_manager:
-                self.mutator_manager.shutdown()
-
-            if hasattr(self, 'malwarfare_handler') and self.malwarfare_handler is not None:
-                self.logger.info("应用关闭，正在关闭 MalwarfareMapHandler。")
-                self.malwarfare_handler.shutdown()
-                self.malwarfare_handler = None
-
-            if hasattr(self, 'mutator_and_enemy_race_recognizer') and self.mutator_and_enemy_race_recognizer:
-                self.mutator_and_enemy_race_recognizer.shutdown()
-                self.logger.info("突变因子和种族识别器已关闭。")
-
-            if hasattr(self, 'artifact_notifier') and self.artifact_notifier:
-                self.artifact_notifier.shutdown()
-                self.logger.info("ArtifactNotifier 已关闭。")
-
-            if hasattr(self, 'enemy_composition_notifier') and self.enemy_composition_notifier:
-                self.enemy_composition_notifier.shutdown()
-                self.logger.info("EnemyCompositionNotifier 已关闭。")
-
-            if hasattr(self, 'supply_notifier') and self.supply_notifier:
-                self.supply_notifier.shutdown()
-                self.logger.info("SupplyNotifier 已关闭。")
-
-            if hasattr(self, 'countdown_manager') and self.countdown_manager:
-                self.countdown_manager.clear_all_countdowns()
-
-            config_hotkeys.unhook_global_hotkeys(self)
-
-            if hasattr(self, 'tray_manager') and self.tray_manager:
-                tray_icon = getattr(self.tray_manager, 'tray_icon', None)
-                if tray_icon is not None:
-                    tray_icon.hide()
-                    tray_icon.deleteLater()
-                    self.tray_manager.tray_icon = None
-
-            if hasattr(self, 'control_window') and self.control_window:
-                self.control_window.close()
-
-            if hasattr(self, 'db_manager') and self.db_manager:
-                self.db_manager.close_all()
-
-            app = QApplication.instance()
-            if app is not None:
-                app.quit()
-
-        except Exception as e:
-            self.logger.error(f'清理失败，无法正常退出: {str(e)}')
-            self.logger.error(traceback.format_exc())
-            self._safe_exiting = False
+        return self.app_runtime.safe_exit()
 
     def closeEvent(self, event):
         """窗口关闭事件处理"""
-        try:
-            if hasattr(self, 'toast_manager') and self.toast_manager:
-                self.toast_manager.shutdown()
-
-            if hasattr(self, 'mutator_manager') and self.mutator_manager:
-                self.mutator_manager.shutdown()
-
-            if self.malwarfare_handler is not None:
-                self.logger.info("应用关闭，正在关闭 MalwarfareMapHandler。")
-                self.malwarfare_handler.shutdown()
-                self.malwarfare_handler = None
-
-            if hasattr(self, 'mutator_and_enemy_race_recognizer') and self.mutator_and_enemy_race_recognizer:
-                self.mutator_and_enemy_race_recognizer.shutdown()
-                self.logger.info("突变因子和种族识别器已关闭。")
-                
-            if hasattr(self, 'global_listener') and self.global_listener:
-                self.global_listener.stop_listening()
-                self.logger.info("按键监听已关闭。")
-                
-            #清理神器自动识别
-            if hasattr(self, 'artifact_notifier') and self.artifact_notifier:
-                self.artifact_notifier.shutdown()
-                self.logger.info("ArtifactNotifier 已关闭。")
-
-            if hasattr(self, 'enemy_composition_notifier') and self.enemy_composition_notifier:
-                self.enemy_composition_notifier.shutdown()
-                self.logger.info("EnemyCompositionNotifier 已关闭。")
-                
-            #清理补给自动识别
-            if hasattr(self, 'supply_notifier') and self.supply_notifier:
-                self.supply_notifier.shutdown()
-                self.logger.info("SupplyNotifier 已关闭。")
-
-            # 清理全局快捷键
-            config_hotkeys.unhook_global_hotkeys(self)
-            self.logger.info('已清理')
-        except Exception as e:
-            self.logger.error(f'清理失败: {str(e)}')
-            self.logger.error(traceback.format_exc())
-
-        # 调用父类的closeEvent
+        self.app_runtime.cleanup_on_close()
         super().closeEvent(event)

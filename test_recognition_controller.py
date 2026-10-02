@@ -8,6 +8,7 @@ from src.recognition_controller import (
     RecognitionController,
     create_production_enemy_composition_ocr_provider,
 )
+from src.app_runtime import AppRuntime
 from src.qt_gui import (
     TimerWindow,
     create_production_enemy_composition_ocr_provider as qt_gui_provider_factory,
@@ -144,7 +145,8 @@ class RecognitionControllerTests(unittest.TestCase):
             recognizer = window.enemy_composition_recognizer
             scheduler = window.enemy_composition_scheduler
             window._last_dispatch_game_second = 42
-            with patch("src.qt_gui.game_state_service.state", state):
+            window.app_runtime = AppRuntime(window)
+            with patch("src.app_runtime.game_state_service.state", state):
                 TimerWindow.handle_progress_update(window, ["reset_game_info"])
 
         provider_constructor.assert_called_once_with()
