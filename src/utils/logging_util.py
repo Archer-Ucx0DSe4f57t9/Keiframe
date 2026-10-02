@@ -6,14 +6,15 @@ def setup_logger(base_dir=None):
     """初始化日志配置
     
     Args:
-        base_dir: 日志文件存储的基础目录，如果为None则使用当前目录
+        base_dir: 日志文件存储的基础目录，如果为None则使用程序所在目录
     """
     if base_dir:
         log_dir = os.path.join(base_dir, 'log')
         os.makedirs(log_dir, exist_ok=True)
         log_file = os.path.join(log_dir, 'sc2_Keiframe.log')
     else:
-        log_file = 'Keiframe.log'
+        from src.utils.fileutil import get_log_file_path
+        log_file = get_log_file_path()
     
     # 配置根日志记录器
     logging.basicConfig(
