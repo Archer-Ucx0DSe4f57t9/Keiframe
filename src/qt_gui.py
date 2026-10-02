@@ -1,6 +1,4 @@
-import os
 import sys
-import json
 import traceback
 import threading, asyncio
 from PyQt5.QtWidgets import (QMainWindow, QApplication,QMessageBox)
@@ -11,6 +9,8 @@ from PyQt5 import QtCore
 from src import  config, ui_setup, game_state_service, config_hotkeys, game_time_handler, app_window_manager, language_manager
 from src.map_handlers import map_loader
 from src.map_handlers.map_variant_auto_resolver import MapVariantAutoResolver
+from src.settings_window.settings_controller import SettingsController
+from src.ui.map_selection_controller import MapSelectionController
 from src.presentation_modules.toast_manager import ToastManager
 from src.game_readers.mutator_and_enemy_race_recognizer import Mutator_and_enemy_race_recognizer
 from src.game_readers.enemy_composition_matcher import EnemyCompositionMatcher
@@ -26,13 +26,7 @@ from src.event_managers_and_notifiers.enemy_composition_notifier import (
 from src.event_managers_and_notifiers.countdown_manager import CountdownManager
 from src.event_managers_and_notifiers.supply_notifier import SupplyNotifier
 
-from src.utils.fileutil import get_project_root
 from src.db.db_manager import DBManager
-from src.db.map_daos import search_maps_by_keyword
-from src.ui.main_window_layout import apply_table_row_height, get_control_font_size
-
-#from src.settings_window import SettingsWindow
-from src.settings_window.settings_window import SettingsWindow
 
 
 def create_production_enemy_composition_ocr_provider(logger):
@@ -131,6 +125,7 @@ class TimerWindow(QMainWindow):
         #在最开始安全地初始化 control_window 为 None
         # 万一在真正创建前触发了 moveEvent，它可以通过 hasattr() 或 try/except 优雅地失败。
         self.control_window = None
+        self.settings_controller = SettingsController(self)
         
         #启动时加载用户自定义配置 (这步最好放在程序入口最开始)
         self.apply_user_settings()
@@ -182,6 +177,7 @@ class TimerWindow(QMainWindow):
         
         # 添加一个标志来控制是否需启用自动地图版本切换
         self.auto_map_variant_switching = False
+        self.map_selection_controller = MapSelectionController(self)
         self.map_variant_auto_resolver = MapVariantAutoResolver(self, self.logger)
         # 初始化UI
         self.init_ui()
@@ -318,21 +314,7 @@ class TimerWindow(QMainWindow):
 
     def process_map_switch_logic(self):
         """主线程执行：实际UI操作"""
-        self.logger.info(f'检测到地图切换快捷键组合: {config.MAP_SHORTCUT}')
-        if self.map_version_group.isVisible():
-            current_btn = None
-            for btn in self.version_buttons:
-                if btn.isChecked():
-                    current_btn = btn
-                    break
-            
-            if current_btn:
-                current_idx = self.version_buttons.index(current_btn)
-                next_idx = (current_idx + 1) % len(self.version_buttons)
-                self.logger.info(f'从版本 {current_btn.text()} 切换到版本 {self.version_buttons[next_idx].text()}')
-                self.version_buttons[next_idx].click()
-        else:
-            self.logger.info('当前地图不支持A/B版本切换')
+        self.map_selection_controller.process_map_switch_logic()
 
     # 2. 锁定窗口
     def handle_lock_shortcut(self):
@@ -362,66 +344,7 @@ class TimerWindow(QMainWindow):
         ui_setup.init_ui(self)
 
     def setup_search_box_connections(self, map_list):
-        ####################
-        # 用户输入搜索
-        # 清空搜索框的定时器->现在在ui_setup实现
-
-        # 更新搜索内容
-        def update_combo_box(keyword, allow_auto_select=True):
-
-            keyword = keyword.strip().lower()
-            current_selected = self.combo_box.currentText()
-
-            self.combo_box.blockSignals(True)  # 🚫 禁止选项变化触发 currentTextChanged
-            self.combo_box.clear()
-
-            filtered = [f for f in map_list if keyword in f.lower()]
-
-            mapped_results = search_maps_by_keyword(self.maps_db, keyword)
-            
-            for map_name in reversed(mapped_results):
-                if map_name in map_list and map_name not in filtered:
-                    filtered.insert(0, map_name)
-
-            self.combo_box.addItems(filtered)
-
-            # ✅ 如果不是自动选择场景，恢复原选项
-            if not allow_auto_select and current_selected in filtered:
-                index = self.combo_box.findText(current_selected)
-                if index >= 0:
-                    self.combo_box.setCurrentIndex(index)
-
-            self.combo_box.blockSignals(False)
-
-            # ✅ 只在明确需要时触发地图变更
-            if filtered and allow_auto_select:
-                map_loader.handle_map_selection(self, filtered[0])
-
-        # 用户输入时触发（允许自动选择）
-        def filter_combo_box_user():
-            keyword = self.search_box.text().strip().lower()
-            update_combo_box(keyword, allow_auto_select=True)
-
-        # 自动清除时触发（禁止自动选择）
-        def filter_combo_box_clear():
-            update_combo_box("", allow_auto_select=False)
-            self.search_box.blockSignals(True)
-            self.search_box.setText("")  # 不触发 filter_combo_box_user
-            self.search_box.blockSignals(False)
-
-        # 根据搜索更新可选列表
-        def restart_clear_timer():
-            self.clear_search_timer.stop()
-            self.clear_search_timer.start(30000)  # 30秒
-
-        # 搜索框关联
-        self.search_box.textChanged.connect(filter_combo_box_user)
-        self.search_box.textChanged.connect(restart_clear_timer)
-        self.clear_search_timer.timeout.connect(filter_combo_box_clear)
-        self.combo_box.currentTextChanged.connect(self.on_map_selected)
-
-        # 调整时间标签的位置和高度
-        self.time_label.setGeometry(10, 40, 100, 20)
+        self.map_selection_controller.setup_search_box_connections(map_list)
 
     def init_tray(self):
         """初始化系统托盘"""
@@ -477,20 +400,7 @@ class TimerWindow(QMainWindow):
         action = data[0]
 
         if action == 'update_map':
-            # 在下拉框中查找并选择地图
-            map_name = data[1]
-            self.logger.info(f'收到地图更新信号: {map_name}')
-            # 如果是新游戏开始，强制更新地图
-            index = self.combo_box.findText(map_name)
-            if index >= 0:
-                self.logger.info(f'找到地图 {map_name}，更新下拉框选择')
-                # 暂时禁用手动选择标志
-                self.manual_map_selection = False
-                self.combo_box.setCurrentIndex(index)
-                # 手动调用地图选择事件处理函数，确保加载地图文件
-                map_loader.handle_map_selection(self, map_name)
-            else:
-                self.logger.warning(f'未在下拉框中找到地图: {map_name}')
+            self.map_selection_controller.handle_map_update(data[1])
 
         #新游戏时清除所有原有的计时器
         elif action == 'reset_game_info':
@@ -661,65 +571,14 @@ class TimerWindow(QMainWindow):
             
     def apply_user_settings(self):
         """读取json并覆盖config.py中的变量"""
-        
-        json_path = os.path.join(get_project_root(), 'settings.json')
-        if os.path.exists(json_path):
-            try:
-                with open(json_path, 'r', encoding='utf-8') as f:
-                    user_settings = json.load(f)
-                    
-                # 动态更新 config 模块的属性
-                for key, value in user_settings.items():
-                    if hasattr(config, key):
-                        setattr(config, key, value)
-                        # print(f"已更新配置: {key} = {value}")
-            except Exception as e:
-                active_logger = getattr(self, "logger", None)
-                if active_logger:
-                    active_logger.error(f"加载用户配置失败: {e}")
+        self.settings_controller.apply_user_settings()
 
     def open_settings(self):
         """打开设置窗口"""
-        if self.settings_window is not None and self.settings_window.isVisible():
-            self.settings_window.raise_()
-            self.settings_window.activateWindow()
-            return
-
-        # 每次正常打开仍复用现有 SettingsWindow 创建和保存逻辑。
-        self.settings_window = SettingsWindow(self)
-        self.settings_window.settings_saved.connect(self.handle_settings_update)
-
-        config_hotkeys.unhook_global_hotkeys(self)
-        try:
-            self.settings_window.exec_()
-        finally:
-            config_hotkeys.init_global_hotkeys(self)
-            self.apply_user_settings()
-            self.settings_window = None
+        self.settings_controller.open_settings()
 
     def handle_settings_update(self, new_settings):
-        """
-        当设置窗口保存后，处理实时更新逻辑
-        有些设置可以直接生效（如颜色、透明度），有些可能需要重启
-        """
-        # 1. 更新 config 内存中的值
-        for key, value in new_settings.items():
-            setattr(config, key, value)
-
-        control_font_size = get_control_font_size()
-        if hasattr(self, 'search_box'):
-            from src.utils.font_uitils import set_font_size
-            set_font_size(self.search_box, control_font_size)
-        if hasattr(self, 'combo_box'):
-            from src.utils.font_uitils import set_font_size
-            set_font_size(self.combo_box, control_font_size)
-            set_font_size(self.combo_box.view(), control_font_size)
-        if hasattr(self, 'table_area'):
-            apply_table_row_height(self.table_area)
-        if hasattr(self, 'main_menu_controller'):
-            self.main_menu_controller.apply_menu_metrics()
-            self.main_menu_controller.sync_artifact_menu_state()
-        self.logger.info("配置已更新，部分功能已重载")
+        self.settings_controller.handle_settings_update(new_settings)
 
     def showEvent(self, event):
         """窗口显示事件，确保窗口始终保持在最上层"""

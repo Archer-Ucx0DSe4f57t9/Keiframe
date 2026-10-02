@@ -90,7 +90,19 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 - 维护 `TimerWindow` 及其 Qt 信号。
 - 装配数据库、UI、识别器、地图管理器和各类提醒器。
 - 响应 `update_map` 与 `reset_game_info`。
-- 管理地图选择、快捷键转发、设置热更新和安全退出。
+- 保留地图/版本选择的 Qt 槽入口、快捷键信号入口、设置入口和安全退出，具体设置协调与地图选择交互分别委托给组合式控制器。
+
+`src/settings_window/settings_controller.py`
+
+- 在原启动阶段加载 `settings.json` 对 `src/config.py` 的覆盖。
+- 协调设置窗口的复用、模态显示、全局快捷键暂停/恢复和既有即时刷新范围。
+- `settings_window` 引用仍由 `TimerWindow` 持有。
+
+`src/ui/map_selection_controller.py`
+
+- 协调地图搜索过滤、关键词 DAO 查询、30 秒搜索清空和版本快捷键轮换。
+- 处理 `update_map` 的自动选图分支，并保留原有同步地图加载次数。
+- 版本按钮和地图下拉框仍连接 `TimerWindow` 的槽，确保 `map_loader` 可通过 `window.sender()` 判断事件来源。
 
 `src/ui_setup.py`、`src/ui/`
 
