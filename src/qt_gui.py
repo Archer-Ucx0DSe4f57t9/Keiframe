@@ -11,13 +11,12 @@ from src.map_handlers import map_loader
 from src.map_handlers.map_variant_auto_resolver import MapVariantAutoResolver
 from src.settings_window.settings_controller import SettingsController
 from src.ui.map_selection_controller import MapSelectionController
+from src.recognition_controller import (
+    RecognitionController,
+    create_production_enemy_composition_ocr_provider,
+)
 from src.presentation_modules.toast_manager import ToastManager
 from src.game_readers.mutator_and_enemy_race_recognizer import Mutator_and_enemy_race_recognizer
-from src.game_readers.enemy_composition_matcher import EnemyCompositionMatcher
-from src.game_readers.enemy_composition_panel_detector import detect_enemy_composition_panel
-from src.game_readers.enemy_composition_recognizer import EnemyCompositionRecognizer
-from src.game_readers.enemy_composition_scheduler import EnemyCompositionScheduler
-from src.game_readers.ppocr_opencv_provider import OpenCVDNNPPOCRv5Provider
 from src.memo_overlay import MemoOverlay
 from src.event_managers_and_notifiers.artifact_notifier import ArtifactNotifier
 from src.event_managers_and_notifiers.enemy_composition_notifier import (
@@ -27,29 +26,6 @@ from src.event_managers_and_notifiers.countdown_manager import CountdownManager
 from src.event_managers_and_notifiers.supply_notifier import SupplyNotifier
 
 from src.db.db_manager import DBManager
-
-
-def create_production_enemy_composition_ocr_provider(logger):
-    """Initialize the optional OpenCV DNN PP-OCRv5 backend once.
-
-    Enemy Composition is optional at runtime: a missing dependency, model,
-    dictionary, or failed OpenCV initialization must not prevent the rest of
-    KeiFrame from starting. The caller keeps the returned instance for the
-    lifetime of ``TimerWindow``; game resets only reset recognizer state.
-    """
-
-    try:
-        provider = OpenCVDNNPPOCRv5Provider()
-    except Exception as exc:  # Optional OCR must not break the main window.
-        reason = str(exc) or type(exc).__name__
-        logger.warning(
-            "Enemy Composition OCR addon unavailable: %s",
-            reason,
-        )
-        return None
-
-    logger.info("Enemy Composition OpenCV PP-OCRv5 backend initialized")
-    return provider
 
 
 class TimerWindow(QMainWindow):
@@ -74,42 +50,7 @@ class TimerWindow(QMainWindow):
         asyncio.run(game_state_service.check_for_new_game_scheduler(progress_signal))
 
     def _initialize_enemy_composition_recognition(self):
-        """Assemble the optional production Enemy Composition pipeline once."""
-
-        self.enemy_composition_matcher = EnemyCompositionMatcher()
-        self.enemy_composition_panel_detector = detect_enemy_composition_panel
-        self.enemy_composition_ocr_provider = (
-            create_production_enemy_composition_ocr_provider(self.logger)
-        )
-        self.enemy_composition_recognizer = None
-        self.enemy_composition_scheduler = None
-
-        if self.enemy_composition_ocr_provider is None:
-            # Explicitly detach any previous scheduler if this method is ever
-            # reused by a caller; no frame should reach a disabled pipeline.
-            self.mutator_and_enemy_race_recognizer.set_enemy_composition_scheduler(
-                None
-            )
-            self.logger.info("Enemy composition recognition disabled")
-            return
-
-        self.enemy_composition_recognizer = EnemyCompositionRecognizer(
-            panel_detector=self.enemy_composition_panel_detector,
-            ocr_provider=self.enemy_composition_ocr_provider,
-            matcher=self.enemy_composition_matcher,
-        )
-        confirmation_signal = getattr(self, "enemy_composition_confirmed_signal", None)
-        confirmation_callback = getattr(confirmation_signal, "emit", None)
-        self.enemy_composition_scheduler = EnemyCompositionScheduler(
-            recognizer=self.enemy_composition_recognizer,
-            game_state=self.game_state,
-            logger=self.logger,
-            confirmation_callback=confirmation_callback,
-        )
-        self.mutator_and_enemy_race_recognizer.set_enemy_composition_scheduler(
-            self.enemy_composition_scheduler
-        )
-        self.logger.info("Enemy composition recognizer initialized")
+        self.recognition_controller.initialize_enemy_composition_recognition()
 
 
     def __init__(self):
@@ -150,6 +91,10 @@ class TimerWindow(QMainWindow):
         self._last_dispatch_game_second = None
         self.drag_position = QPoint(0, 0)
         self.game_state = game_state_service.state
+        self.recognition_controller = RecognitionController(
+            self,
+            game_state=self.game_state,
+        )
 
         # The notifier and its signal connection are created before the
         # perception worker starts.  A worker may emit the signal, but the
@@ -374,26 +319,9 @@ class TimerWindow(QMainWindow):
 
     @QtCore.pyqtSlot(str)
     def handle_enemy_composition_confirmed(self, canonical_composition):
-        """Render a worker confirmation on the Qt main thread only."""
-
-        if getattr(self, '_safe_exiting', False):
-            return
-        if not canonical_composition:
-            return
-
-        # The scheduler publishes GlobalState before emitting the signal.  A
-        # reset can be queued concurrently; checking the published fact here
-        # prevents a stale queued confirmation from showing in the next game.
-        if getattr(self.game_state, 'enemy_composition', None) != canonical_composition:
-            self.logger.debug(
-                "Ignoring stale Enemy Composition confirmation: %s",
-                canonical_composition,
-            )
-            return
-
-        notifier = getattr(self, 'enemy_composition_notifier', None)
-        if notifier is not None:
-            notifier.show(canonical_composition)
+        self.recognition_controller.handle_enemy_composition_confirmed(
+            canonical_composition
+        )
 
     def handle_progress_update(self, data):
         """处理进度更新信号"""
@@ -526,29 +454,9 @@ class TimerWindow(QMainWindow):
     
     # 处理识别器传回突变因子和种族的数据
     def handle_mutator_and_enemy_race_recognition_update(self, results):
-        """处理种族和突变因子识别结果的更新"""
-        race = results.get("race")
-        mutators = results.get("mutators")
-
-        if race:
-            self.logger.info(f"UI接收到确认种族: {race}")
-            game_state_service.state.enemy_race = race
-
-            current_map = self.combo_box.currentText()
-            if current_map:
-                map_loader.handle_map_selection(self, current_map)
-            # 如果种族更新，强制同步突变因子按钮状态    
-            if hasattr(self, 'mutator_manager') and self.mutator_manager and game_state_service.state.active_mutators is not None:
-                self.logger.info(f"种族已更新{race}，强制重新同步突变因子变式。")
-                self.mutator_manager.sync_mutator_toggles(game_state_service.state.active_mutators)
-
-        if mutators is not None:
-            # 只有当 mutators 不为 None（即识别完成，可能是空列表）时才更新
-            self.logger.info(f"UI接收到确认突变因子: {mutators}")
-            game_state_service.state.active_mutators = mutators
-            # 调用 MutatorManager 来同步按钮状态
-            if hasattr(self, 'mutator_manager') and self.mutator_manager:
-                self.mutator_manager.sync_mutator_toggles(mutators)
+        self.recognition_controller.handle_mutator_and_enemy_race_recognition_update(
+            results
+        )
 
     #当搜索框失去焦点时，检查是否需要恢复锁定（事件穿透
     def restore_lock_on_search_focus_out(self):
