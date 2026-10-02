@@ -1,0 +1,15 @@
+Model:
+ch_PP-OCRv5_rec_mobile.onnx
+
+Source:
+RapidAI/RapidOCR
+PP-OCRv5
+
+Version:
+RapidOCR model set v3.9.2
+
+SHA256:
+5825fc7ebf84ae7a412be049820b4d86d77620f204a041697b0494669b1742c5
+
+License:
+Apache-2.0

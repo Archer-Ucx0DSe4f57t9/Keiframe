@@ -1,5 +1,6 @@
 python310.zip
 .
+..
 Lib
 Lib\site-packages
 import site

@@ -17,26 +17,52 @@ a = Analysis(
         os.path.join(pro_root, 'python', 'Lib', 'site-packages')
     ],
     binaries=[],
+    # OCR model files are an external addon and are copied by
+    # build-keiframe.bat, not embedded in the executable distribution.
     datas=[],
     hiddenimports=[
         'PyQt5.sip',
         'aiohttp',
         'pandas',
         'pypinyin',
+        'rapidfuzz',
         'win32api',
         'src.config',
         'src.utils.logging_util'
     ] + src_submodules,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
     # 排除不需要的大型库以减小体积
-    excludes=['tkinter', 'matplotlib', 'easyocr', 'torch', 'IPython'],
+    excludes=[
+        'tkinter',
+        'matplotlib',
+        'easyocr',
+        'torch',
+        'IPython',
+        # No source module uses Pillow; screenshots and resources use OpenCV
+        # and Qt directly.
+        'PIL',
+        # Benchmark-only OCR dependencies; production uses OpenCV DNN.
+        'rapidocr',
+        'onnxruntime',
+        'omegaconf',
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=None,
     noarchive=False,
 )
+
+# KeiFrame uses OpenCV for image/template/DNN operations and captures frames
+# through mss. The OpenCV wheel's optional FFmpeg video codecs are not used by
+# the application and account for a large amount of release size.
+a.binaries = [
+    entry
+    for entry in a.binaries
+    if not os.path.basename(entry[0]).lower().startswith(
+        'opencv_videoio_ffmpeg'
+    )
+]
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 

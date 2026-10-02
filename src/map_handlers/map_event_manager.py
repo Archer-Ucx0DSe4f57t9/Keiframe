@@ -5,10 +5,13 @@ from PyQt5.QtCore import Qt
 import sys, os
 from src import config , game_state_service
 import time  # 添加 time 模块用于调试
+from src.game_readers.enemy_composition_unit_advisor import (
+    get_enemy_composition_unit_advisor,
+)
 
 
 class MapEventManager:
-    def __init__(self, table_area, toast_manager, logger):
+    def __init__(self, table_area, toast_manager, logger, advisor=None):
         """
         初始化地图事件管理器
         :param table_area: QTableWidget 实例
@@ -19,6 +22,39 @@ class MapEventManager:
         self.toast_manager = toast_manager
         self.logger = logger
         self.last_seconds = -1  # 用于避免重复高亮和提示
+        try:
+            self.enemy_composition_unit_advisor = (
+                advisor
+                if advisor is not None
+                else get_enemy_composition_unit_advisor()
+            )
+        except Exception as exc:
+            self.logger.error(
+                f'初始化 Enemy Composition unit advisor 失败: {exc}'
+            )
+            self.enemy_composition_unit_advisor = None
+        self._advisor_error_logged = False
+
+    def _get_attention_units(self, army_text):
+        """Return optional unit advice using only the army-column text."""
+
+        if self.enemy_composition_unit_advisor is None:
+            return None
+
+        try:
+            attention_units = self.enemy_composition_unit_advisor.get_attention_units(
+                game_state_service.state.enemy_composition,
+                army_text,
+            )
+            self._advisor_error_logged = False
+            return attention_units
+        except Exception as exc:
+            if not self._advisor_error_logged:
+                self.logger.error(
+                    f'Enemy Composition unit advisor 查询失败: {exc}'
+                )
+                self._advisor_error_logged = True
+            return None
 
     def update_events(self, current_seconds, is_in_game) -> object:
         """
@@ -129,6 +165,12 @@ class MapEventManager:
                                 + (f"\t{army_item.text()}" if army_item else "")
                                 + (f"风暴: \t{hero_item.text()}" if is_heroes_from_the_storm_active and len(hero_item.text())>0 else "")
                             )
+                            if army_item:
+                                attention_units = self._get_attention_units(
+                                    army_item.text()
+                                )
+                                if attention_units:
+                                    toast_message += f" 注意单位: {attention_units}"
                             sound_filename = sound_item.text().strip() if sound_item else ""
                             # 调用 ToastManager 的新方法
                             self.logger.debug(f'正在调用toast_manager播报地图事件')

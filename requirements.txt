@@ -9,3 +9,4 @@ pandas
 pypinyin
 pywin32
 PyInstaller
+rapidfuzz

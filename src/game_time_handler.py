@@ -2,6 +2,7 @@
 import time
 import traceback
 
+
 def update_game_time(window):
     """更新游戏时间显示和处理地图/突变事件 (原 TimerWindow.update_game_time)"""
     window.logger.debug('开始更新游戏时间')
