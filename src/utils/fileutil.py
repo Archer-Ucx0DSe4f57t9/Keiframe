@@ -17,6 +17,13 @@ def get_project_root():
         return os.path.dirname(os.path.dirname(os.path.dirname(current_file_path)))
 
 
+def get_log_file_path():
+    """
+    获取日志文件路径：exe 所在目录（打包后）或项目根目录（源码运行）
+    """
+    return os.path.join(get_project_root(), 'Keiframe.log')
+
+
 def get_resources_dir(*subdirs):
     """
     获取项目根目录下的 resources 目录（支持子目录）
