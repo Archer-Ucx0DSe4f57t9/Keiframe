@@ -64,7 +64,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 | 截图 asyncio task | `game_state_service.check_for_new_game_scheduler()` | 约每 0.1 秒捕获活动 SC2 窗口并更新共享截图 | 只写 `GlobalState`，使用锁 |
 | 突变/种族识别线程 | `Mutator_and_enemy_race_recognizer` | 从共享截图识别敌方种族和突变图标 | 通过 Qt signal 返回结果 |
 | 敌方组成被动更新 | 复用 `Mutator_and_enemy_race_recognizer` 的 perception loop | 使用锁内复制、锁外处理的最新截图执行 tooltip 检测、OCR 和匹配 | 确认后写入 `GlobalState.enemy_composition`，再通过 Qt signal 交给主线程 notifier |
-| 净网行动识别线程 | `MalwarfareMapHandler` | 识别颜色文字、倒计时、暂停和节点 | 主线程轮询其最新结构化数据 |
+| 净网行动识别线程 | `MalwarfareMapHandler` | 单序列调用 frozen OCR；Count 约 1 秒一次，Time/Paused 约 0.13 秒一次 | 主线程轮询其最新结构化数据 |
 | 小地图红点 worker | `MinimapRedDotDetector` | 按监控规则分析共享截图 | `MapVariantAutoResolver` 查询结果并切图 |
 | 死亡摇篮识别线程 | `CradleOfDeathMapHandler` | 识别倒计时并产生阶段事件 | 当前尚未由主窗口创建或消费 |
 
@@ -164,7 +164,8 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 
 `src/map_handlers/malwarfare_*`
 
-- 从动态画面倒计时驱动“净网行动”节点事件，不依赖固定绝对游戏时间。
+- 正式 Handler 把标准化完整帧传给 `src.malwarfare` production API，自身保留 UI profile/颜色探测、25 秒规则、暂停历史时间、单调保护和重定位状态机。
+- `malwarfare_map_handler_legacy.py` 与旧模板 OCR/资源保持不变，作为英文过渡兼容实现；事件管理器和对外结果 contract 不变。
 
 `src/map_handlers/map_variant_auto_resolver.py`
 
@@ -287,7 +288,8 @@ mss 捕获 SC2 窗口
 
 ```text
 共享截图
-  -> MalwarfareMapHandler 后台识别
+  -> MalwarfareMapHandler 单序列后台调度
+  -> src.malwarfare frozen OCR（完整 1920×1080 BGR 帧）
   -> 最新节点 n、倒计时、暂停状态
   -> game_time_handler 每 200 ms 读取
   -> MapwarfareEventManager 按节点和剩余时间匹配事件

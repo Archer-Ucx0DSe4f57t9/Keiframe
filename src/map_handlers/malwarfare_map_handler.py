@@ -1,565 +1,573 @@
-#malwarfare_map_handler.py
+"""Malwarfare map state handler backed by the frozen production OCR runtime."""
+
+from __future__ import annotations
+
+from collections import deque
+import numbers
+import threading
+import time
+
 import cv2
 import numpy as np
-import time
-import threading
-from concurrent.futures import ThreadPoolExecutor
-import os
 
-# 自带模块
-from src.utils.logging_util import get_logger
-from src.map_handlers.malwarfate_ocr_processor import MalwarfareOcrProcessor
 from src import config
 from src.game_state_service import state
-from src.utils.fileutil import get_project_root
+from src.malwarfare import MalwarfareOcrProcessor
+from src.utils.logging_util import get_logger
 
 
 class MalwarfareMapHandler:
-    """
-    通过屏幕捕捉、图像处理和模板匹配，实时识别净网的当前已净化的节点数，倒计时，和是否处于暂停状态。
-    """
-    def __init__(self, game_state = None, debug=False):
-        """
-        初始化处理器。
-        """
+    """Recognize Malwarfare visuals and preserve the existing game-state contract."""
+
+    COUNT_INTERVAL_SECONDS = 1.0
+    STATUS_INTERVAL_SECONDS = 0.13
+    LOOP_IDLE_SECONDS = 0.02
+    FAILURE_RELOCATION_THRESHOLD = 30
+    CANONICAL_FRAME_SHAPE = (1080, 1920, 3)
+
+    UI_PROFILES = (
+        "Normal",
+        "Replay",
+        "Hero",
+        "HeroReplay",
+        "Zweihaka",
+        "ZweihakaReplay",
+    )
+    COUNT_COLOR_PROFILES = ("green", "blue", "orange")
+    UI_PROFILE_OFFSETS = {
+        "Normal": 0,
+        "Replay": 49,
+        "Hero": 97,
+        "HeroReplay": 146,
+        "Zweihaka": 181,
+        "ZweihakaReplay": 230,
+    }
+    COUNT_PROBE_ROI = (172, 72, 219, 103)
+    COUNT_PROBE_MIN_PIXELS = 0
+
+    def __init__(self, game_state=None, debug=False, ocr_processor=None):
         self.logger = get_logger(__name__)
         self.logger.info("初始化 MalwarfareMapHandler...")
         self.debug = debug
-        
-        self.game_state = game_state
-        # 使用 config 中的当前游戏语言
+        self.game_state = game_state or state
         self.lang = config.current_game_language
-        
-        # === 1. 初始化 OCR 处理器 ===
-        self.ocr = MalwarfareOcrProcessor(lang=self.lang)
-        
-        self._consecutive_failures = 0 #连续获取数据失败一定次数后重定位
-        self._time_recognition_failures = 0 #时间识别的连续失败计数器
-        
-        # 获取当前文件所在目录，用于构建绝对路径 (仅用于Debug输出)
-        base_dir = get_project_root()
-        self.debug_path = os.path.join(base_dir, 'debugpath')
-        if self.debug and not os.path.exists(self.debug_path):
-            os.makedirs(self.debug_path)
 
-        self._executor = ThreadPoolExecutor(max_workers=3)
+        # Resource/manifest/SHA errors are intentionally not swallowed. The frozen
+        # runtime is loaded once for the lifetime of this handler.
+        self.ocr = ocr_processor or MalwarfareOcrProcessor.from_default_resources()
+
         self._running = False
         self._running_thread = None
-
-        # --- 2. 只有 UI 探测 (检测是否存在) 还需要保留简单的 HSV 定义 ---
-        # 注意：实际 OCR 识别不再使用这些，而是使用 OCR_CONFIG 中的参数
-        
-        # 黄色 (对应倒计时和暂停的颜色)
-        self.yellow_lower = np.array([20, 80, 80])
-        self.yellow_upper = np.array([40, 255, 255])
-        
-        #用于统计三种已净化的节点的颜色
-        # 绿色 (对应人族)
-        self.green_lower = np.array([60, 70, 70])
-        self.green_upper = np.array([90, 255, 255])
-        # 蓝色 (对应神族)
-        self.blue_lower = np.array([100, 100, 100])
-        self.blue_upper = np.array([125, 255, 255])
-        # 橙色 (对应虫族)
-        self.orange_lower = np.array([10, 150, 150])
-        self.orange_upper = np.array([25, 255, 255])
-
-        # 将所有颜色处理器打包管理，用于颜色校准
-        self.count_color_processors = {
-            'green': (self.green_lower, self.green_upper),
-            'blue': (self.blue_lower, self.blue_upper),
-            'orange': (self.orange_lower, self.orange_upper)
-        }
-        # 用于颜色校准的状态变量
-        self._detected_count_color = None 
-        self._possible_colors = ['green', 'blue', 'orange']
-
-        # --- 2. 动态ROI定位相关定义 ---
-        # 定义三种UI状态对应的精确垂直偏移像素
-
-        self.UI_STATE_OFFSETS = [0, config.MALWARFARE_HERO_OFFSET, config.MALWARFARE_ZWEIHAKA_OFFSET] 
-        
-        # 存储“基准”ROI (状态0: 0偏移时的坐标)
-        self._base_count_roi = config.get_malwarfare_roi(self.lang, 'purified_count')
-        self._base_paused_roi = config.get_malwarfare_roi(self.lang, 'paused')
-        self._base_time_roi = config.get_malwarfare_roi(self.lang, 'time')
-        
-        # UI状态变量, -1 代表未知，需要探测
-        self._current_ui_offset_state = -1 
-        
-        # 当前生效的ROI，会在探测后被设置
-        self._count_roi = None
-        self._paused_roi = None
-        self._time_roi = None
-
-        # --- 4. 状态变量初始化 ---
-        self._latest_count = None
-        self._latest_paused = None
-        self._latest_time = None
-        
-        self._count_lock = threading.Lock()
-        self._paused_lock = threading.Lock()
-        self._time_lock = threading.Lock()
-        
-        self._last_count_update = 0
-        self._last_status_update = 0
-        
-        self._latest_result = None
+        self._state_lock = threading.RLock()
         self._result_lock = threading.Lock()
-        self._last_valid_parsed = None
-    
-    def _detect_and_set_ui_state(self, img_bgr):
-        """
-        探测UI的当前垂直偏移状态。
-        它会检查 `count` 区域的所有可能位置，找到有效信息后，设置全局的ROI。
-        """
-        self.logger.info("正在探测UI偏移状态...")
-        
-        # 遍历所有定义好的偏移状态
-        for base_index, base_offset in enumerate(self.UI_STATE_OFFSETS):
-            for replay_offset in (0, config.MALWARFARE_REPLAY_OFFSET):
-                
-                y_offset = base_offset + replay_offset
 
-                probe_roi_coords = (
-                    self._base_count_roi[0],
-                    self._base_count_roi[1] + y_offset,
-                    self._base_count_roi[2],
-                    self._base_count_roi[3] + y_offset
-                )
+        self._count_timings_ms = deque(maxlen=120)
+        self._status_timings_ms = deque(maxlen=120)
+        self._count_timing_samples = 0
+        self._status_timing_samples = 0
 
-                self.logger.info(f"尝试探测UI状态: base={base_index}, replay={replay_offset != 0}, ROI={probe_roi_coords}")
-                
-                x0, y0, x1, y1 = probe_roi_coords
-                # 安全检查，确保ROI在图像范围内
-                if y1 > img_bgr.shape[0] or x1 > img_bgr.shape[1]: 
-                    self.logger.warning(f"跳过越界的ROI检测: base={base_index}, replay={replay_offset != 0}, ROI={probe_roi_coords}")
-                    continue
-                roi_img = img_bgr[y0:y1, x0:x1]
-                
-                #cv2.imwrite(f"debug_roi_state_{y0}_{y1}.png", roi_img) # Debug: 输出当前探测的ROI图像，检查是否正确截取
-                
-                if roi_img.size == 0:
-                    self.logger.warning(f"跳过空的ROI检测: base={base_index}, replay={replay_offset != 0}, ROI={probe_roi_coords}")
-                    continue
+        self._count_probe_ranges = (
+            (np.array([60, 70, 70]), np.array([90, 255, 255])),
+            (np.array([100, 100, 100]), np.array([125, 255, 255])),
+            (np.array([10, 150, 150]), np.array([25, 255, 255])),
+        )
 
-                # 使用所有可能的颜色进行快速、低成本的探测
-                hsv_img = cv2.cvtColor(roi_img, cv2.COLOR_BGR2HSV)
-                
-                # 将所有颜色mask合并，只要有任何一个颜色存在即可
-                mask_green = cv2.inRange(hsv_img, self.green_lower, self.green_upper)
-                mask_blue = cv2.inRange(hsv_img, self.blue_lower, self.blue_upper)
-                mask_orange = cv2.inRange(hsv_img, self.orange_lower, self.orange_upper)
-                combined_mask = cv2.bitwise_or(mask_green, mask_blue)
-                combined_mask = cv2.bitwise_or(combined_mask, mask_orange)
-
-
-                nonzero = cv2.countNonZero(combined_mask) # 统计ROI内符合任一颜色的像素数量，作为是否存在有效信息的粗筛依据
-                self.logger.info(
-                    f"UI探测候选: base={base_index}, replay={replay_offset != 0}, "
-                    f"y_offset={y_offset}, ROI={probe_roi_coords}, color_pixels={nonzero}"
-                )
-
-                # HSV 只作为粗筛，不直接认定成功
-                if nonzero <= 50:
-                    continue
-
-                detected_color = None
-                detected_text = None
-
-                for color_name in self._possible_colors:
-                    result_text = self.ocr.recognize(
-                        roi_img,
-                        color_name,
-                        confidence_thresh=0.70,
-                        debug_show=False
-                    )
-
-                    self.logger.info(
-                        f"UI探测OCR验证: y_offset={y_offset}, color={color_name}, result={result_text!r}"
-                    )
-
-                    if self._is_valid_count_text(result_text):
-                        detected_color = color_name
-                        detected_text = result_text
-                        break
-
-                if detected_color is None:
-                    self.logger.info(
-                        f"UI探测候选被拒绝: y_offset={y_offset}, 原因=颜色像素存在但count OCR不合法"
-                    )
-                    continue
-
-                self._current_ui_offset_state = base_index
-                self._detected_count_color = detected_color
-
-                self.logger.info(
-                    f"UI状态探测成功: base={base_index}, replay={replay_offset != 0}, "
-                    f"总偏移={y_offset}, count_color={detected_color}, count_text={detected_text!r}"
-                )
-
-                self._count_roi = probe_roi_coords
-                self._paused_roi = (
-                    self._base_paused_roi[0], self._base_paused_roi[1] + y_offset,
-                    self._base_paused_roi[2], self._base_paused_roi[3] + y_offset
-                )
-                self._time_roi = (
-                    self._base_time_roi[0], self._base_time_roi[1] + y_offset,
-                    self._base_time_roi[2], self._base_time_roi[3] + y_offset
-                )
-                return True
-            
-
-            
-        self.logger.info("UI状态探测失败，所有预设位置均未找到有效信息。")
-
-        return False
+        self._reset_state()
 
     def start(self):
-        """启动后台识别线程。"""
+        """Start the single sequential OCR worker."""
         if self._running_thread is None or not self._running_thread.is_alive():
             self._running = True
-            self._running_thread = threading.Thread(target=self._run_loop, daemon=True)
+            self._running_thread = threading.Thread(
+                target=self._run_loop,
+                name="MalwarfareOcrWorker",
+                daemon=True,
+            )
             self._running_thread.start()
-            self.logger.info("MalwarfareMapHandler 已启动后台OCR线程。")
-    
+            self.logger.info("MalwarfareMapHandler 已启动单序列后台 OCR 线程。")
+
     def cleanup(self):
-        """停止后台线程并清理资源。"""
-        if self._running:
-            self._running = False
-            if self._running_thread and self._running_thread.is_alive():
-                self._running_thread.join(timeout=1)
-            #清理线程池
-            try:
-                self._executor.shutdown(wait=False, cancel_futures=True)
-            except TypeError:
-                self._executor.shutdown(wait=False)
-            self.logger.info("MalwarfareMapHandler 已停止。")
+        """Stop the worker; the cached OCR models remain owned by this instance."""
+        self._running = False
+        worker = self._running_thread
+        if (
+            worker is not None
+            and worker.is_alive()
+            and worker is not threading.current_thread()
+        ):
+            worker.join(timeout=1)
+        self._running_thread = None
+        self.logger.info("MalwarfareMapHandler 已停止。")
+
+    def shutdown(self):
+        self.logger.info("请求关闭 MalwarfareMapHandler...")
+        self.cleanup()
 
     def _run_loop(self):
-        """后台线程的主循环"""
-        last_game_screen_time_stamp = 0.0
-        while self._running:
-            start_time = time.perf_counter()
-            
-            with state.screenshot_lock:
-                game_screen = state.latest_screenshot
-                #self.logger.info(f"当前处理图片尺寸: {game_screen.shape if game_screen is not None else 'None'}")
-                game_screen_time_stamp = state.screenshot_timestamp
-            
-            if game_screen is None or game_screen_time_stamp == last_game_screen_time_stamp:
-                time.sleep(0.05)
-                continue
-            
-            if self._current_ui_offset_state == -1:
-                self.logger.info("正在探测ui状态...")
-                if not self._detect_and_set_ui_state(game_screen):
-                    time.sleep(0.5)
-                    continue
-            
-            last_game_screen_time_stamp = game_screen_time_stamp
-            current_time = time.perf_counter()
-            
-            # 依据时间间隔决定执行哪些OCR任务
-            if current_time - self._last_count_update >= 1.0:
-                self._executor.submit(self._ocr_and_process_count, game_screen)
-                self._last_count_update = current_time
-            if current_time - self._last_status_update >= 0.13:
-                self._executor.submit(self._ocr_and_process_time_and_paused, game_screen)
-                self._last_status_update = current_time
-
-            self._update_latest_result()
-
-            elapsed_time = time.perf_counter() - start_time
-            sleep_time = max(0, 0.1 - elapsed_time)
-            if sleep_time > 0:
-                time.sleep(sleep_time)
-
-    def _post_process_n_value(self, n_value):
-        """对识别出的n值进行后处理，修正已知的特定识别错误。"""
-        if n_value is None:
-            return None
-        if (n_value == 8 or n_value == 9) and self._last_valid_parsed and self._last_valid_parsed.get('n') == 2:
-            self.logger.warning("OCR识别到n=8/9，但前一个状态为n=2，修正为n=3。")
-            return 3
-        return n_value
-
-    def _ocr_and_process_count(self, img_bgr):
-        """
-        利用 Processor 识别净化节点数。
-        如果颜色未知，尝试轮询颜色。
-        """
-        parsed_n = None
-        if not self._count_roi:
-            return
-        x0, y0, x1, y1 = self._count_roi
-        roi_img = img_bgr[y0:y1, x0:x1]
-
-        if roi_img.size == 0: return
-
-        try:
-            # --- 步骤1: 颜色校准 (仅在颜色未知时运行) ---
-            if self._detected_count_color is None:
-                self.logger.info("正在尝试自动校准'Count'区域的颜色...")
-                
-                for color_name in self._possible_colors:
-                    # 尝试用每种颜色的配置去识别
-                    result_text = self.ocr.recognize(roi_img, color_name, confidence_thresh=0.75)
-                    
-                    if result_text:
-                        # 检查识别结果是否合法 (例如 "3", "c0")
-                        valid = False
-                        if result_text.isdigit(): valid = True
-                        if result_text.startswith('c') and result_text[1:].isdigit(): valid = True
-                        
-                        if valid:
-                            self._detected_count_color = color_name
-                            self.logger.debug(f"颜色校准成功！本局颜色: {color_name.upper()}, 识别结果: {result_text}")
-                            break
-                
-                if self._detected_count_color is None:
-                    self.logger.debug("本轮颜色校准未找到匹配，稍后重试。")
-                    return
-
-            # --- 步骤2: 使用已确定的颜色进行识别 ---
-            if self._detected_count_color:
-                result_text = self.ocr.recognize(
-                    roi_img, 
-                    self._detected_count_color, 
-                    confidence_thresh=0.7,
-                    debug_show=False
-                )
-                
-                if result_text:
-                    # 处理 "c3" 这种格式 (Template 文件夹里的文件名可能是 c0, c1...)
-                    if result_text.startswith('c'):
-                        result_text = result_text[1:]
-                    
-                    # 处理可能存在的干扰 (Processor 已经合并了，这里再次清理)
-                    clean_text = ''.join(filter(str.isdigit, result_text))
-                    
-                    self.logger.debug(f"Count区域识别结果原始: '{result_text}'，清理后: '{clean_text}'")
-                    
-                    if clean_text:
-                        parsed_n = int(clean_text)
-
-            parsed_n = self._post_process_n_value(parsed_n)
-            
-            with self._count_lock:
-                self._latest_count = parsed_n
-
-        except Exception as e:
-            self.logger.error(f"Count区域OCR出错: {e}", exc_info=True)
-            
-    def _ocr_and_process_time_and_paused(self, img_bgr):
-        """
-        识别时间和暂停状态。
-        - 如果识别到3位数时间，则设置 time 并将 paused 状态设为 False。
-        - 否则，将 paused 状态设为 True。
-        """
-        if not self._time_roi or not self._paused_roi:
-            return
-        x_t0, y_t0, x_t1, y_t1 = self._time_roi
-        time_roi_img = img_bgr[y_t0:y_t1, x_t0:x_t1]
-        
-        x_p0, y_p0, x_p1, y_p1 = self._paused_roi
-        paused_roi_img = img_bgr[y_p0:y_p1, x_p0:x_p1]
-
-        try:
-            # 1. 尝试识别时间
-            # Processor 会返回类似 "2:48" 的字符串
-            time_text = self.ocr.recognize(time_roi_img, 'yellow', confidence_thresh=0.7)
-            self.logger.debug(f"time_text raw: '{time_text}'")
-            # Case A: 时间识别成功
-            if time_text and len(time_text)==3:
-                with self._time_lock:
-                    self._latest_time = time_text
-                with self._paused_lock:
-                    self._latest_paused = False # 只要有时间，就没有暂停
-                return
-
-            # Case B: 检查 PAUSED
-            paused_text = self.ocr.recognize(paused_roi_img, 'yellow', confidence_thresh=0.7)
-            
-            is_paused_detected = False
-            if paused_text and 'paused' in paused_text.lower():
-                is_paused_detected = True
-            
-            if is_paused_detected:
-                with self._time_lock: self._latest_time = None
-                with self._paused_lock: self._latest_paused = True
-                return
-            
-            # Case C: 既没时间也没暂停 -> 间歇期或闪烁
-            # 25秒规则逻辑保持不变
-            last_result = self._last_valid_parsed
-            
-            if not last_result or not last_result.get('time'):
-                # 没有历史数据，默认为间歇期
-                with self._time_lock: self._latest_time = None
-                with self._paused_lock: self._latest_paused = False
-                return
-
-            last_time_str = last_result.get('time')
-
-            # 如果上次没有时间记录，或者n>=5，也视为间歇期
-            if not last_time_str:
-                with self._time_lock: self._latest_time = None
-                with self._paused_lock: self._latest_paused = False
-                return
-
-            try:
-                # 解析 "Min:Sec"
-                if ':' in str(last_time_str):
-                    parts = last_time_str.split(':')
-                    last_min, last_sec = int(parts[0]), int(parts[1])
-                    last_total_seconds = last_min * 60 + last_sec
-
-                # 如果上次时间 > 25秒，则判定为OCR“闪烁”，保持状态不变
-                if last_total_seconds > 25:
-                    self.logger.debug(f"时间识别失败，但上次时间为 {last_time_str} (>25s)，判定为闪烁，保持状态不变。")
-                    # 直接返回，不修改 _latest_time 和 _latest_paused
-                    return
-
-                # 如果上次时间 <= 25秒 (且n<5)，则判定为正常的“间歇期”
+        """Process only the newest screenshot, with no executor or queued frames."""
+        while self._running and not getattr(self.game_state, "app_closing", False):
+            with self.game_state.screenshot_lock:
+                screenshot = self.game_state.latest_screenshot
+                screenshot_timestamp = self.game_state.screenshot_timestamp
+                if screenshot is None:
+                    frame = None
                 else:
-                    self.logger.debug(f"时间识别失败，上次时间为 {last_time_str} (<=25s)，判定为间歇期。")
-                    with self._time_lock:
-                        self._latest_time = None
-                    with self._paused_lock:
-                        self._latest_paused = False
+                    # Shared state is copied under the lock and processed after release.
+                    frame = screenshot.copy()
+
+            if (
+                frame is None
+                or screenshot_timestamp == self._last_game_screen_timestamp
+            ):
+                time.sleep(self.LOOP_IDLE_SECONDS)
+                continue
+
+            # Mark the frame before OCR. If OCR takes longer than a capture interval,
+            # the next pass reads the newest screenshot and intermediate frames vanish.
+            self._last_game_screen_timestamp = screenshot_timestamp
+            self._process_frame(frame, now=time.perf_counter())
+
+        self._running = False
+
+    def _process_frame(self, frame, *, now=None):
+        """Validate and synchronously dispatch due OCR operations for one frame."""
+        if not self._validate_frame(frame):
+            self._set_latest_count(None)
+            self._update_latest_result()
+            return
+
+        if self._current_ui_profile is None:
+            if not self._detect_and_set_ui_state(frame):
+                return
+
+        current_time = time.perf_counter() if now is None else float(now)
+
+        if self._is_due(current_time, self._last_count_update, self.COUNT_INTERVAL_SECONDS):
+            self._last_count_update = current_time
+            self._ocr_and_process_count(frame)
+
+        if self._is_due(current_time, self._last_status_update, self.STATUS_INTERVAL_SECONDS):
+            self._last_status_update = current_time
+            self._ocr_and_process_time_and_paused(frame)
+
+        self._update_latest_result()
+
+    @staticmethod
+    def _is_due(now, last_update, interval):
+        return last_update is None or now - last_update >= interval
+
+    def _validate_frame(self, frame):
+        if not isinstance(frame, np.ndarray):
+            self.logger.error(
+                "Malwarfare OCR 输入必须为 numpy.ndarray，实际为 %s。",
+                type(frame).__name__,
+            )
+            return False
+        if frame.dtype != np.uint8 or frame.shape != self.CANONICAL_FRAME_SHAPE:
+            self.logger.error(
+                "Malwarfare OCR 输入必须为 1920x1080 uint8 BGR，实际 shape=%s, dtype=%s；不会静默缩放。",
+                frame.shape,
+                frame.dtype,
+            )
+            return False
+        return True
+
+    def _detect_and_set_ui_state(self, frame):
+        """Find a unique UI profile/color pair using production Count OCR."""
+        self.logger.info("正在使用新版 Count OCR 探测 UI profile 和颜色...")
+        candidates = []
+        for ui_profile in self._ordered_ui_profiles():
+            if not self._coarse_profile_has_count_color(frame, ui_profile):
+                continue
+            for color_profile in self.COUNT_COLOR_PROFILES:
+                try:
+                    count = self._timed_recognize_count(
+                        frame,
+                        ui_profile=ui_profile,
+                        color_profile=color_profile,
+                    )
+                except Exception:
+                    self.logger.exception(
+                        "UI 探测调用新版 Count OCR 失败: profile=%s, color=%s",
+                        ui_profile,
+                        color_profile,
+                    )
+                    return False
+                if self._is_valid_count(count):
+                    candidates.append((ui_profile, color_profile, int(count)))
+                elif count is not None:
+                    self.logger.error(
+                        "新版 Count OCR 违反输出 contract: profile=%s, color=%s, value=%r",
+                        ui_profile,
+                        color_profile,
+                        count,
+                    )
+
+        selected = self._select_ui_candidate(candidates)
+        if selected is None:
+            if candidates:
+                self.logger.warning("UI 探测结果不唯一，暂不采用: %s", candidates)
+            else:
+                self.logger.debug("UI 探测未找到可见的 Count。")
+            return False
+
+        ui_profile, color_profile, count = selected
+        with self._state_lock:
+            self._current_ui_profile = ui_profile
+            self._detected_count_color = color_profile
+            self._latest_count = count
+            self._last_successful_ui_profile = ui_profile
+        self.logger.info(
+            "UI 状态探测成功: profile=%s, count_color=%s, count=%s",
+            ui_profile,
+            color_profile,
+            count,
+        )
+        return True
+
+    def _coarse_profile_has_count_color(self, frame, ui_profile):
+        """Cheap legacy HSV presence probe; production OCR remains authoritative."""
+        offset = self.UI_PROFILE_OFFSETS[ui_profile]
+        x0, y0, x1, y1 = self.COUNT_PROBE_ROI
+        roi = frame[y0 + offset : y1 + offset, x0:x1]
+        if roi.size == 0:
+            return False
+        hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+        combined_mask = None
+        for lower, upper in self._count_probe_ranges:
+            color_mask = cv2.inRange(hsv, lower, upper)
+            combined_mask = (
+                color_mask
+                if combined_mask is None
+                else cv2.bitwise_or(combined_mask, color_mask)
+            )
+        return cv2.countNonZero(combined_mask) > self.COUNT_PROBE_MIN_PIXELS
+
+    def _ordered_ui_profiles(self):
+        preferred = self._last_successful_ui_profile
+        if preferred in self.UI_PROFILES:
+            return (preferred,) + tuple(
+                profile for profile in self.UI_PROFILES if profile != preferred
+            )
+        return self.UI_PROFILES
+
+    def _select_ui_candidate(self, candidates):
+        if len(candidates) == 1:
+            return candidates[0]
+
+        preferred = self._last_successful_ui_profile
+        preferred_candidates = [
+            candidate for candidate in candidates if candidate[0] == preferred
+        ]
+        if len(preferred_candidates) == 1:
+            return preferred_candidates[0]
+        return None
+
+    def _ocr_and_process_count(self, frame):
+        """Recognize Count as int | None without legacy text cleanup or hacks."""
+        ui_profile = self._current_ui_profile
+        if ui_profile is None:
+            return
+
+        if self._detected_count_color is None:
+            color_results = []
+            for color_profile in self.COUNT_COLOR_PROFILES:
+                try:
+                    count = self._timed_recognize_count(
+                        frame,
+                        ui_profile=ui_profile,
+                        color_profile=color_profile,
+                    )
+                except Exception:
+                    self.logger.exception(
+                        "Count 颜色自动探测失败: profile=%s, color=%s",
+                        ui_profile,
+                        color_profile,
+                    )
+                    self._set_latest_count(None)
                     return
+                if self._is_valid_count(count):
+                    color_results.append((color_profile, int(count)))
+                elif count is not None:
+                    self.logger.error("新版 Count OCR 返回非法值: %r", count)
 
-            except (ValueError, IndexError, TypeError):
-                # 如果解析上次时间出错，安全起见，判定为间歇期
-                self.logger.warning(f"解析上次时间'{last_time_str}'失败，默认进入间歇期。")
-                
-            # 默认 fallback
-            with self._time_lock: self._latest_time = None
-            with self._paused_lock: self._latest_paused = False
+            if len(color_results) != 1:
+                if color_results:
+                    self.logger.warning("Count 颜色探测结果不唯一: %s", color_results)
+                self._set_latest_count(None)
+                return
+            self._detected_count_color, parsed_count = color_results[0]
+        else:
+            try:
+                parsed_count = self._timed_recognize_count(
+                    frame,
+                    ui_profile=ui_profile,
+                    color_profile=self._detected_count_color,
+                )
+            except Exception:
+                self.logger.exception(
+                    "Count OCR 执行失败: profile=%s, color=%s",
+                    ui_profile,
+                    self._detected_count_color,
+                )
+                self._set_latest_count(None)
+                return
 
-        except Exception as e:
-            self.logger.error(f"Time/Paused区域OCR出错: {e}", exc_info=True)
+        if parsed_count is not None and not self._is_valid_count(parsed_count):
+            self.logger.error("新版 Count OCR 返回非法值: %r", parsed_count)
+            parsed_count = None
+        self._set_latest_count(
+            int(parsed_count) if parsed_count is not None else None
+        )
+
+    def _ocr_and_process_time_and_paused(self, frame):
+        """Apply OCR output while keeping pause history and the 25-second rule here."""
+        ui_profile = self._current_ui_profile
+        if ui_profile is None:
+            return
+
+        started = time.perf_counter()
+        try:
+            time_value, paused = self.ocr.recognize_time_paused(
+                frame,
+                ui_profile=ui_profile,
+            )
+        except Exception:
+            self.logger.exception(
+                "Time/Paused OCR 执行失败: profile=%s",
+                ui_profile,
+            )
+            return
+        finally:
+            self._record_timing("status", (time.perf_counter() - started) * 1000.0)
+
+        if time_value is not None:
+            normalized_time = self._normalize_time_value(time_value)
+            if normalized_time is None:
+                self.logger.error("新版 Time OCR 返回非法 MSS 值: %r", time_value)
+                return
+            with self._state_lock:
+                self._latest_time = normalized_time
+                self._latest_paused = False
+            return
+
+        if paused is True:
+            with self._state_lock:
+                self._latest_time = None
+                self._latest_paused = True
+            return
+
+        if paused not in (False, None):
+            self.logger.error("新版 Paused OCR 返回非法值: %r", paused)
+            return
+
+        # Neither Time nor Paused is visible. Above 25 seconds this is treated
+        # as a transient miss and the previous raw state is retained unchanged.
+        last_time_seconds = self._last_valid_time_seconds()
+        if last_time_seconds is not None and last_time_seconds > 25:
+            self.logger.debug(
+                "时间识别暂时失败，但历史时间 >25 秒；保留上一有效时间。"
+            )
+            with self._state_lock:
+                self._latest_time = self._formatted_time_to_mss(
+                    self._last_valid_parsed.get("time")
+                )
+                self._latest_paused = False
+            return
+
+        # At/below 25 seconds (or without history), the legacy state machine
+        # enters the normal movement/no-timer phase.
+        with self._state_lock:
+            self._latest_time = None
+            self._latest_paused = False
+
+    def _timed_recognize_count(self, frame, *, ui_profile, color_profile):
+        started = time.perf_counter()
+        try:
+            return self.ocr.recognize_count(
+                frame,
+                ui_profile=ui_profile,
+                count_color_profile=color_profile,
+            )
+        finally:
+            self._record_timing("count", (time.perf_counter() - started) * 1000.0)
+
+    def _record_timing(self, operation, elapsed_ms):
+        if operation == "count":
+            samples = self._count_timings_ms
+            self._count_timing_samples += 1
+            sample_count = self._count_timing_samples
+        else:
+            samples = self._status_timings_ms
+            self._status_timing_samples += 1
+            sample_count = self._status_timing_samples
+        samples.append(float(elapsed_ms))
+        self.logger.debug("Malwarfare %s OCR 耗时 %.2f ms", operation, elapsed_ms)
+        if sample_count % 50 == 0:
+            self.logger.info(
+                "Malwarfare %s OCR 最近 %d 次平均 %.2f ms，最大 %.2f ms。",
+                operation,
+                len(samples),
+                sum(samples) / len(samples),
+                max(samples),
+            )
+
+    def get_performance_metrics(self):
+        """Return lightweight in-process timing metrics for diagnostics."""
+        return {
+            "count": self._timing_summary(self._count_timings_ms),
+            "time_paused": self._timing_summary(self._status_timings_ms),
+        }
+
+    @staticmethod
+    def _timing_summary(samples):
+        if not samples:
+            return {"samples": 0, "average_ms": None, "maximum_ms": None}
+        return {
+            "samples": len(samples),
+            "average_ms": sum(samples) / len(samples),
+            "maximum_ms": max(samples),
+        }
 
     def _update_latest_result(self):
-        """
-        组合结果。
-        修正：适配新的时间字符串格式 (M:SS)。
-        """
-        parsed = None
-        with self._count_lock, self._paused_lock, self._time_lock:
+        with self._state_lock:
             latest_count = self._latest_count
             latest_paused = bool(self._latest_paused)
             latest_time = self._latest_time
-        
-        # 必须有节点数才算有效，则无法构成有效结果，直接处理失败计数并返回
+
         if latest_count is None:
-            if self._current_ui_offset_state != -1:
+            if self._current_ui_profile is not None:
                 self._consecutive_failures += 1
-                if self._consecutive_failures > 30:
-                    self.logger.info("已连续识别失败超过阈值，重置UI状态...")
+                if self._consecutive_failures > self.FAILURE_RELOCATION_THRESHOLD:
+                    self.logger.info("Count 连续识别失败，重新定位 UI profile。")
+                    recent_profile = self._current_ui_profile
                     self.reset()
+                    # A relocation may yield more than one Count candidate. Keep
+                    # only the recently successful profile as a tie-break hint;
+                    # the active profile and color themselves were reset above.
+                    with self._state_lock:
+                        self._last_successful_ui_profile = recent_profile
             return
 
-        final_time_str = None
-        
-        # Case 1: 游戏正在运行 (检测到时间且未暂停)
-        if latest_paused is False and latest_time is not None:
-            try:
-                min_val = int(latest_time[0]); 
-                sec_val = int(latest_time[1:])
-                
-                if min_val > 3 or sec_val > 59:
-                    self.logger.warning(f"时间值超出范围: M={min_val}, S={sec_val}")
-                else:
-                    current_total_seconds = min_val * 60 + sec_val
-                    
-                    # 检查时间倒退 (保持原逻辑)
-                    is_valid_update = True
-                    if self._last_valid_parsed and self._last_valid_parsed.get('time'):
-                        last_t = self._last_valid_parsed['time']
-                        if ':' in str(last_t):
-                            try:
-                                l_min, l_sec = map(int, last_t.split(':'))
-                                last_total = l_min * 60 + l_sec
-                                # 只有当节点数未变时才检查时间流逝
-                                if latest_count == self._last_valid_parsed.get('n'):
-                                    if current_total_seconds - 1 > last_total:
-                                        is_valid_update = False
-                            except: pass # 解析上次时间失败，则允许本次更新 
+        final_time = None
+        if not latest_paused and latest_time is not None:
+            current_mss = self._normalize_time_value(latest_time)
+            if current_mss is not None:
+                current_seconds = int(current_mss[0]) * 60 + int(current_mss[1:])
+                final_time = f"{current_mss[0]}:{current_mss[1:]}"
 
-                    if is_valid_update:
-                        final_time_str = f"{min_val}:{str(sec_val).zfill(2)}"
-                    else:
-                        final_time_str = self._last_valid_parsed.get('time')
-                    
+                if (
+                    self._last_valid_parsed
+                    and self._last_valid_parsed.get("time")
+                    and latest_count == self._last_valid_parsed.get("n")
+                ):
+                    last_seconds = self._parse_formatted_time(
+                        self._last_valid_parsed.get("time")
+                    )
+                    if (
+                        last_seconds is not None
+                        and current_seconds - 1 > last_seconds
+                    ):
+                        final_time = self._last_valid_parsed.get("time")
+            else:
+                self.logger.warning("时间处理错误: %r", latest_time)
+        elif latest_paused and self._last_valid_parsed:
+            final_time = self._last_valid_parsed.get("time")
 
-
-            except Exception as e:
-                self.logger.warning(f"时间处理错误 '{latest_time}': {e}")
-        
-        # Case 2: 暂停或无时间
-        elif latest_paused:
-            if self._last_valid_parsed and self._last_valid_parsed.get('time'):
-                final_time_str = self._last_valid_parsed.get('time')
-        
-        # Case 3: 间歇期，final_time_str 保持为 None
-        
-        # 输出结果
         parsed = {
             "lang": self.lang,
             "n": latest_count,
-            "time": final_time_str,
-            "is_paused": latest_paused
+            "time": final_time,
+            "is_paused": latest_paused,
         }
-        self.logger.debug(f"OCR 解析结果: {parsed}")
-
-        # 更新状态
-        if parsed:
-            self._consecutive_failures = 0
-            if self._last_valid_parsed is None or parsed != self._last_valid_parsed:
-                self.logger.info(f"状态更新: {parsed}")
-                self._last_valid_parsed = parsed
+        self._consecutive_failures = 0
+        if self._last_valid_parsed is None or parsed != self._last_valid_parsed:
+            self.logger.info("状态更新: %s", parsed)
+            self._last_valid_parsed = parsed
 
         with self._result_lock:
             self._latest_result = self._last_valid_parsed
 
-    def _is_valid_count_text(self, text):
-        if not text:
-            return False
-        if text.isdigit():
-            return True
-        if text.startswith('c') and text[1:].isdigit():
-            return True
-        return False
+    @staticmethod
+    def _is_valid_count(value):
+        return (
+            isinstance(value, numbers.Integral)
+            and not isinstance(value, bool)
+            and 0 <= int(value) <= 4
+        )
+
+    @staticmethod
+    def _normalize_time_value(value):
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, numbers.Integral):
+            numeric = int(value)
+            raw_value = f"{numeric:03d}" if 0 <= numeric <= 999 else ""
+        elif isinstance(value, str):
+            raw_value = value
+        else:
+            return None
+        if (
+            len(raw_value) == 3
+            and raw_value.isascii()
+            and raw_value.isdigit()
+            and 0 <= int(raw_value[0]) <= 3
+            and 0 <= int(raw_value[1:]) <= 59
+        ):
+            return raw_value
+        return None
+
+    @staticmethod
+    def _parse_formatted_time(value):
+        try:
+            minutes, seconds = (int(part) for part in str(value).split(":"))
+        except (TypeError, ValueError):
+            return None
+        if minutes < 0 or not 0 <= seconds <= 59:
+            return None
+        return minutes * 60 + seconds
+
+    @classmethod
+    def _formatted_time_to_mss(cls, value):
+        total_seconds = cls._parse_formatted_time(value)
+        if total_seconds is None:
+            return None
+        minutes, seconds = divmod(total_seconds, 60)
+        if minutes > 3:
+            return None
+        return f"{minutes}{seconds:02d}"
+
+    def _last_valid_time_seconds(self):
+        if not self._last_valid_parsed:
+            return None
+        return self._parse_formatted_time(self._last_valid_parsed.get("time"))
+
+    def _set_latest_count(self, value):
+        with self._state_lock:
+            self._latest_count = value
 
     def get_latest_data(self):
         with self._result_lock:
-            # 返回 self._latest_result 的一个浅拷贝，防止外部修改影响内部状态
             return self._latest_result.copy() if self._latest_result else None
 
     def reset(self):
-        """重置状态"""
-    
+        """Reset game/UI state without reloading frozen OCR resources."""
         self.logger.info("重置 MalwarfareMapHandler...")
-        try:
-            self._executor.shutdown(wait=False)
-        except Exception:
-            pass
-        self._executor = ThreadPoolExecutor(max_workers=3)
+        self._reset_state()
 
-        # 重置所有在 __init__ 中设置的状态变量
-        self._consecutive_failures = 0
-        self._time_recognition_failures = 0
-        
-        self._current_ui_offset_state = -1 # 强制重新探测UI位置
-        self._detected_count_color = None  # 强制重新校准颜色
-        
-        self._latest_count = None
-        self._latest_paused = None
-        self._latest_time = None
-        self._last_valid_parsed = None
-    
-    def shutdown(self):
-        self.logger.info("请求关闭 MalwarfareMapHandler...")
-        self.cleanup()
+    def _reset_state(self):
+        with self._state_lock:
+            self._consecutive_failures = 0
+            self._time_recognition_failures = 0
+            self._current_ui_profile = None
+            self._detected_count_color = None
+            self._last_successful_ui_profile = None
+            self._latest_count = None
+            self._latest_paused = None
+            self._latest_time = None
+            self._last_valid_parsed = None
+            self._last_count_update = None
+            self._last_status_update = None
+            self._last_game_screen_timestamp = None
+        with self._result_lock:
+            self._latest_result = None

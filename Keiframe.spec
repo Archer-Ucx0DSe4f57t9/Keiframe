@@ -10,6 +10,17 @@ pro_root = os.path.abspath(os.getcwd())
 # 这样可以解决你提到的大量 src.xxx.yyy 导入问题
 src_submodules = collect_submodules('src')
 
+# The frozen Malwarfare runtime resolves these production resources relative
+# to its packaged module location. Keep the small verified bundle inside the
+# PyInstaller onedir payload; the normal resources copy remains unchanged.
+malwarfare_runtime_datas = [
+    (os.path.join(pro_root, 'config', 'malwarfare_zh.json'), 'config'),
+    (
+        os.path.join(pro_root, 'resources', 'malwarfare'),
+        os.path.join('resources', 'malwarfare'),
+    ),
+]
+
 a = Analysis(
     ['src/main.py'],
     pathex=[
@@ -17,9 +28,9 @@ a = Analysis(
         os.path.join(pro_root, 'python', 'Lib', 'site-packages')
     ],
     binaries=[],
-    # OCR model files are an external addon and are copied by
-    # build-keiframe.bat, not embedded in the executable distribution.
-    datas=[],
+    # PP-OCRv5 remains an external addon. The small Malwarfare frozen runtime
+    # bundle is embedded because its public API uses module-relative defaults.
+    datas=malwarfare_runtime_datas,
     hiddenimports=[
         'PyQt5.sip',
         'aiohttp',

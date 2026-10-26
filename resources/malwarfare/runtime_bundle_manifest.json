@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "bundle_id": "malwarfare_ocr_runtime_zh_2560_v1",
+  "entrypoint": "src.malwarfare.MalwarfareOcrProcessor.from_default_resources",
+  "external_dependencies": [
+    "numpy",
+    "opencv-python"
+  ],
+  "python_files": [
+    "src/__init__.py",
+    "src/malwarfare/__init__.py",
+    "src/malwarfare/ocr_processor.py",
+    "src/malwarfare/profile.py",
+    "src/malwarfare/paused_recognizer.py",
+    "src/malwarfare/runtime/__init__.py",
+    "src/malwarfare/runtime/geometry.py",
+    "src/malwarfare/runtime/count.py",
+    "src/malwarfare/runtime/time.py"
+  ],
+  "resource_files": [
+    "config/malwarfare_zh.json",
+    "resources/malwarfare/runtime_bundle_manifest.json",
+    "resources/malwarfare/count_zh_2560_v1/manifest.json",
+    "resources/malwarfare/count_zh_2560_v1/orange.npz",
+    "resources/malwarfare/count_zh_2560_v1/blue.npz",
+    "resources/malwarfare/count_zh_2560_v1/green.npz",
+    "resources/malwarfare/time_zh_2560_v1/manifest.json",
+    "resources/malwarfare/time_zh_2560_v1/model.npz",
+    "resources/malwarfare/paused_zh_2560_v1/manifest.json",
+    "resources/malwarfare/paused_zh_2560_v1/paused_v01_yellow.png",
+    "resources/malwarfare/paused_zh_2560_v1/paused_v02_white.png"
+  ],
+  "excluded_runtime_directories": [
+    "analysis",
+    "recordings",
+    "tests",
+    "tools"
+  ],
+  "profile_single_source_of_truth": "config/malwarfare_zh.json"
+}
