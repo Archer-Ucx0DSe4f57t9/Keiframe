@@ -248,6 +248,7 @@ class AppRuntimeInitializationTests(unittest.TestCase):
                 )
             )
             stack.enter_context(patch("src.app_runtime.sys.platform", "test"))
+            stack.enter_context(patch.object(AppRuntime, "_initialize_fullscreen_overlay"))
 
             AppRuntime(window).initialize()
 

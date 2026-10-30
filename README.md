@@ -104,7 +104,7 @@ git diff --check
 .\build-keiframe.bat
 ```
 
-脚本会递归清理 `build/` 和 `dist/`，调用项目内嵌 Python 的 PyInstaller，然后将除 `resources/ocr/ppocrv5/` 外的运行时资源复制到主发布目录，并在 `dist/KeiFrame_PP-OCRv5_Addon/` 生成独立 OCR addon。主程序没有 addon 时仍可启动，但敌方组成识别会被禁用；安装 addon 后重启即可启用。生成物不应提交到仓库。
+脚本会递归清理 `build/` 和 `dist/`，调用项目内嵌 Python 的 PyInstaller，然后将除 `resources/ocr/ppocrv5/` 外的运行时资源复制到主发布目录，并在 `dist/KeiFrame_PP-OCRv5_Addon/` 生成独立 OCR addon。主程序没有 addon 时仍可启动，但敌方组成识别会被禁用；安装 addon 后重启即可启用。生成物不应提交到仓库。 `build-keiframe.ps1` 是同一批处理发布流程的入口包装，不再另行复制整个资源目录。
 
 ## 6119 端口
 

@@ -51,6 +51,7 @@ flowchart LR
 8. 注册全局快捷键、创建托盘与控制窗。
 9. 启动后台游戏状态线程，并由 Qt 定时器每 200 ms 调用 `game_time_handler.update_game_time()`。
 10. 加载地图列表中的第一张地图并显示置顶主窗口。
+11. 在窗口显示后，由 `AppRuntime` 按 `ENABLE_GAMEBAR_OVERLAY` 创建并启动 Game Bar bridge，再安排初始锁定状态。
 
 DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能导致 Windows 缩放和坐标基准不一致。
 游戏检查线程仍按既有顺序早于 `progress_signal` 和种族/突变信号连接启动；本轮只迁移创建位置，没有调整这一时序。
@@ -319,6 +320,8 @@ mss 捕获 SC2 窗口
 
 - 托盘或菜单调用 `TimerWindow.safe_exit()`，同步委托 `AppRuntime.safe_exit()`。该路径使用 `_safe_exiting` 防重入，设置 `state.app_closing`，停止主 timer，并按原顺序清理 Toast、manager、地图 handler、识别器、notifier、倒计时、热键、托盘和控制窗，关闭数据库后调用 `QApplication.quit()`；中途异常会停止后续清理并恢复 `_safe_exiting`。
 - 窗口关闭事件调用 `AppRuntime.cleanup_on_close()`，随后无论清理是否失败都进入父类 `closeEvent`。该路径保留可选 `global_listener` 清理，但不新增 `app_closing`、主 timer 停止、倒计时/托盘/控制窗/数据库清理或 `QApplication.quit()`。
+
+可选 Game Bar bridge 在两条退出路径中均先停止；停止异常单独记录，不阻断其余清理。创建或启动失败时也尝试停止已创建的 bridge。
 
 这两条路径目前并未统一，也不代表已有退出竞态或资源泄漏已解决。任何新增后台组件仍需明确应接入哪条路径。
 

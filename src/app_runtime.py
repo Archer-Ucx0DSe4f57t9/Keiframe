@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import QApplication
 
 from src import (
     app_window_manager,
+    config,
     config_hotkeys,
     game_state_service,
     game_time_handler,
@@ -222,10 +223,40 @@ class AppRuntime:
                 | win32con.SWP_NOACTIVATE,
             )
 
+        self._initialize_fullscreen_overlay()
+
         QTimer.singleShot(
             100,
             lambda: app_window_manager.on_control_state_changed(window, False),
         )
+
+    def _initialize_fullscreen_overlay(self):
+        window = self.window
+        window.fullscreen_overlay_bridge = None
+        if not getattr(config, "ENABLE_GAMEBAR_OVERLAY", True):
+            return
+        try:
+            from src.fullscreen_overlay.bridge import FullscreenOverlayBridge
+
+            window.fullscreen_overlay_bridge = FullscreenOverlayBridge(window)
+            window.fullscreen_overlay_bridge.start()
+        except Exception as error:
+            window.logger.error(f"启动 Game Bar 全屏覆盖层失败: {error}")
+            window.logger.error(traceback.format_exc())
+            self._stop_fullscreen_overlay()
+
+    def _stop_fullscreen_overlay(self):
+        window = self.window
+        bridge = getattr(window, "fullscreen_overlay_bridge", None)
+        if bridge is None:
+            return
+        try:
+            bridge.stop()
+            window.fullscreen_overlay_bridge = None
+        except Exception as error:
+            # A broken optional overlay must not skip the remaining cleanup.
+            window.logger.error(f"停止 Game Bar 全屏覆盖层失败: {error}")
+            window.logger.error(traceback.format_exc())
 
     def run_async_game_scheduler(self, progress_signal):
         asyncio.run(
@@ -292,6 +323,7 @@ class AppRuntime:
 
         try:
             game_state_service.state.app_closing = True
+            self._stop_fullscreen_overlay()
 
             if hasattr(window, "timer") and window.timer:
                 window.timer.stop()
@@ -366,6 +398,7 @@ class AppRuntime:
     def cleanup_on_close(self):
         window = self.window
 
+        self._stop_fullscreen_overlay()
         try:
             if hasattr(window, "toast_manager") and window.toast_manager:
                 window.toast_manager.shutdown()
