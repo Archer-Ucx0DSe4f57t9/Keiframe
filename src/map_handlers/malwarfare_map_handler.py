@@ -12,7 +12,9 @@ import numpy as np
 
 from src import config
 from src.game_state_service import state
-from src.malwarfare import MalwarfareOcrProcessor
+from src.malwarfare.ocr_processor import MalwarfareOcrProcessor
+from src.malwarfare.runtime_3840 import Malwarfare3840Runtime
+from src.malwarfare.runtime_router import MalwarfareRuntimeRouter
 from src.utils.logging_util import get_logger
 
 
@@ -24,6 +26,7 @@ class MalwarfareMapHandler:
     LOOP_IDLE_SECONDS = 0.02
     FAILURE_RELOCATION_THRESHOLD = 30
     CANONICAL_FRAME_SHAPE = (1080, 1920, 3)
+    NATIVE_3840_FRAME_SHAPE = (2160, 3840, 3)
 
     UI_PROFILES = (
         "Normal",
@@ -45,7 +48,14 @@ class MalwarfareMapHandler:
     COUNT_PROBE_ROI = (172, 72, 219, 103)
     COUNT_PROBE_MIN_PIXELS = 0
 
-    def __init__(self, game_state=None, debug=False, ocr_processor=None):
+    def __init__(
+        self,
+        game_state=None,
+        debug=False,
+        ocr_processor=None,
+        runtime_router=None,
+        enable_3840_runtime=None,
+    ):
         self.logger = get_logger(__name__)
         self.logger.info("初始化 MalwarfareMapHandler...")
         self.debug = debug
@@ -55,6 +65,27 @@ class MalwarfareMapHandler:
         # Resource/manifest/SHA errors are intentionally not swallowed. The frozen
         # runtime is loaded once for the lifetime of this handler.
         self.ocr = ocr_processor or MalwarfareOcrProcessor.from_default_resources()
+        self.enable_3840_runtime = (
+            getattr(config, "enable_malwarfare_3840_runtime", False) is True
+            if enable_3840_runtime is None
+            else bool(enable_3840_runtime)
+        )
+        self.runtime_router = None
+        if self.enable_3840_runtime:
+            try:
+                runtime_3840 = (
+                    Malwarfare3840Runtime.from_default_resources()
+                    if runtime_router is None
+                    else None
+                )
+                self.runtime_router = runtime_router or MalwarfareRuntimeRouter(
+                    runtime_2560=self.ocr,
+                    runtime_3840=runtime_3840,
+                )
+            except Exception as exc:
+                raise RuntimeError(
+                    "Malwarfare 3840 Runtime 初始化失败；不会静默回退到 2560 模型"
+                ) from exc
 
         self._running = False
         self._running_thread = None
@@ -114,6 +145,20 @@ class MalwarfareMapHandler:
                 else:
                     # Shared state is copied under the lock and processed after release.
                     frame = screenshot.copy()
+                native_screenshot = getattr(
+                    self.game_state,
+                    "latest_malwarfare_native_screenshot",
+                    None,
+                )
+                if self.enable_3840_runtime and native_screenshot is not None:
+                    native_frame = native_screenshot.copy()
+                else:
+                    native_frame = None
+                native_shape = getattr(
+                    self.game_state,
+                    "latest_screenshot_native_shape",
+                    None,
+                )
 
             if (
                 frame is None
@@ -125,15 +170,44 @@ class MalwarfareMapHandler:
             # Mark the frame before OCR. If OCR takes longer than a capture interval,
             # the next pass reads the newest screenshot and intermediate frames vanish.
             self._last_game_screen_timestamp = screenshot_timestamp
-            self._process_frame(frame, now=time.perf_counter())
+            self._process_frame(
+                frame,
+                native_frame=native_frame,
+                native_shape=native_shape,
+                now=time.perf_counter(),
+            )
 
         self._running = False
 
-    def _process_frame(self, frame, *, now=None):
+    def _process_frame(
+        self,
+        frame,
+        *,
+        now=None,
+        native_frame=None,
+        native_shape=None,
+    ):
         """Validate and synchronously dispatch due OCR operations for one frame."""
         if not self._validate_frame(frame):
             self._set_latest_count(None)
             self._update_latest_result()
+            return
+
+        source_shape = (
+            tuple(native_shape)
+            if native_shape is not None
+            else getattr(native_frame, "shape", None)
+        )
+        if self.enable_3840_runtime and source_shape == self.NATIVE_3840_FRAME_SHAPE:
+            if not isinstance(native_frame, np.ndarray):
+                if not self._missing_native_3840_reported:
+                    self.logger.error(
+                        "检测到原生 3840x2160 客户端区，但原生帧不可用；"
+                        "本帧不会回退到 2560 模型。"
+                    )
+                    self._missing_native_3840_reported = True
+                return
+            self._process_3840_frame(frame, native_frame, now=now)
             return
 
         if self._current_ui_profile is None:
@@ -152,9 +226,123 @@ class MalwarfareMapHandler:
 
         self._update_latest_result()
 
+    def _process_3840_frame(self, canonical_frame, native_frame, *, now=None):
+        """Route a confirmed native 3840 frame without any 2560 fallback."""
+        if self.runtime_router is None:
+            self.logger.error(
+                "3840 Runtime 已启用但未初始化；不会静默回退到 2560 模型。"
+            )
+            return
+        if self._current_ui_profile is None:
+            if not self._detect_and_set_3840_ui_state(
+                canonical_frame,
+                native_frame,
+            ):
+                return
+
+        current_time = time.perf_counter() if now is None else float(now)
+        count_due = self._is_due(
+            current_time,
+            self._last_count_update,
+            self.COUNT_INTERVAL_SECONDS,
+        )
+        status_due = self._is_due(
+            current_time,
+            self._last_status_update,
+            self.STATUS_INTERVAL_SECONDS,
+        )
+        if not count_due and not status_due:
+            return
+
+        started = time.perf_counter()
+        try:
+            result = self.runtime_router.process(
+                native_frame,
+                ui_profile=self._current_ui_profile,
+                count_color_profile=self._detected_count_color,
+            )
+        except Exception:
+            self.logger.exception(
+                "3840 Runtime 执行失败；本帧不会回退到 2560 模型。"
+            )
+            return
+        elapsed_ms = (time.perf_counter() - started) * 1000.0
+
+        if count_due:
+            self._last_count_update = current_time
+            if result.count is not None and not self._is_valid_count(result.count):
+                self.logger.error("3840 Count Runtime 返回非法值: %r", result.count)
+                self._set_latest_count(None)
+            else:
+                self._set_latest_count(
+                    int(result.count) if result.count is not None else None
+                )
+            self._record_timing("count", elapsed_ms)
+        if status_due:
+            self._last_status_update = current_time
+            self._apply_time_paused_result(result.time, result.paused, source="3840")
+            self._record_timing("status", elapsed_ms)
+        self._update_latest_result()
+
     @staticmethod
     def _is_due(now, last_update, interval):
         return last_update is None or now - last_update >= interval
+
+    def _detect_and_set_3840_ui_state(self, canonical_frame, native_frame):
+        """Use the existing color probe but accept only the verified Normal UI."""
+        if not self._coarse_profile_has_count_color(canonical_frame, "Normal"):
+            unsupported = [
+                profile
+                for profile in self.UI_PROFILES
+                if profile != "Normal"
+                and self._coarse_profile_has_count_color(canonical_frame, profile)
+            ]
+            if unsupported and not self._unsupported_3840_ui_profile_reported:
+                self.logger.error(
+                    "3840 Runtime 仅支持已验证的 Normal UI profile；检测到候选 %s，"
+                    "不会使用未经验证的模型。",
+                    unsupported,
+                )
+                self._unsupported_3840_ui_profile_reported = True
+            return False
+
+        candidates = []
+        for color_profile in self.COUNT_COLOR_PROFILES:
+            try:
+                result = self.runtime_router.process(
+                    native_frame,
+                    ui_profile="Normal",
+                    count_color_profile=color_profile,
+                )
+            except Exception:
+                self.logger.exception(
+                    "3840 Runtime UI/颜色探测失败: profile=Normal, color=%s；"
+                    "不会回退到 2560 模型。",
+                    color_profile,
+                )
+                return False
+            if self._is_valid_count(result.count):
+                candidates.append((color_profile, int(result.count)))
+            elif result.count is not None:
+                self.logger.error("3840 Count Runtime 返回非法值: %r", result.count)
+
+        if len(candidates) != 1:
+            if candidates:
+                self.logger.warning("3840 Count 颜色探测结果不唯一: %s", candidates)
+            return False
+
+        color_profile, count = candidates[0]
+        with self._state_lock:
+            self._current_ui_profile = "Normal"
+            self._detected_count_color = color_profile
+            self._latest_count = count
+            self._last_successful_ui_profile = "Normal"
+        self.logger.info(
+            "3840 UI 状态探测成功: profile=Normal, count_color=%s, count=%s",
+            color_profile,
+            count,
+        )
+        return True
 
     def _validate_frame(self, frame):
         if not isinstance(frame, np.ndarray):
@@ -341,10 +529,15 @@ class MalwarfareMapHandler:
         finally:
             self._record_timing("status", (time.perf_counter() - started) * 1000.0)
 
+        self._apply_time_paused_result(time_value, paused, source="新版")
+
+    def _apply_time_paused_result(self, time_value, paused, *, source):
+        """Apply mutually exclusive OCR values to the unchanged state contract."""
+
         if time_value is not None:
             normalized_time = self._normalize_time_value(time_value)
             if normalized_time is None:
-                self.logger.error("新版 Time OCR 返回非法 MSS 值: %r", time_value)
+                self.logger.error("%s Time OCR 返回非法 MSS 值: %r", source, time_value)
                 return
             with self._state_lock:
                 self._latest_time = normalized_time
@@ -358,7 +551,7 @@ class MalwarfareMapHandler:
             return
 
         if paused not in (False, None):
-            self.logger.error("新版 Paused OCR 返回非法值: %r", paused)
+            self.logger.error("%s Paused OCR 返回非法值: %r", source, paused)
             return
 
         # Neither Time nor Paused is visible. Above 25 seconds this is treated
@@ -569,5 +762,7 @@ class MalwarfareMapHandler:
             self._last_count_update = None
             self._last_status_update = None
             self._last_game_screen_timestamp = None
+            self._unsupported_3840_ui_profile_reported = False
+            self._missing_native_3840_reported = False
         with self._result_lock:
             self._latest_result = None

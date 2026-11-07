@@ -104,7 +104,15 @@ def handle_map_selection(window, map_name):
         
         if window.malwarfare_handler is None:
             window.logger.info("创建并启动 MalwarfareMapHandler 实例。")
-            window.malwarfare_handler = MalwarfareMapHandler(game_state = window.game_state)
+            try:
+                window.malwarfare_handler = MalwarfareMapHandler(
+                    game_state=window.game_state
+                )
+            except Exception:
+                window.logger.exception(
+                    "Malwarfare Runtime 初始化失败；不会静默回退到其他 OCR 模型。"
+                )
+                raise
             window.malwarfare_handler.reset()
             window.malwarfare_handler.start()
         

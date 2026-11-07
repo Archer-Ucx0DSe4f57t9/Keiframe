@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "task": "paused",
+  "candidate_name": "paused_binary_centroid_margin_v1",
+  "candidate_version": "malwarfare_zh_3840_candidate_v2",
+  "supported_native_resolution": {"width": 3840, "height": 2160},
+  "canonical_resolution": {"width": 1920, "height": 1080},
+  "feature_version": "legacy_yellow_v1_binary_flat_l2_v1",
+  "selected_candidate": "candidate_b_ncc_and_margin",
+  "baseline_templates": "baseline/manifest.json",
+  "model": {
+    "filename": "model.npz",
+    "sha256": "c63580ac829ce5e074819566404b446f6cf1fffa11e64de71075eb99faa76419"
+  }
+}

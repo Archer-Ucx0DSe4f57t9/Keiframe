@@ -61,3 +61,5 @@ settings.json
 # Keep the isolated Malwarfare Handler regression suite visible.
 !/tests/
 !/tests/test_malwarfare_map_handler.py
+!/tests/test_malwarfare_runtime_3840.py
+!/tests/test_malwarfare_3840_integration.py

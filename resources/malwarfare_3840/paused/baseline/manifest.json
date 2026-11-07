@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "task": "paused",
+  "language": "zh",
+  "source_resolution_profile": "native_2560_to_canonical_1920",
+  "canonical_roi_width": 53,
+  "canonical_roi_height": 32,
+  "canonical_roi_dtype": "uint8",
+  "canonical_roi_format": "BGR",
+  "candidate": "legacy_template",
+  "candidate_version": "paused_zh_2560_v1",
+  "preprocessing": {
+    "version": "legacy_yellow_v1",
+    "resize_scale": 4,
+    "interpolation": "INTER_CUBIC",
+    "color_space": "HSV",
+    "h_min": 21,
+    "h_max": 35,
+    "s_min": 50,
+    "v_min": 50,
+    "normalization": "NORM_MINMAX_0_255_when_yellow_mask_nonempty",
+    "binary_threshold": 110,
+    "matcher": "TM_CCOEFF_NORMED",
+    "aggregation": "max"
+  },
+  "templates": [
+    {
+      "identifier": "paused_v01_yellow",
+      "filename": "paused_v01_yellow.png",
+      "sha256": "8d0e1e098d1299e1be3d107cbd97ecf188f153f419e67c74bf8685be6fcfd5d0",
+      "source_sha256": "8d0e1e098d1299e1be3d107cbd97ecf188f153f419e67c74bf8685be6fcfd5d0"
+    },
+    {
+      "identifier": "paused_v02_white",
+      "filename": "paused_v02_white.png",
+      "sha256": "b7718a3077e66f9dd98a2b8e991d7e298e4e164b47fe6c74b11e9d90295932ba",
+      "source_sha256": "b7718a3077e66f9dd98a2b8e991d7e298e4e164b47fe6c74b11e9d90295932ba"
+    }
+  ],
+  "source_development_poc_path": "analysis/malwarfare_paused_recognizer_poc_round1",
+  "source_development_poc_summary_sha256": "c910e404232e054c8480a42b7ef8973fbe55a6d6c7d28cf360138f3b653c01e5",
+  "frozen_from": "development_poc",
+  "production_threshold": 0.511977851,
+  "validation_status": "frozen_after_within_recording_temporal_holdout_validation",
+  "validation_type": "locked-candidate temporal holdout validation",
+  "independent_recording_validation": false,
+  "validation_artifact": "analysis/malwarfare_runtime_final_temporal_holdout/freeze_metadata.json",
+  "validation_summary": "analysis/malwarfare_runtime_final_temporal_holdout/summary.json"
+}

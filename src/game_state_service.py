@@ -39,6 +39,10 @@ class GlobalState:
         
         # 截图相关信息
         self.latest_screenshot = None  # 存储BGR格式的numpy数组
+        # 仅在 3840 Runtime 显式启用且客户端区原生为 3840x2160 时保留。
+        # 旧识别器继续只消费 latest_screenshot，不受此字段影响。
+        self.latest_malwarfare_native_screenshot = None
+        self.latest_screenshot_native_shape = None
         self.screenshot_timestamp = 0
         self.scale_factor = 1.0        # 基于1920宽度的缩放比例
         self.screenshot_lock = threading.Lock() # 用于保护截图数据的读写安全
@@ -217,8 +221,18 @@ def _capture_game_screen(sct):
         
         # 3. 颜色空间转换 BGRA -> BGR
         game_screen_bgr = cv2.cvtColor(img_array, cv2.COLOR_BGRA2BGR)
+        native_frame_shape = tuple(game_screen_bgr.shape)
         
-        # 4. 重缩放图片大小（临时手段）
+        # 4. 在任何缩放发生前，按显式开关保留 3840 Runtime 所需原生帧。
+        # 其他原生尺寸不保留，由旧 1920 标准帧路径继续处理。
+        malwarfare_native_bgr = None
+        if (
+            getattr(config, "enable_malwarfare_3840_runtime", False)
+            and game_screen_bgr.shape == (2160, 3840, 3)
+        ):
+            malwarfare_native_bgr = game_screen_bgr
+
+        # 5. 重缩放图片大小（既有行为）
         target_w = 1920
         target_h = int(h * (1920.0 / w)) # 保持纵横比
 
@@ -227,12 +241,14 @@ def _capture_game_screen(sct):
 
         current_scale = 1.0
         
-        # 4. 计算缩放比例（基于宽度）
+        # 6. 计算缩放比例（基于宽度）
         # current_scale = float(w) / BASE_RESOLUTION_WIDTH
         
-        # 5. 更新全局状态 (加锁)
+        # 7. 更新全局状态 (加锁)
         with state.screenshot_lock:
             state.latest_screenshot = game_screen_bgr
+            state.latest_malwarfare_native_screenshot = malwarfare_native_bgr
+            state.latest_screenshot_native_shape = native_frame_shape
             state.scale_factor = current_scale
             state.screenshot_timestamp = time.perf_counter()
         logger.info("截图成功更新全局状态")

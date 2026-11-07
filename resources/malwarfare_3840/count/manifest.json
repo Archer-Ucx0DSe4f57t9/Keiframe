@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "task": "count",
+  "candidate_version": "malwarfare_zh_3840_candidate_v1",
+  "supported_native_resolution": {"width": 3840, "height": 2160},
+  "canonical_resolution": {"width": 1920, "height": 1080},
+  "adaptation": "full rendering-specific centroid refit",
+  "presence": "inherited unchanged from 2560",
+  "thresholds": {
+    "blue": {"best_score_minimum": 0.198723, "projection_sum_minimum": 12.149592},
+    "green": {"best_score_minimum": 0.228908, "projection_sum_minimum": 23.516688},
+    "orange": {"best_score_minimum": 0.181485, "projection_sum_minimum": 36.026504}
+  },
+  "models": {
+    "blue": {"filename": "blue.npz", "sha256": "bf9f3256cbfae74287b8b8487a59a769a36005b2c49eec4fe079d4327a6ea516"},
+    "green": {"filename": "green.npz", "sha256": "9de265b747ae3c4bd4bc92af5627193704a374bdb1b308e56d0239cc39be4d7f"},
+    "orange": {"filename": "orange.npz", "sha256": "27ad964db3e8ae2da7b411bf36b41b8da348aeb5ba0147ed4fceaec09f0f1235"}
+  }
+}

@@ -1,4 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
+import json
 import os
 import sys
 from PyInstaller.utils.hooks import collect_submodules
@@ -20,6 +21,41 @@ malwarfare_runtime_datas = [
         os.path.join('resources', 'malwarfare'),
     ),
 ]
+
+# The opt-in 3840 bundle verifies both its resource hashes and the declared
+# pure-inference Python file inventory. Include exactly those manifest entries
+# in the onedir payload so the frozen app can verify itself without a source
+# checkout, analysis data, recordings, Candidate, Shadow, or GT artifacts.
+malwarfare_3840_manifest_path = os.path.join(
+    pro_root,
+    'resources',
+    'malwarfare_3840',
+    'runtime_bundle_manifest.json',
+)
+with open(malwarfare_3840_manifest_path, 'r', encoding='utf-8') as manifest_file:
+    malwarfare_3840_manifest = json.load(manifest_file)
+malwarfare_runtime_datas.append(
+    (
+        os.path.join(pro_root, 'resources', 'malwarfare_3840'),
+        os.path.join('resources', 'malwarfare_3840'),
+    )
+)
+for relative_path in malwarfare_3840_manifest['python_files']:
+    path_parts = relative_path.split('/')
+    malwarfare_runtime_datas.append(
+        (
+            os.path.join(pro_root, *path_parts),
+            os.path.dirname(relative_path),
+        )
+    )
+# The resolution Router composes the 2560 and 3840 bundles but is intentionally
+# outside the 3840-only manifest. Keep it visible in the packaged audit tree.
+malwarfare_runtime_datas.append(
+    (
+        os.path.join(pro_root, 'src', 'malwarfare', 'runtime_router.py'),
+        os.path.join('src', 'malwarfare'),
+    )
+)
 
 a = Analysis(
     ['src/main.py'],

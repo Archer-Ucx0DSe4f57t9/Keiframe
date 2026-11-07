@@ -19,6 +19,9 @@ FONT_MESSAGE_STYLE = None
 current_game_language = 'zh'  # 当前游戏语言 / Current game language
 current_language = 'zh'  # 当前语言 / Current language
 
+# Opt-in only. Native 3840x2160 Malwarfare frames use the frozen 3840 Runtime.
+enable_malwarfare_3840_runtime = False
+
 # 快捷键
 MAP_SHORTCUT = 'ctrl + shift + ['  # 地图快捷键 / Map shortcut key
 LOCK_SHORTCUT = 'ctrl + shift + ]'  # 锁定快捷键 / Lock shortcut key
