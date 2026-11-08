@@ -105,6 +105,18 @@ class MalwarfareOcrProcessor:
             paused_resource_dir=paused_resource_dir,
         )
 
+    @property
+    def profile(self) -> MalwarfareProfile:
+        """Expose the shared canonical UI geometry as immutable profile data."""
+
+        return self._profile
+
+    def resolved_rois(self, ui_profile: str) -> dict[str, Rect]:
+        return {
+            task_id: self._profile.resolved_task(task_id, ui_profile)[1]
+            for task_id in ("count", "time", "paused")
+        }
+
     def recognize_count(
         self,
         frame_bgr: np.ndarray,

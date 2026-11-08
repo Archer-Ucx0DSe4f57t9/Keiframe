@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import deque
+import copy
 import numbers
 import threading
 import time
@@ -12,7 +13,11 @@ import numpy as np
 
 from src import config
 from src.game_state_service import state
-from src.malwarfare.ocr_processor import MalwarfareOcrProcessor
+from src.malwarfare.ocr_processor import (
+    DEFAULT_PROFILE_PATH,
+    MalwarfareOcrProcessor,
+)
+from src.malwarfare.profile import load_profile
 from src.malwarfare.runtime_3840 import Malwarfare3840Runtime
 from src.malwarfare.runtime_router import MalwarfareRuntimeRouter
 from src.utils.logging_util import get_logger
@@ -47,6 +52,7 @@ class MalwarfareMapHandler:
     }
     COUNT_PROBE_ROI = (172, 72, 219, 103)
     COUNT_PROBE_MIN_PIXELS = 0
+    DIAGNOSTIC_LOG_INTERVAL_SECONDS = 10.0
 
     def __init__(
         self,
@@ -55,6 +61,8 @@ class MalwarfareMapHandler:
         ocr_processor=None,
         runtime_router=None,
         enable_3840_runtime=None,
+        diagnostic_ui_profile_override=None,
+        diagnostic_count_color_override=None,
     ):
         self.logger = get_logger(__name__)
         self.logger.info("初始化 MalwarfareMapHandler...")
@@ -65,10 +73,42 @@ class MalwarfareMapHandler:
         # Resource/manifest/SHA errors are intentionally not swallowed. The frozen
         # runtime is loaded once for the lifetime of this handler.
         self.ocr = ocr_processor or MalwarfareOcrProcessor.from_default_resources()
+        self._ui_geometry = getattr(self.ocr, "profile", None) or load_profile(
+            DEFAULT_PROFILE_PATH
+        )
+        if tuple(self._ui_geometry.ui_offsets) != self.UI_PROFILES:
+            raise ValueError("Malwarfare UI profile order does not match shared config")
+        if dict(self._ui_geometry.ui_offsets) != self.UI_PROFILE_OFFSETS:
+            raise ValueError("Malwarfare UI offsets do not match shared config")
+        normal_count = self._ui_geometry.resolved_task("count", "Normal")[1]
+        if self._roi_diagnostic(normal_count) != self.COUNT_PROBE_ROI:
+            raise ValueError("Malwarfare Count probe does not match shared config")
         self.enable_3840_runtime = (
             getattr(config, "enable_malwarfare_3840_runtime", False) is True
             if enable_3840_runtime is None
             else bool(enable_3840_runtime)
+        )
+        if diagnostic_ui_profile_override not in (None, *self.UI_PROFILES):
+            raise ValueError(
+                "3840 diagnostic UI override must name a configured UI profile"
+            )
+        if (
+            diagnostic_count_color_override is not None
+            and diagnostic_count_color_override not in self.COUNT_COLOR_PROFILES
+        ):
+            raise ValueError(
+                "3840 diagnostic Count color override must be green, blue, or orange"
+            )
+        self._diagnostic_ui_profile_override = diagnostic_ui_profile_override
+        self._diagnostic_count_color_override = diagnostic_count_color_override
+        self._diagnostic_log_times = {}
+        self.logger.warning(
+            "[HandlerDiag] Malwarfare Runtime 配置: enable_3840=%s, config_module=%s, "
+            "ui_override=%r, color_override=%r",
+            self.enable_3840_runtime,
+            getattr(config, "__file__", None),
+            self._diagnostic_ui_profile_override,
+            self._diagnostic_count_color_override,
         )
         self.runtime_router = None
         if self.enable_3840_runtime:
@@ -115,7 +155,12 @@ class MalwarfareMapHandler:
                 daemon=True,
             )
             self._running_thread.start()
-            self.logger.info("MalwarfareMapHandler 已启动单序列后台 OCR 线程。")
+            self.logger.warning(
+                "[HandlerDiag] MalwarfareMapHandler 已启动: running_flag=%s, "
+                "worker_alive=%s",
+                self._running,
+                self._running_thread.is_alive(),
+            )
 
     def cleanup(self):
         """Stop the worker; the cached OCR models remain owned by this instance."""
@@ -164,6 +209,16 @@ class MalwarfareMapHandler:
                 frame is None
                 or screenshot_timestamp == self._last_game_screen_timestamp
             ):
+                self._log_diagnostic(
+                    "waiting_for_frame",
+                    "warning",
+                    "[HandlerDiag] 等待新截图: frame=%s, timestamp=%r, "
+                    "is_in_game=%r, app_closing=%r",
+                    frame is not None,
+                    screenshot_timestamp,
+                    getattr(self.game_state, "is_in_game", None),
+                    getattr(self.game_state, "app_closing", None),
+                )
                 time.sleep(self.LOOP_IDLE_SECONDS)
                 continue
 
@@ -207,6 +262,15 @@ class MalwarfareMapHandler:
                     )
                     self._missing_native_3840_reported = True
                 return
+            self._log_diagnostic(
+                "route_3840",
+                "warning",
+                "[HandlerDiag] 3840 Runtime 已进入: canonical=%s %s, native=%s %s",
+                getattr(frame, "shape", None),
+                getattr(frame, "dtype", None),
+                getattr(native_frame, "shape", None),
+                getattr(native_frame, "dtype", None),
+            )
             self._process_3840_frame(frame, native_frame, now=now)
             return
 
@@ -228,18 +292,19 @@ class MalwarfareMapHandler:
 
     def _process_3840_frame(self, canonical_frame, native_frame, *, now=None):
         """Route a confirmed native 3840 frame without any 2560 fallback."""
+        with self._state_lock:
+            self._latest_3840_diagnostics.update(
+                {
+                    "route_reached": True,
+                    "canonical_frame_shape": tuple(canonical_frame.shape),
+                    "native_frame_shape": tuple(native_frame.shape),
+                }
+            )
         if self.runtime_router is None:
             self.logger.error(
                 "3840 Runtime 已启用但未初始化；不会静默回退到 2560 模型。"
             )
             return
-        if self._current_ui_profile is None:
-            if not self._detect_and_set_3840_ui_state(
-                canonical_frame,
-                native_frame,
-            ):
-                return
-
         current_time = time.perf_counter() if now is None else float(now)
         count_due = self._is_due(
             current_time,
@@ -254,95 +319,342 @@ class MalwarfareMapHandler:
         if not count_due and not status_due:
             return
 
-        started = time.perf_counter()
-        try:
-            result = self.runtime_router.process(
-                native_frame,
-                ui_profile=self._current_ui_profile,
-                count_color_profile=self._detected_count_color,
+        with self._state_lock:
+            needs_initialization = (
+                self._current_ui_profile is None
+                or self._detected_count_color is None
             )
-        except Exception:
-            self.logger.exception(
-                "3840 Runtime 执行失败；本帧不会回退到 2560 模型。"
-            )
+        if needs_initialization:
+            if count_due:
+                self._last_count_update = current_time
+                started = time.perf_counter()
+                self._detect_and_set_ui_state_3840(
+                    canonical_frame,
+                )
+                self._record_timing(
+                    "count",
+                    (time.perf_counter() - started) * 1000.0,
+                )
+                self._last_status_update = current_time
+            self._update_latest_result()
             return
-        elapsed_ms = (time.perf_counter() - started) * 1000.0
 
+        rois = self._resolved_rois(self._current_ui_profile)
+        inference_succeeded = False
         if count_due:
             self._last_count_update = current_time
-            if result.count is not None and not self._is_valid_count(result.count):
-                self.logger.error("3840 Count Runtime 返回非法值: %r", result.count)
-                self._set_latest_count(None)
-            else:
-                self._set_latest_count(
-                    int(result.count) if result.count is not None else None
+            started = time.perf_counter()
+            try:
+                count = self.runtime_router.recognize_count_canonical_3840(
+                    canonical_frame,
+                    count_rect=rois["count"],
+                    count_color_profile=self._detected_count_color,
                 )
-            self._record_timing("count", elapsed_ms)
+            except Exception:
+                self.logger.exception(
+                    "3840 Count Runtime 执行失败；本帧不会回退到 2560 模型。"
+                )
+            else:
+                inference_succeeded = True
+                if count.value is not None and not self._is_valid_count(count.value):
+                    self.logger.error(
+                        "3840 Count Runtime 返回非法值: %r", count.value
+                    )
+                    self._set_latest_count(None)
+                else:
+                    self._set_latest_count(
+                        int(count.value) if count.value is not None else None
+                    )
+            finally:
+                self._record_timing(
+                    "count", (time.perf_counter() - started) * 1000.0
+                )
         if status_due:
             self._last_status_update = current_time
-            self._apply_time_paused_result(result.time, result.paused, source="3840")
-            self._record_timing("status", elapsed_ms)
+            started = time.perf_counter()
+            try:
+                status = self.runtime_router.recognize_status_canonical_3840(
+                    canonical_frame,
+                    time_rect=rois["time"],
+                    paused_rect=rois["paused"],
+                )
+            except Exception:
+                self.logger.exception(
+                    "3840 Time/Paused Runtime 执行失败；本帧不会回退到 2560 模型。"
+                )
+            else:
+                inference_succeeded = True
+                self._apply_time_paused_result(
+                    status.production_time_first_time,
+                    status.production_time_first_paused,
+                    source="3840",
+                )
+            finally:
+                self._record_timing(
+                    "status", (time.perf_counter() - started) * 1000.0
+                )
+        if not inference_succeeded:
+            return
         self._update_latest_result()
 
     @staticmethod
     def _is_due(now, last_update, interval):
         return last_update is None or now - last_update >= interval
 
-    def _detect_and_set_3840_ui_state(self, canonical_frame, native_frame):
-        """Use the existing color probe but accept only the verified Normal UI."""
-        if not self._coarse_profile_has_count_color(canonical_frame, "Normal"):
-            unsupported = [
-                profile
-                for profile in self.UI_PROFILES
-                if profile != "Normal"
-                and self._coarse_profile_has_count_color(canonical_frame, profile)
-            ]
-            if unsupported and not self._unsupported_3840_ui_profile_reported:
-                self.logger.error(
-                    "3840 Runtime 仅支持已验证的 Normal UI profile；检测到候选 %s，"
-                    "不会使用未经验证的模型。",
-                    unsupported,
-                )
-                self._unsupported_3840_ui_profile_reported = True
-            return False
+    def _resolved_rois(self, ui_profile):
+        return {
+            task_id: self._ui_geometry.resolved_task(task_id, ui_profile)[1]
+            for task_id in ("count", "time", "paused")
+        }
+
+    @staticmethod
+    def _roi_diagnostic(rect):
+        return (rect.x, rect.y, rect.right, rect.bottom)
+
+    def _scan_ui_profile_candidates(self, frame, count_reader):
+        """Use shared HSV filtering and Count confirmation for every runtime."""
 
         candidates = []
-        for color_profile in self.COUNT_COLOR_PROFILES:
-            try:
-                result = self.runtime_router.process(
-                    native_frame,
-                    ui_profile="Normal",
-                    count_color_profile=color_profile,
-                )
-            except Exception:
-                self.logger.exception(
-                    "3840 Runtime UI/颜色探测失败: profile=Normal, color=%s；"
-                    "不会回退到 2560 模型。",
-                    color_profile,
-                )
-                return False
-            if self._is_valid_count(result.count):
-                candidates.append((color_profile, int(result.count)))
-            elif result.count is not None:
-                self.logger.error("3840 Count Runtime 返回非法值: %r", result.count)
+        scans = {}
+        for ui_profile in self._ordered_ui_profiles():
+            rois = self._resolved_rois(ui_profile)
+            probe_pixels = self._count_probe_color_pixels(frame, ui_profile)
+            hsv_candidate = (
+                sum(probe_pixels.values()) > self.COUNT_PROBE_MIN_PIXELS
+                or ui_profile == self._diagnostic_ui_profile_override
+            )
+            scan = {
+                "offset": int(self._ui_geometry.ui_offsets[ui_profile]),
+                "rois": {
+                    task_id: self._roi_diagnostic(rect)
+                    for task_id, rect in rois.items()
+                },
+                "hsv_count_probe_pixels": dict(probe_pixels),
+                "hsv_candidate": bool(hsv_candidate),
+                "probe_color": self._select_count_color_from_probe(probe_pixels),
+                "per_color_count_results": {},
+            }
+            scans[ui_profile] = scan
+            if not hsv_candidate:
+                continue
+            for color_profile in self.COUNT_COLOR_PROFILES:
+                try:
+                    evidence = count_reader(ui_profile, color_profile, rois)
+                except Exception:
+                    self.logger.exception(
+                        "UI Profile Count 候选探测失败: profile=%s, color=%s",
+                        ui_profile,
+                        color_profile,
+                    )
+                    raise
+                count = evidence.get("count")
+                present = bool(evidence.get("present"))
+                scan["per_color_count_results"][color_profile] = {
+                    "count": count,
+                    "present": present,
+                    "score": evidence.get("score"),
+                    "raw_prediction": evidence.get("raw_prediction"),
+                }
+                if present and self._is_valid_count(count):
+                    candidates.append((ui_profile, color_profile, int(count)))
+                elif count is not None and not self._is_valid_count(count):
+                    self.logger.error(
+                        "Count OCR 违反输出 contract: profile=%s, color=%s, value=%r",
+                        ui_profile,
+                        color_profile,
+                        count,
+                    )
+        return candidates, scans
 
-        if len(candidates) != 1:
-            if candidates:
-                self.logger.warning("3840 Count 颜色探测结果不唯一: %s", candidates)
+    def _detect_and_set_ui_state_3840(self, canonical_frame):
+        """Detect six shared UI profiles, then adapt their ROIs to frozen 3840 OCR."""
+
+        previous_profile = self._last_successful_ui_profile
+
+        def read_count(ui_profile, color_profile, rois):
+            details = self.runtime_router.recognize_count_canonical_3840(
+                canonical_frame,
+                count_rect=rois["count"],
+                count_color_profile=color_profile,
+            )
+            return {
+                "count": details.value,
+                "present": bool(details.present),
+                "score": float(details.best_score),
+                "raw_prediction": details.raw_prediction,
+            }
+
+        try:
+            candidates, scans = self._scan_ui_profile_candidates(
+                canonical_frame,
+                read_count,
+            )
+            for ui_profile in self.UI_PROFILES:
+                rois = self._resolved_rois(ui_profile)
+                status = self.runtime_router.recognize_status_canonical_3840(
+                    canonical_frame,
+                    time_rect=rois["time"],
+                    paused_rect=rois["paused"],
+                )
+                scans[ui_profile]["status"] = {
+                    "time_present": bool(status.raw_time_presence),
+                    "raw_time": status.raw_time_prediction,
+                    "time": status.production_time_first_time,
+                    "raw_paused": bool(status.raw_paused_prediction),
+                    "paused": bool(status.production_time_first_paused),
+                }
+        except Exception:
+            self.logger.exception(
+                "3840 共享 UI Profile 探测失败；本帧不会回退到 2560 模型。"
+            )
             return False
 
-        color_profile, count = candidates[0]
+        if self._diagnostic_ui_profile_override is not None:
+            candidates = [
+                candidate
+                for candidate in candidates
+                if candidate[0] == self._diagnostic_ui_profile_override
+            ]
+        if self._diagnostic_count_color_override is not None:
+            candidates = [
+                candidate
+                for candidate in candidates
+                if candidate[1] == self._diagnostic_count_color_override
+            ]
+        selected = self._select_ui_candidate(candidates)
+        selected_status = None
+        if selected is not None:
+            ui_profile, color_profile, count = selected
+            selected_status = scans[ui_profile]["status"]
+            with self._state_lock:
+                self._current_ui_profile = ui_profile
+                self._detected_count_color = color_profile
+                self._latest_count = count
+                self._last_successful_ui_profile = ui_profile
+            self._apply_time_paused_result(
+                selected_status["time"],
+                selected_status["paused"],
+                source="3840",
+            )
+
+        normal_scan = scans["Normal"]
+        legacy_status = (
+            selected_status
+            or scans.get(self._diagnostic_ui_profile_override or "Normal", {}).get(
+                "status"
+            )
+        )
+        selected_profile = None if selected is None else selected[0]
+        selected_color = None if selected is None else selected[1]
+        selected_rois = (
+            None if selected_profile is None else scans[selected_profile]["rois"]
+        )
         with self._state_lock:
-            self._current_ui_profile = "Normal"
-            self._detected_count_color = color_profile
-            self._latest_count = count
-            self._last_successful_ui_profile = "Normal"
+            self._latest_3840_diagnostics.update(
+                {
+                    "route_reached": True,
+                    "original_ui_profile": previous_profile,
+                    "profile_scans": copy.deepcopy(scans),
+                    "candidate_results": list(candidates),
+                    "selected_ui_profile": selected_profile,
+                    "selected_y_offset": (
+                        None
+                        if selected_profile is None
+                        else scans[selected_profile]["offset"]
+                    ),
+                    "selected_rois": copy.deepcopy(selected_rois),
+                    "hsv_count_probe_pixels": copy.deepcopy(
+                        normal_scan["hsv_count_probe_pixels"]
+                    ),
+                    "normal_hsv_candidate": bool(normal_scan["hsv_candidate"]),
+                    "normal_ui_accepted": selected_profile == "Normal",
+                    "selected_count_color": selected_color,
+                    "raw_count": None if selected is None else selected[2],
+                    "per_color_count_results": copy.deepcopy(
+                        normal_scan["per_color_count_results"]
+                    ),
+                    "raw_time": (
+                        None if legacy_status is None else legacy_status["raw_time"]
+                    ),
+                    "raw_time_present": (
+                        False
+                        if legacy_status is None
+                        else legacy_status["time_present"]
+                    ),
+                    "raw_paused": (
+                        None
+                        if legacy_status is None
+                        else legacy_status["raw_paused"]
+                    ),
+                }
+            )
+
+        scan_summary = {
+            profile: {
+                "offset": scan["offset"],
+                "hsv": scan["hsv_count_probe_pixels"],
+                "count_hits": [
+                    (color, result["count"], result["score"])
+                    for color, result in scan["per_color_count_results"].items()
+                    if result["present"]
+                ],
+                "time_present": scan["status"]["time_present"],
+                "paused": scan["status"]["raw_paused"],
+            }
+            for profile, scan in scans.items()
+        }
+        self._log_diagnostic(
+            "initial_probe",
+            "warning",
+            "[HandlerDiag] 3840 UI Profile 探测: candidates=%s, selected=%s, summary=%s",
+            candidates,
+            selected,
+            scan_summary,
+        )
+        if selected is None:
+            self._set_latest_count(None)
+            self._set_3840_blocking_condition(
+                "ui_profile_ambiguous" if candidates else "ui_profile_not_confirmed"
+            )
+            return False
+
         self.logger.info(
-            "3840 UI 状态探测成功: profile=Normal, count_color=%s, count=%s",
-            color_profile,
-            count,
+            "3840 UI 状态探测成功: profile=%s, y_offset=%s, "
+            "count_color=%s, count=%s",
+            selected[0],
+            scans[selected[0]]["offset"],
+            selected[1],
+            selected[2],
         )
         return True
+
+    def _count_probe_color_pixels(self, frame, ui_profile):
+        count_rect = self._resolved_rois(ui_profile)["count"]
+        roi = frame[
+            count_rect.y : count_rect.bottom,
+            count_rect.x : count_rect.right,
+        ]
+        if roi.size == 0:
+            return {color: 0 for color in self.COUNT_COLOR_PROFILES}
+        hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+        return {
+            color: int(cv2.countNonZero(cv2.inRange(hsv, lower, upper)))
+            for color, (lower, upper) in zip(
+                self.COUNT_COLOR_PROFILES,
+                self._count_probe_ranges,
+            )
+        }
+
+    def _select_count_color_from_probe(self, probe_pixels):
+        if not probe_pixels:
+            return None
+        maximum = max(probe_pixels.values())
+        if maximum <= self.COUNT_PROBE_MIN_PIXELS:
+            return None
+        winners = [
+            color for color, pixels in probe_pixels.items() if pixels == maximum
+        ]
+        return winners[0] if len(winners) == 1 else None
 
     def _validate_frame(self, frame):
         if not isinstance(frame, np.ndarray):
@@ -363,33 +675,27 @@ class MalwarfareMapHandler:
     def _detect_and_set_ui_state(self, frame):
         """Find a unique UI profile/color pair using production Count OCR."""
         self.logger.info("正在使用新版 Count OCR 探测 UI profile 和颜色...")
-        candidates = []
-        for ui_profile in self._ordered_ui_profiles():
-            if not self._coarse_profile_has_count_color(frame, ui_profile):
-                continue
-            for color_profile in self.COUNT_COLOR_PROFILES:
-                try:
-                    count = self._timed_recognize_count(
-                        frame,
-                        ui_profile=ui_profile,
-                        color_profile=color_profile,
-                    )
-                except Exception:
-                    self.logger.exception(
-                        "UI 探测调用新版 Count OCR 失败: profile=%s, color=%s",
-                        ui_profile,
-                        color_profile,
-                    )
-                    return False
-                if self._is_valid_count(count):
-                    candidates.append((ui_profile, color_profile, int(count)))
-                elif count is not None:
-                    self.logger.error(
-                        "新版 Count OCR 违反输出 contract: profile=%s, color=%s, value=%r",
-                        ui_profile,
-                        color_profile,
-                        count,
-                    )
+        def read_count(ui_profile, color_profile, _rois):
+            count = self._timed_recognize_count(
+                frame,
+                ui_profile=ui_profile,
+                color_profile=color_profile,
+            )
+            valid = self._is_valid_count(count)
+            return {
+                "count": count,
+                "present": valid,
+                "score": None,
+                "raw_prediction": f"c{int(count)}" if valid else None,
+            }
+
+        try:
+            candidates, _scans = self._scan_ui_profile_candidates(
+                frame,
+                read_count,
+            )
+        except Exception:
+            return False
 
         selected = self._select_ui_candidate(candidates)
         if selected is None:
@@ -415,21 +721,10 @@ class MalwarfareMapHandler:
 
     def _coarse_profile_has_count_color(self, frame, ui_profile):
         """Cheap legacy HSV presence probe; production OCR remains authoritative."""
-        offset = self.UI_PROFILE_OFFSETS[ui_profile]
-        x0, y0, x1, y1 = self.COUNT_PROBE_ROI
-        roi = frame[y0 + offset : y1 + offset, x0:x1]
-        if roi.size == 0:
-            return False
-        hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-        combined_mask = None
-        for lower, upper in self._count_probe_ranges:
-            color_mask = cv2.inRange(hsv, lower, upper)
-            combined_mask = (
-                color_mask
-                if combined_mask is None
-                else cv2.bitwise_or(combined_mask, color_mask)
-            )
-        return cv2.countNonZero(combined_mask) > self.COUNT_PROBE_MIN_PIXELS
+        return (
+            sum(self._count_probe_color_pixels(frame, ui_profile).values())
+            > self.COUNT_PROBE_MIN_PIXELS
+        )
 
     def _ordered_ui_profiles(self):
         preferred = self._last_successful_ui_profile
@@ -629,6 +924,16 @@ class MalwarfareMapHandler:
             latest_time = self._latest_time
 
         if latest_count is None:
+            self._log_diagnostic(
+                "publish_blocked_count_none",
+                "warning",
+                "[PublishDiag] 结果暂不发布: Count=None, profile=%r, color=%r, "
+                "raw_time=%r, raw_paused=%r",
+                self._current_ui_profile,
+                self._detected_count_color,
+                latest_time,
+                latest_paused,
+            )
             if self._current_ui_profile is not None:
                 self._consecutive_failures += 1
                 if self._consecutive_failures > self.FAILURE_RELOCATION_THRESHOLD:
@@ -675,7 +980,7 @@ class MalwarfareMapHandler:
         }
         self._consecutive_failures = 0
         if self._last_valid_parsed is None or parsed != self._last_valid_parsed:
-            self.logger.info("状态更新: %s", parsed)
+            self.logger.warning("[PublishDiag] 最新状态已生成: %s", parsed)
             self._last_valid_parsed = parsed
 
         with self._result_lock:
@@ -743,6 +1048,48 @@ class MalwarfareMapHandler:
         with self._result_lock:
             return self._latest_result.copy() if self._latest_result else None
 
+    def get_runtime_diagnostics(self):
+        """Return a copy of the latest 3840 routing/initialization diagnostics."""
+
+        with self._state_lock:
+            result = copy.deepcopy(self._latest_3840_diagnostics)
+            result.update(
+                {
+                    "runtime_enabled": self.enable_3840_runtime,
+                    "handler_running_flag": bool(self._running),
+                    "worker_alive": bool(
+                        self._running_thread is not None
+                        and self._running_thread.is_alive()
+                    ),
+                    "handler_running": bool(
+                        self._running_thread is not None
+                        and self._running_thread.is_alive()
+                    ),
+                    "ui_profile": self._current_ui_profile,
+                    "count_color": self._detected_count_color,
+                    "latest_count": self._latest_count,
+                    "latest_time": self._latest_time,
+                    "latest_paused": self._latest_paused,
+                }
+            )
+        return result
+
+    def _set_3840_blocking_condition(self, condition):
+        with self._state_lock:
+            if self._latest_3840_diagnostics["first_blocking_condition"] is None:
+                self._latest_3840_diagnostics["first_blocking_condition"] = condition
+
+    def _log_diagnostic(self, key, level, message, *args):
+        now = time.monotonic()
+        previous = self._diagnostic_log_times.get(key)
+        if (
+            previous is not None
+            and now - previous < self.DIAGNOSTIC_LOG_INTERVAL_SECONDS
+        ):
+            return
+        self._diagnostic_log_times[key] = now
+        getattr(self.logger, level)(message, *args)
+
     def reset(self):
         """Reset game/UI state without reloading frozen OCR resources."""
         self.logger.info("重置 MalwarfareMapHandler...")
@@ -764,5 +1111,24 @@ class MalwarfareMapHandler:
             self._last_game_screen_timestamp = None
             self._unsupported_3840_ui_profile_reported = False
             self._missing_native_3840_reported = False
+            self._latest_3840_diagnostics = {
+                "route_reached": False,
+                "original_ui_profile": None,
+                "profile_scans": {},
+                "candidate_results": [],
+                "selected_ui_profile": None,
+                "selected_y_offset": None,
+                "selected_rois": None,
+                "hsv_count_probe_pixels": None,
+                "normal_hsv_candidate": None,
+                "normal_ui_accepted": None,
+                "selected_count_color": None,
+                "raw_count": None,
+                "per_color_count_results": {},
+                "raw_time": None,
+                "raw_time_present": None,
+                "raw_paused": None,
+                "first_blocking_condition": None,
+            }
         with self._result_lock:
             self._latest_result = None

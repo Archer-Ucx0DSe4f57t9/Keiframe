@@ -148,6 +148,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 `src/map_handlers/IdentifyMap.py`
 
 - 根据玩家数量和特定槽位的多语言单位名识别地图。
+- “净网行动”保留标准 6 人规则；编辑器测试局仅在 ID、类型、名称和顺序同时匹配已观测的五人签名时命中。
 
 `src/map_handlers/map_loader.py`
 
@@ -167,8 +168,10 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 
 - 正式 Handler 把标准化完整帧传给 `src.malwarfare` production API，自身保留 UI profile/颜色探测、25 秒规则、暂停历史时间、单调保护和重定位状态机。
 - 开关关闭，或原生尺寸不是 3840×2160 时，上述既有路径不变。开关开启且原生尺寸精确匹配时，Handler 把原生帧交给 `MalwarfareRuntimeRouter`；Router 在内部 canonicalization 前确认分辨率并调用 3840 Bundle。
-- 3840 Bundle 只允许已验证的 `Normal` UI profile，Count 颜色仍由现有 HSV 粗探测与三套可信 color profile 决定；Runtime 输出继续进入同一个 25 秒、暂停历史与单调保护状态机。
+- 3840 frozen Bundle 的正式验证范围仍只有 `Normal` UI profile；KeiFrame 非冻结适配层复用 2560 的六组纵向偏移，在 Canonical 帧上裁出与 Normal 完全同尺寸的 Count/Time/Paused ROI，再调用同一套冻结纯推理。Handler 的共享候选扫描先用 Green/Blue/Orange HSV 探针筛选，再以对应 Count Presence 唯一确认；低分 raw prediction 不算有效 Count，`Count=0` 保留合法语义，多颜色或多 Profile 歧义保持未知。逐 Profile 的 Count/Presence/score 和独立 Time/Paused 结果保存在诊断快照中，运行日志只输出限频摘要；确认后的结果继续进入同一个 25 秒、暂停历史、重定位和单调保护状态机。除 Normal 外均不得据此宣称冻结模型正式支持。
+- 开发诊断可在构造 Handler 时显式传入 `diagnostic_ui_profile_override="Normal"` 和 `diagnostic_count_color_override`；覆盖值只用于验证接入，不根据模型预测猜测颜色，也不会把 `Count=None` 发布为可信结果。
 - 3840 Runtime/manifest/model 初始化失败会明确报错；单帧执行失败会丢弃该帧，均不回退到 2560 模型。
+- `[RuntimeDiag]` 到 `[EventDiag]` 的限频日志覆盖运行路径、地图选择、截图、Handler、原始识别/发布和事件管理器入口；默认不会录制视频或逐帧刷屏。
 - `malwarfare_map_handler_legacy.py` 与旧模板 OCR/资源保持不变，作为英文过渡兼容实现；事件管理器和对外结果 contract 不变。
 
 `src/map_handlers/map_variant_auto_resolver.py`

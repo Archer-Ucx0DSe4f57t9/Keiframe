@@ -10,6 +10,7 @@ from unittest import mock
 import numpy as np
 
 from src.malwarfare.ocr_processor import MalwarfareOcrResult
+from src.malwarfare.profile import load_profile
 from src.malwarfare.runtime_3840 import (
     BUNDLE_ID_3840,
     Malwarfare3840Runtime,
@@ -55,6 +56,65 @@ class Runtime3840Tests(unittest.TestCase):
         )
         self.assertIsInstance(result, MalwarfareOcrResult)
         self.assertEqual(result, MalwarfareOcrResult(None, None, False))
+
+    def test_normal_canonical_adapter_matches_native_runtime_predictions(self) -> None:
+        native = np.zeros((2160, 3840, 3), np.uint8)
+        native[140:220, 320:620] = (255, 128, 0)
+        canonical = self.runtime.canonicalize(native)
+        rois = self.runtime.resolved_rois("Normal")
+
+        original = self.runtime.process_diagnostic(
+            native,
+            ui_profile="Normal",
+            count_color_profile="blue",
+        )
+        adapted = self.runtime.process_canonical_diagnostic(
+            canonical,
+            rois=rois,
+            count_color_profile="blue",
+        )
+
+        for field in (
+            "count",
+            "raw_count_prediction",
+            "raw_count_present",
+            "raw_count_score",
+            "raw_time_presence",
+            "raw_time_prediction",
+            "raw_time_presence_details",
+            "raw_time_numeric_details",
+            "raw_paused_prediction",
+            "raw_paused_score",
+            "raw_paused_baseline_ncc_score",
+            "raw_paused_details",
+            "time_paused_conflict",
+            "production_time_first_time",
+            "production_time_first_paused",
+            "runtime_bundle_id",
+        ):
+            self.assertEqual(getattr(original, field), getattr(adapted, field), field)
+
+    def test_shared_profile_offsets_keep_frozen_roi_sizes(self) -> None:
+        profile = load_profile(ROOT / "config" / "malwarfare_zh.json")
+        normal = self.runtime.resolved_rois("Normal")
+        canonical = np.zeros((1080, 1920, 3), np.uint8)
+
+        for ui_profile, offset in profile.ui_offsets.items():
+            with self.subTest(ui_profile=ui_profile):
+                rois = {
+                    task: profile.resolved_task(task, ui_profile)[1]
+                    for task in ("count", "time", "paused")
+                }
+                for task in rois:
+                    self.assertEqual(rois[task].width, normal[task].width)
+                    self.assertEqual(rois[task].height, normal[task].height)
+                    self.assertEqual(rois[task].y, normal[task].y + offset)
+                result = self.runtime.process_canonical(
+                    canonical,
+                    rois=rois,
+                    count_color_profile="orange",
+                )
+                self.assertEqual(MalwarfareOcrResult(None, None, False), result)
 
     def test_native_resolution_and_unverified_ui_profile_are_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "only native 3840x2160"):
@@ -129,6 +189,32 @@ class Runtime3840Tests(unittest.TestCase):
 
 
 class RuntimeRouterTests(unittest.TestCase):
+    def test_exposes_3840_diagnostics_without_changing_production_result(self) -> None:
+        runtime_2560 = mock.Mock()
+        runtime_3840 = mock.Mock()
+        runtime_3840.model_load_ms = 1.0
+        expected = mock.Mock()
+        runtime_3840.process_diagnostic.return_value = expected
+        router = MalwarfareRuntimeRouter(
+            runtime_2560=runtime_2560,
+            runtime_3840=runtime_3840,
+        )
+        frame = np.zeros((2160, 3840, 3), np.uint8)
+
+        result = router.process_diagnostic(
+            frame,
+            ui_profile="Normal",
+            count_color_profile="blue",
+        )
+
+        self.assertIs(expected, result)
+        runtime_3840.process_diagnostic.assert_called_once_with(
+            frame,
+            ui_profile="Normal",
+            count_color_profile="blue",
+        )
+        self.assertEqual(BUNDLE_ID_3840, router.last_runtime_bundle_id)
+
     def test_routes_before_canonicalization_and_reports_bundle(self) -> None:
         runtime_2560 = mock.Mock()
         runtime_2560.process.return_value = MalwarfareOcrResult(0, "123", False)

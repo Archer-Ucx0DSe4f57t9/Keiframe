@@ -176,8 +176,58 @@ map_checks = {
 
 logger = get_logger(__name__)
 
+
+_MALWARFARE_EDITOR_PLAYER_IDS = (1, 3, 4, 5, 6)
+_MALWARFARE_EDITOR_PLAYER_TYPES = (
+    'user',
+    'computer',
+    'computer',
+    'computer',
+    'computer',
+)
+_MALWARFARE_EDITOR_NEUTRAL_REWARD_NAMES = {
+    'Neutral Reward',
+    '中立奖励',
+    '中立獎勵',
+}
+
+
+def _matches_malwarfare_editor_test(player_data: List[Dict[str, Any]]) -> bool:
+    """Match the observed five-player Editor test signature only.
+
+    Editor test games omit the second user at id=2, shifting the two Purifier
+    holograms and Megalith one list position to the left. IDs, types, names,
+    and order are all required so an arbitrary five-player game cannot match.
+    """
+
+    if len(player_data) != 5:
+        return False
+    if tuple(player.get('id') for player in player_data) != _MALWARFARE_EDITOR_PLAYER_IDS:
+        return False
+    if (
+        tuple(player.get('type') for player in player_data)
+        != _MALWARFARE_EDITOR_PLAYER_TYPES
+    ):
+        return False
+
+    malwarfare_names = map_checks['净网行动']['check']
+    return (
+        player_data[1].get('name') in malwarfare_names[2]
+        and player_data[2].get('name') in malwarfare_names[2]
+        and player_data[3].get('name') in malwarfare_names[4]
+        and player_data[4].get('name') in _MALWARFARE_EDITOR_NEUTRAL_REWARD_NAMES
+    )
+
 def identify_map(player_data: List[Dict[str, Any]]) -> Optional[str]:
     """ Identify a map based on the list of players """
+    if _matches_malwarfare_editor_test(player_data):
+        logger.warning(
+            "[MapDiag] 识别到净网行动编辑器 5 人签名: ids=%s, names=%s",
+            [player.get('id') for player in player_data],
+            [player.get('name') for player in player_data],
+        )
+        return '净网行动'
+
     length = len(player_data)
     for m in map_checks:
         found = True

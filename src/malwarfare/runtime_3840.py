@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import hashlib
 import json
 from pathlib import Path
@@ -17,6 +17,7 @@ from .paused_recognizer import PausedRecognizer
 from .profile import MalwarfareProfile, load_profile
 from .runtime.count import (
     COUNT_RUNTIME_PROFILES,
+    CountRecognitionResult,
     CountPresenceThresholds,
     load_frozen_count_model,
     recognize_count_details,
@@ -77,6 +78,23 @@ class Malwarfare3840DiagnosticResult:
     production_time_first_paused: bool
     runtime_bundle_id: str
     timings: Malwarfare3840Timings
+
+
+@dataclass(frozen=True)
+class Malwarfare3840StatusDiagnosticResult:
+    raw_time_presence: bool
+    raw_time_prediction: str | None
+    raw_time_presence_details: Mapping[str, Any]
+    raw_time_numeric_details: Mapping[str, Any] | None
+    raw_paused_prediction: bool
+    raw_paused_score: float
+    raw_paused_baseline_ncc_score: float
+    raw_paused_details: Mapping[str, Any]
+    time_paused_conflict: bool
+    production_time_first_time: str | None
+    production_time_first_paused: bool
+    time_ms: float
+    paused_ms: float
 
 
 def _sha256_file(path: Path) -> str:
@@ -236,38 +254,104 @@ class Malwarfare3840Runtime:
         }
 
     @staticmethod
+    def _validate_canonical(frame_bgr: np.ndarray) -> None:
+        if not isinstance(frame_bgr, np.ndarray):
+            raise TypeError("canonical_frame_bgr must be a numpy.ndarray")
+        if frame_bgr.dtype != np.uint8:
+            raise ValueError(
+                "canonical_frame_bgr must have dtype uint8, "
+                f"got {frame_bgr.dtype}"
+            )
+        if frame_bgr.shape != CANONICAL_FRAME_SHAPE:
+            raise ValueError(
+                "canonical_frame_bgr must be 1920x1080 BGR with shape "
+                f"{CANONICAL_FRAME_SHAPE}; got {frame_bgr.shape}"
+            )
+
+    def _validate_adapted_rois(self, rois: Mapping[str, Rect]) -> dict[str, Rect]:
+        if not isinstance(rois, Mapping) or set(rois) != {
+            "count",
+            "time",
+            "paused",
+        }:
+            raise ValueError("adapted ROIs must contain count, time, and paused")
+        normal = self.resolved_rois(SUPPORTED_UI_PROFILE_3840)
+        validated: dict[str, Rect] = {}
+        for task_id, expected in normal.items():
+            rect = rois[task_id]
+            if not isinstance(rect, Rect):
+                raise TypeError(f"adapted {task_id} ROI must be a Rect")
+            if (rect.width, rect.height) != (expected.width, expected.height):
+                raise ValueError(
+                    f"adapted {task_id} ROI must keep frozen size "
+                    f"{expected.width}x{expected.height}; got "
+                    f"{rect.width}x{rect.height}"
+                )
+            if rect.right > CANONICAL_WIDTH or rect.bottom > CANONICAL_HEIGHT:
+                raise ValueError(f"adapted {task_id} ROI is outside canonical frame")
+            validated[task_id] = rect
+        return validated
+
+    @staticmethod
     def _crop(frame_bgr: np.ndarray, rect: Rect) -> np.ndarray:
         return frame_bgr[rect.y : rect.bottom, rect.x : rect.right]
 
-    def process_diagnostic(
+    def recognize_count_canonical_details(
         self,
-        frame_bgr: np.ndarray,
+        canonical_frame_bgr: np.ndarray,
         *,
-        ui_profile: str,
+        count_rect: Rect,
         count_color_profile: str,
-    ) -> Malwarfare3840DiagnosticResult:
-        total_started = perf_counter()
-        stage = perf_counter()
-        canonical = self.canonicalize(frame_bgr)
-        canonicalization_ms = (perf_counter() - stage) * 1000.0
-        rois = self.resolved_rois(ui_profile)
-        count_roi = self._crop(canonical, rois["count"])
-        time_roi = self._crop(canonical, rois["time"])
-        paused_roi = self._crop(canonical, rois["paused"])
+    ) -> CountRecognitionResult:
+        """Run frozen Count inference on one geometry-adapted canonical ROI."""
 
+        self._validate_canonical(canonical_frame_bgr)
+        normal_count = self.resolved_rois(SUPPORTED_UI_PROFILE_3840)["count"]
+        if not isinstance(count_rect, Rect):
+            raise TypeError("count_rect must be a Rect")
+        if (count_rect.width, count_rect.height) != (
+            normal_count.width,
+            normal_count.height,
+        ):
+            raise ValueError(
+                "adapted count ROI must preserve the frozen Count ROI size"
+            )
+        if count_rect.right > CANONICAL_WIDTH or count_rect.bottom > CANONICAL_HEIGHT:
+            raise ValueError("adapted count ROI is outside canonical frame")
         color = str(count_color_profile).lower()
         if color not in self._count_centroids:
             raise ValueError(f"unsupported Count color profile: {count_color_profile}")
-        stage = perf_counter()
-        count = recognize_count_details(
-            count_roi,
+        return recognize_count_details(
+            self._crop(canonical_frame_bgr, count_rect),
             color_profile=color,
             centroids=self._count_centroids[color],
             thresholds=self._count_thresholds[color],
         )
-        count_ms = (perf_counter() - stage) * 1000.0
+
+    def recognize_status_canonical_diagnostic(
+        self,
+        canonical_frame_bgr: np.ndarray,
+        *,
+        time_rect: Rect,
+        paused_rect: Rect,
+    ) -> Malwarfare3840StatusDiagnosticResult:
+        """Run frozen Time-first/Paused inference on adapted canonical ROIs."""
+
+        self._validate_canonical(canonical_frame_bgr)
+        normal = self.resolved_rois(SUPPORTED_UI_PROFILE_3840)
+        for task_id, rect in (("time", time_rect), ("paused", paused_rect)):
+            expected = normal[task_id]
+            if not isinstance(rect, Rect):
+                raise TypeError(f"{task_id}_rect must be a Rect")
+            if (rect.width, rect.height) != (expected.width, expected.height):
+                raise ValueError(
+                    f"adapted {task_id} ROI must preserve frozen ROI size"
+                )
+            if rect.right > CANONICAL_WIDTH or rect.bottom > CANONICAL_HEIGHT:
+                raise ValueError(f"adapted {task_id} ROI is outside canonical frame")
 
         stage = perf_counter()
+        time_roi = self._crop(canonical_frame_bgr, time_rect)
         presence = predict_time_presence_3840(time_roi)
         numeric = (
             predict_time_numeric_3840(time_roi, self._time_model)
@@ -277,6 +361,7 @@ class Malwarfare3840Runtime:
         time_ms = (perf_counter() - stage) * 1000.0
 
         stage = perf_counter()
+        paused_roi = self._crop(canonical_frame_bgr, paused_rect)
         baseline = self._paused_baseline.score_details(paused_roi)
         paused = predict_paused_3840(
             self._paused_model,
@@ -288,11 +373,7 @@ class Malwarfare3840Runtime:
         time_present = bool(presence["present"])
         paused_prediction = bool(paused["prediction"])
         raw_time = None if numeric is None else str(numeric["value"])
-        return Malwarfare3840DiagnosticResult(
-            count=count.value,
-            raw_count_prediction=count.raw_prediction,
-            raw_count_present=count.present,
-            raw_count_score=count.best_score,
+        return Malwarfare3840StatusDiagnosticResult(
             raw_time_presence=time_present,
             raw_time_prediction=raw_time,
             raw_time_presence_details=dict(presence),
@@ -310,13 +391,104 @@ class Malwarfare3840Runtime:
             production_time_first_paused=(
                 False if time_present else paused_prediction
             ),
+            time_ms=time_ms,
+            paused_ms=paused_ms,
+        )
+
+    def process_canonical_diagnostic(
+        self,
+        canonical_frame_bgr: np.ndarray,
+        *,
+        rois: Mapping[str, Rect],
+        count_color_profile: str,
+    ) -> Malwarfare3840DiagnosticResult:
+        """Apply frozen inference to shared-profile canonical ROI geometry."""
+
+        total_started = perf_counter()
+        self._validate_canonical(canonical_frame_bgr)
+        resolved = self._validate_adapted_rois(rois)
+
+        stage = perf_counter()
+        count = self.recognize_count_canonical_details(
+            canonical_frame_bgr,
+            count_rect=resolved["count"],
+            count_color_profile=count_color_profile,
+        )
+        count_ms = (perf_counter() - stage) * 1000.0
+        status = self.recognize_status_canonical_diagnostic(
+            canonical_frame_bgr,
+            time_rect=resolved["time"],
+            paused_rect=resolved["paused"],
+        )
+        return Malwarfare3840DiagnosticResult(
+            count=count.value,
+            raw_count_prediction=count.raw_prediction,
+            raw_count_present=count.present,
+            raw_count_score=count.best_score,
+            raw_time_presence=status.raw_time_presence,
+            raw_time_prediction=status.raw_time_prediction,
+            raw_time_presence_details=status.raw_time_presence_details,
+            raw_time_numeric_details=status.raw_time_numeric_details,
+            raw_paused_prediction=status.raw_paused_prediction,
+            raw_paused_score=status.raw_paused_score,
+            raw_paused_baseline_ncc_score=(
+                status.raw_paused_baseline_ncc_score
+            ),
+            raw_paused_details=status.raw_paused_details,
+            time_paused_conflict=status.time_paused_conflict,
+            production_time_first_time=status.production_time_first_time,
+            production_time_first_paused=status.production_time_first_paused,
             runtime_bundle_id=BUNDLE_ID_3840,
             timings=Malwarfare3840Timings(
                 model_load_ms=self._model_load_ms,
-                canonicalization_ms=canonicalization_ms,
+                canonicalization_ms=0.0,
                 count_ms=count_ms,
-                time_ms=time_ms,
-                paused_ms=paused_ms,
+                time_ms=status.time_ms,
+                paused_ms=status.paused_ms,
+                total_per_frame_ms=(perf_counter() - total_started) * 1000.0,
+            ),
+        )
+
+    def process_canonical(
+        self,
+        canonical_frame_bgr: np.ndarray,
+        *,
+        rois: Mapping[str, Rect],
+        count_color_profile: str,
+    ) -> MalwarfareOcrResult:
+        diagnostic = self.process_canonical_diagnostic(
+            canonical_frame_bgr,
+            rois=rois,
+            count_color_profile=count_color_profile,
+        )
+        return MalwarfareOcrResult(
+            count=diagnostic.count,
+            time=diagnostic.production_time_first_time,
+            paused=diagnostic.production_time_first_paused,
+        )
+
+    def process_diagnostic(
+        self,
+        frame_bgr: np.ndarray,
+        *,
+        ui_profile: str,
+        count_color_profile: str,
+    ) -> Malwarfare3840DiagnosticResult:
+        total_started = perf_counter()
+        stage = perf_counter()
+        canonical = self.canonicalize(frame_bgr)
+        canonicalization_ms = (perf_counter() - stage) * 1000.0
+        rois = self.resolved_rois(ui_profile)
+        result = self.process_canonical_diagnostic(
+            canonical,
+            rois=rois,
+            count_color_profile=count_color_profile,
+        )
+        return replace(
+            result,
+            timings=replace(
+                result.timings,
+                canonicalization_ms=canonicalization_ms,
                 total_per_frame_ms=(perf_counter() - total_started) * 1000.0,
             ),
         )
@@ -411,6 +583,7 @@ __all__ = [
     "DEFAULT_RUNTIME_3840_RESOURCE_DIR",
     "Malwarfare3840DiagnosticResult",
     "Malwarfare3840Runtime",
+    "Malwarfare3840StatusDiagnosticResult",
     "Malwarfare3840Timings",
     "NATIVE_FRAME_SHAPE_3840",
     "SUPPORTED_UI_PROFILE_3840",

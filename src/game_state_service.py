@@ -18,6 +18,17 @@ from src.utils.window_utils import get_sc2_window_geometry, is_game_active
 #from src import show_fence
 
 logger = get_logger(__name__)
+_capture_log_times = {}
+_CAPTURE_LOG_INTERVAL_SECONDS = 10.0
+
+
+def _log_capture_diagnostic(key, level, message, *args):
+    now = time.monotonic()
+    previous = _capture_log_times.get(key)
+    if previous is not None and now - previous < _CAPTURE_LOG_INTERVAL_SECONDS:
+        return
+    _capture_log_times[key] = now
+    getattr(logger, level)(message, *args)
 
 
 class GlobalState:
@@ -116,7 +127,14 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
         # 如果游戏ID发生变化，说明是新游戏
         if new_game_id != state.current_game_id:
             state.current_game_id = new_game_id
-            logger.info('检测到新游戏，准备更新地图信息')
+            logger.warning(
+                "[MapDiag] /game/ 玩家解析成功: count=%d, players=%s",
+                len(players),
+                [
+                    (player.get('id'), player.get('name'), player.get('type'))
+                    for player in players
+                ],
+            )
 
             # 如果所有玩家都是用户类型，说明是对战模式，跳过
             if all(p['type'] == 'user' for p in players) or len(players) <= 2:
@@ -150,13 +168,18 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
                 logger.info(f'玩家数据: {json.dumps(players, ensure_ascii=False, indent=2)}')
                 map_found = identify_map(players)
                 if map_found:
-                    logger.info(f'地图识别成功: {map_found}')
+                    logger.warning(
+                        "[MapDiag] identify_map(players)=%r，准备发出 update_map",
+                        map_found,
+                    )
                     # 发送信号更新下拉列表
                     progress_callback.emit(['update_map', map_found])
                     # 更新全局变量中的地图信息
                     state.current_selected_map = map_found
                 else:
-                    logger.info('地图识别失败,- 原因: 无法从API响应中获取地图名称')
+                    logger.warning(
+                        "[MapDiag] identify_map(players)=None，不会发出 update_map"
+                    )
             except Exception:
                 logger.error(f'地图识别出错: {traceback.format_exc()}')
 
@@ -183,6 +206,13 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
     #如果activeScreens非空，说明在菜单界面，不在游戏中；如果activeScreens为空，说明在游戏中
     new_is_in_game = not bool(active_screens)
     state.is_in_game = new_is_in_game
+    if previous_is_in_game is not new_is_in_game:
+        logger.warning(
+            "[CaptureDiag] is_in_game 变化: %r -> %r, activeScreens=%s",
+            previous_is_in_game,
+            new_is_in_game,
+            active_screens,
+        )
 
     # 从游戏内切换到非游戏内时，如果本局触发过 message_presenter，则重置一次
     if previous_is_in_game is True and new_is_in_game is False:
@@ -196,15 +226,25 @@ def _capture_game_screen(sct):
     同步函数：执行截屏并更新state。
     由scheduler调用。
     """
-    logger.info("尝试截图")
     try:
         # 基础检查：游戏是否激活且在进行中
         if not is_game_active(): # 如果你需要只在游戏窗口激活时截图，保留此行；否则可去掉
+            _log_capture_diagnostic(
+                "inactive",
+                "warning",
+                "[CaptureDiag] SC2 截图暂停: is_game_active=False, is_in_game=%r",
+                state.is_in_game,
+            )
             return
 
         # 获取窗口几何信息
         sc2_rect = get_sc2_window_geometry()
         if not sc2_rect:
+            _log_capture_diagnostic(
+                "missing_geometry",
+                "warning",
+                "SC2 截图暂停: get_sc2_window_geometry() 未返回客户端区。",
+            )
             return
             
         x, y, w, h = sc2_rect
@@ -251,7 +291,20 @@ def _capture_game_screen(sct):
             state.latest_screenshot_native_shape = native_frame_shape
             state.scale_factor = current_scale
             state.screenshot_timestamp = time.perf_counter()
-        logger.info("截图成功更新全局状态")
+            updated_timestamp = state.screenshot_timestamp
+        _log_capture_diagnostic(
+            "capture_active",
+            "warning",
+            "[CaptureDiag] SC2 截图已更新: rect=%s, native=%s %s, canonical=%s %s, "
+            "native_3840_preserved=%s, timestamp=%.6f",
+            sc2_rect,
+            native_frame_shape,
+            game_screen_bgr.dtype,
+            tuple(game_screen_bgr.shape),
+            game_screen_bgr.dtype,
+            malwarfare_native_bgr is not None,
+            updated_timestamp,
+        )
     except Exception as e:
         logger.error(f"截图失败: {e}")
 

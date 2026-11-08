@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 from time import perf_counter
+from typing import Mapping
 
 import cv2
 import numpy as np
 
 from .ocr_processor import MalwarfareOcrProcessor, MalwarfareOcrResult
-from .runtime.geometry import CANONICAL_HEIGHT, CANONICAL_WIDTH
+from .runtime.geometry import CANONICAL_HEIGHT, CANONICAL_WIDTH, Rect
 from .runtime_3840 import (
     BUNDLE_ID_3840,
     DEFAULT_RUNTIME_3840_RESOURCE_DIR,
@@ -124,6 +125,92 @@ class MalwarfareRuntimeRouter:
                 count_color_profile=count_color_profile,
             )
         self._last_runtime_bundle_id = bundle_id
+        return result
+
+    def process_diagnostic(
+        self,
+        native_frame_bgr: np.ndarray,
+        *,
+        ui_profile: str,
+        count_color_profile: str,
+    ):
+        """Expose the frozen 3840 runtime's read-only inference diagnostics."""
+
+        if not isinstance(native_frame_bgr, np.ndarray):
+            raise TypeError("native_frame_bgr must be a numpy.ndarray")
+        bundle_id = self.runtime_bundle_id_for_shape(native_frame_bgr.shape)
+        if bundle_id != BUNDLE_ID_3840:
+            raise ValueError(
+                "diagnostic inference is available only for native 3840 frames"
+            )
+        result = self._runtime_3840.process_diagnostic(
+            native_frame_bgr,
+            ui_profile=ui_profile,
+            count_color_profile=count_color_profile,
+        )
+        self._last_runtime_bundle_id = bundle_id
+        return result
+
+    def process_canonical_3840(
+        self,
+        canonical_frame_bgr: np.ndarray,
+        *,
+        rois: Mapping[str, Rect],
+        count_color_profile: str,
+    ) -> MalwarfareOcrResult:
+        """Run 3840 models on shared-profile canonical geometry."""
+
+        result = self._runtime_3840.process_canonical(
+            canonical_frame_bgr,
+            rois=rois,
+            count_color_profile=count_color_profile,
+        )
+        self._last_runtime_bundle_id = BUNDLE_ID_3840
+        return result
+
+    def process_canonical_3840_diagnostic(
+        self,
+        canonical_frame_bgr: np.ndarray,
+        *,
+        rois: Mapping[str, Rect],
+        count_color_profile: str,
+    ):
+        result = self._runtime_3840.process_canonical_diagnostic(
+            canonical_frame_bgr,
+            rois=rois,
+            count_color_profile=count_color_profile,
+        )
+        self._last_runtime_bundle_id = BUNDLE_ID_3840
+        return result
+
+    def recognize_count_canonical_3840(
+        self,
+        canonical_frame_bgr: np.ndarray,
+        *,
+        count_rect: Rect,
+        count_color_profile: str,
+    ):
+        result = self._runtime_3840.recognize_count_canonical_details(
+            canonical_frame_bgr,
+            count_rect=count_rect,
+            count_color_profile=count_color_profile,
+        )
+        self._last_runtime_bundle_id = BUNDLE_ID_3840
+        return result
+
+    def recognize_status_canonical_3840(
+        self,
+        canonical_frame_bgr: np.ndarray,
+        *,
+        time_rect: Rect,
+        paused_rect: Rect,
+    ):
+        result = self._runtime_3840.recognize_status_canonical_diagnostic(
+            canonical_frame_bgr,
+            time_rect=time_rect,
+            paused_rect=paused_rect,
+        )
+        self._last_runtime_bundle_id = BUNDLE_ID_3840
         return result
 
 

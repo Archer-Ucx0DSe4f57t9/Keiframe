@@ -120,13 +120,15 @@ git diff --check
 
 无法读取游戏状态时，先确认 SC2 正在运行，并检查 `http://127.0.0.1:6119/game/` 与 `/ui/` 是否可访问。仓库中的 `端口修复.bat` 会以管理员权限调整 Windows 网络配置；仅在理解其影响且确实需要时运行。
 
+“净网行动”标准对局继续使用 6 人槽位规则。编辑器测试局仅在玩家 ID、类型、名称与顺序完整匹配已观测的 `1,3,4,5,6` 五人签名时识别为“净网行动”，不会把任意 5 人对局一概识别为该地图。运行日志使用 `[RuntimeDiag]`、`[MapDiag]`、`[CaptureDiag]`、`[HandlerDiag]`、`[PublishDiag]` 和 `[EventDiag]` 串联限频诊断。
+
 ## 当前限制
 
 - 依赖 Windows、SC2 窗口和固定屏幕区域；不同分辨率、语言、UI 缩放或游戏更新可能降低识别率。
 - 敌方组成识别依赖独立 PP-OCRv5 addon；真实游戏中的 tooltip、覆盖层位置、5 秒隐藏和 DPI 组合仍需手工验收。
 - `resources/` 是运行时必需内容，源码运行和发布目录都必须保持其结构。
 - “死亡摇篮”倒计时、阶段和偷车波次组件已存在并有核心单元测试，但当前尚未接入主窗口的地图选择与生命周期流程。
-- 3840 Runtime 当前只验证中文 `Normal` UI profile；其他 3840 UI profile 会明确报错且不会使用未经验证的模型。真实游戏、窗口模式、DPI 与 UI 比例组合仍需手工验收。
+- 3840 frozen Bundle 的正式模型范围仍只有中文 `Normal` UI profile。KeiFrame 的非冻结适配层复用 2560 的六组 UI 纵向偏移，在 1920×1080 Canonical 帧上保持原 ROI 尺寸调用同一套纯推理；HSV 只筛选候选，必须由 Count Presence 唯一确认，颜色或 Profile 歧义时不发布 Count，而 Time/Paused 仍保留逐 Profile 诊断。`Normal` 已做冻结结果一致性验证；`Replay` 及其余 Profile 仅属于兼容性实验范围，真实游戏、窗口模式、DPI 与 UI 比例组合仍需手工验收。
 - README 只描述当前源码行为；普通用户操作流程以发行版使用说明为准。
 
 ## 贡献

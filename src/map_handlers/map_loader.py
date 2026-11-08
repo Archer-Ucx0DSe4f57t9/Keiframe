@@ -76,6 +76,15 @@ def handle_map_selection(window, map_name):
             window.manual_map_selection = True
             window.logger.info('用户手动选择了地图')
         
+    previous_map = game_state_service.state.current_selected_map
+    window.logger.warning(
+        "[MapDiag] 地图选择进入: requested=%r, ui_current=%r, previous_state=%r, "
+        "handler_exists=%s",
+        map_name,
+        window.combo_box.currentText(),
+        previous_map,
+        window.malwarfare_handler is not None,
+    )
     game_state_service.state.current_selected_map = map_name
     
     # 在地嗪图识别到神族时，自动切换到神族模式
@@ -115,6 +124,22 @@ def handle_map_selection(window, map_name):
                 raise
             window.malwarfare_handler.reset()
             window.malwarfare_handler.start()
+            runtime_diagnostics = window.malwarfare_handler.get_runtime_diagnostics()
+            window.logger.warning(
+                "[HandlerDiag] MalwarfareMapHandler 已创建: enable_3840=%s, "
+                "running_flag=%s, worker_alive=%s",
+                runtime_diagnostics["runtime_enabled"],
+                runtime_diagnostics["handler_running_flag"],
+                runtime_diagnostics["worker_alive"],
+            )
+        else:
+            runtime_diagnostics = window.malwarfare_handler.get_runtime_diagnostics()
+            window.logger.warning(
+                "[HandlerDiag] 复用现有 MalwarfareMapHandler: running_flag=%s, "
+                "worker_alive=%s",
+                runtime_diagnostics["handler_running_flag"],
+                runtime_diagnostics["worker_alive"],
+            )
         
         window.countdown_label.show()
         apply_malwarfare_table_columns(window.table_area)

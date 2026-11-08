@@ -3,6 +3,25 @@ import time
 import traceback
 
 
+MALWARFARE_EVENT_DIAGNOSTIC_INTERVAL_SECONDS = 10.0
+
+
+def _log_malwarfare_event_diagnostic(window, key, message, *args):
+    now = time.monotonic()
+    log_times = getattr(window, "_malwarfare_event_diag_times", None)
+    if log_times is None:
+        log_times = {}
+        window._malwarfare_event_diag_times = log_times
+    previous = log_times.get(key)
+    if (
+        previous is not None
+        and now - previous < MALWARFARE_EVENT_DIAGNOSTIC_INTERVAL_SECONDS
+    ):
+        return
+    log_times[key] = now
+    window.logger.warning("[EventDiag] " + message, *args)
+
+
 def update_game_time(window):
     """更新游戏时间显示和处理地图/突变事件 (原 TimerWindow.update_game_time)"""
     window.logger.debug('开始更新游戏时间')
@@ -53,6 +72,13 @@ def update_game_time(window):
                             ocr_data = window.malwarfare_handler.get_latest_data()
 
                             if ocr_data:
+                                _log_malwarfare_event_diagnostic(
+                                    window,
+                                    "state",
+                                    "读取到 Handler 状态: data=%s, is_in_game=%r",
+                                    ocr_data,
+                                    window.game_state.is_in_game,
+                                )
                                 time_str = ocr_data.get('time')
                                 is_paused = ocr_data.get('is_paused')
 
@@ -78,6 +104,16 @@ def update_game_time(window):
                                         seconds = int(parts[1])
                                         countdown_seconds = minutes * 60 + seconds
 
+                                        _log_malwarfare_event_diagnostic(
+                                            window,
+                                            "event_manager",
+                                            "进入 MapwarfareEventManager.update_events: "
+                                            "count=%r, seconds=%r, is_in_game=%r",
+                                            current_count,
+                                            countdown_seconds,
+                                            window.game_state.is_in_game,
+                                        )
+
                                         window.map_event_manager.update_events(
                                             current_count,
                                             countdown_seconds,
@@ -88,6 +124,11 @@ def update_game_time(window):
                                 except (ValueError, TypeError) as e:
                                     window.logger.error(f"解析OCR时间 '{time_str}' 失败: {e}")
                             else:
+                                _log_malwarfare_event_diagnostic(
+                                    window,
+                                    "empty",
+                                    "Handler 尚未生成可发布状态",
+                                )
                                 window.logger.debug("游戏暂停或无有效OCR数据，跳过地图事件更新。")
                     else:
                         # 标准地图逻辑按秒处理即可
