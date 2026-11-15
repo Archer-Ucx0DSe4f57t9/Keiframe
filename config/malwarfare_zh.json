@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "profile_id": "malwarfare_zh",
+  "ui_language": "zh",
+  "coordinate_space": "canonical_1920x1080",
+  "canonicalization": {
+    "width": 1920,
+    "height": 1080,
+    "interpolation": "INTER_AREA",
+    "pipeline": "full_native_frame -> full_canonical_frame -> canonical_roi"
+  },
+  "configured_native_resolutions": [
+    {
+      "width": 2560,
+      "height": 1440,
+      "rendering_profile": "native_2560_to_1920"
+    }
+  ],
+  "future_rendering_profiles": [
+    "native_1920",
+    "native_3840_to_1920"
+  ],
+  "roi_padding": {
+    "x": 12,
+    "y": 8
+  },
+  "ui_offsets": {
+    "Normal": 0,
+    "Replay": 49,
+    "Hero": 97,
+    "HeroReplay": 146,
+    "Zweihaka": 181,
+    "ZweihakaReplay": 230
+  },
+  "default_ui_profile": "Normal",
+  "tasks": {
+    "count": {
+      "sample_type": "purified_count",
+      "base_roi_xyxy": [184, 80, 207, 95],
+      "font_profile": "orange",
+      "visual_class_mode": "atomic",
+      "allowed_labels": ["c0", "c1", "c2", "c3", "c4", "empty", "ignore"],
+      "accepted_raw_label_rule": "c0|c1|c2|c3|c4",
+      "layout": {
+        "kind": "atomic",
+        "slot_count": 1,
+        "meaning": "the complete x/5 visual unit"
+      }
+    },
+    "time": {
+      "sample_type": "time",
+      "base_roi_xyxy": [244, 81, 273, 94],
+      "font_profile": "yellow",
+      "visual_class_mode": "three_digit_slots",
+      "allowed_digit_classes": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+      "allowed_labels": ["000-359", "empty", "ignore"],
+      "accepted_raw_label_rule": "three ASCII digits with numeric value 000 through 359",
+      "layout": {
+        "kind": "slots",
+        "slot_count": 3,
+        "slot_meanings": ["minute", "seconds_tens", "seconds_ones"],
+        "slot_geometry_status": "PENDING_MANUAL_VERIFICATION"
+      }
+    },
+    "paused": {
+      "sample_type": "paused",
+      "base_roi_xyxy": [216, 79, 245, 95],
+      "font_profile": "yellow",
+      "visual_class_mode": "atomic",
+      "allowed_labels": ["paused", "empty", "ignore"],
+      "accepted_raw_label_rule": "paused",
+      "future_visual_classes": ["PAUSED"],
+      "layout": {
+        "kind": "atomic",
+        "slot_count": 1,
+        "meaning": "complete localized pause visual"
+      }
+    }
+  }
+}

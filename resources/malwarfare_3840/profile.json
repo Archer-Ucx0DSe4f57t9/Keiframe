@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "profile_id": "malwarfare_zh_3840_normal_v1",
+  "ui_language": "zh",
+  "coordinate_space": "canonical_1920x1080",
+  "canonicalization": {
+    "width": 1920,
+    "height": 1080,
+    "interpolation": "INTER_AREA",
+    "pipeline": "full_native_frame -> full_canonical_frame -> canonical_roi"
+  },
+  "configured_native_resolutions": [
+    {"width": 3840, "height": 2160, "rendering_profile": "native_3840_to_1920"}
+  ],
+  "roi_padding": {"x": 12, "y": 8},
+  "ui_offsets": {"Normal": 0},
+  "default_ui_profile": "Normal",
+  "tasks": {
+    "count": {
+      "sample_type": "purified_count",
+      "base_roi_xyxy": [184, 80, 207, 95],
+      "font_profile": "orange",
+      "allowed_labels": ["c0", "c1", "c2", "c3", "c4", "empty", "ignore"]
+    },
+    "time": {
+      "sample_type": "time",
+      "base_roi_xyxy": [244, 81, 273, 94],
+      "font_profile": "yellow",
+      "allowed_labels": ["000-359", "empty", "ignore"]
+    },
+    "paused": {
+      "sample_type": "paused",
+      "base_roi_xyxy": [216, 79, 245, 95],
+      "font_profile": "yellow",
+      "allowed_labels": ["paused", "empty", "ignore"]
+    }
+  }
+}

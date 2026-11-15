@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "task": "count_presence",
+  "language": "zh",
+  "candidate_version": "count_presence_zh_2560_v1",
+  "presence_algorithm_version": "count_projection_sum_and_frozen_score_v1",
+  "source_resolution_profile": "native_2560_to_canonical_1920",
+  "thresholds": {
+    "orange": {
+      "projection_sum_minimum": 36.026504,
+      "best_score_minimum": 0.181485
+    },
+    "blue": {
+      "projection_sum_minimum": 12.149592,
+      "best_score_minimum": 0.198723
+    },
+    "green": {
+      "projection_sum_minimum": 23.516688,
+      "best_score_minimum": 0.228908
+    }
+  },
+  "models": {
+    "orange": {
+      "identifier": "orange_poc_a_centroid_ncc_shift1_v1",
+      "provenance_path": "analysis/malwarfare_20261024_full_hero/malwarfare/count_round1_coloraware/count_recognizer_poc/poc_a_centroid_ncc_shift1.npz",
+      "sha256": "c3e037545e6cd4f4a166c075a1cfe5c3d1c86f9f082cf271e916eb34d88c93e2"
+    },
+    "blue": {
+      "identifier": "blue_poc_a_centroid_ncc_shift1_v1",
+      "provenance_path": "analysis/malwarfare_count_crosscolor_poc/blue_frozen_candidate/poc_a_centroid_ncc_shift1.npz",
+      "sha256": "7299b76eedcca85a7430e378b22eb4f7d9f2dbf0b6ac0d85bf2912995596c764"
+    },
+    "green": {
+      "identifier": "green_v2_poc_a_centroid_ncc_shift1_v1",
+      "provenance_path": "analysis/malwarfare_count_green_v2/green_v2_frozen_candidate/poc_a_centroid_ncc_shift1.npz",
+      "sha256": "e683842b09c3c21b9ca37af29dac9abdbd1ee107b47e0a138eb35f7063003b98"
+    }
+  },
+  "validation_type": "locked-candidate temporal holdout validation",
+  "independent_recording_validation": false,
+  "status": "frozen_after_within_recording_temporal_holdout_validation",
+  "validation_artifact": "analysis/malwarfare_runtime_final_temporal_holdout/freeze_metadata.json",
+  "validation_summary": "analysis/malwarfare_runtime_final_temporal_holdout/summary.json"
+}

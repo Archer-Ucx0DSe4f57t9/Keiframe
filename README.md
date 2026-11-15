@@ -14,7 +14,7 @@ KeiFrame 是一个面向《星际争霸 II》合作模式的 Windows 桌面辅�
 - 识别敌方种族和突变因子；按配置显示图标、文字与音频提醒。
 - 在可选 PP-OCRv5 addon 可用时识别敌方组成，并以无声文字提示名称；没有 addon 时该识别功能单独禁用。
 - 提供自定义倒计时、地图笔记、泽拉图神器提醒和补给提醒。
-- 对“净网行动”使用画面文字模板识别处理动态倒计时。
+- 对“净网行动”使用本地 frozen OCR runtime 识别节点数、动态倒计时和暂停状态；可显式选择原生 3840×2160 Runtime，默认关闭。
 - 对部分存在分支的地图使用小地图红点检测自动选择版本，用户可手动覆盖。
 - 提供设置窗口、全局快捷键、系统托盘和可锁定的置顶窗口。
 
@@ -58,11 +58,14 @@ Keiframe/
 │   └── utils/                          # 路径、日志、DPI、窗口等工具
 ├── resources/
 │   ├── db/                             # 地图、突变和敌方组成数据库
+│   ├── malwarfare/                     # 净网行动 frozen OCR 模型、manifest 与暂停模板
+│   ├── malwarfare_3840/                # 可选原生 3840 Runtime 的冻结 Bundle
 │   ├── templates/                      # 图像识别模板
 │   ├── memo/                           # 地图笔记图片
 │   ├── icons/ fonts/ sounds/           # UI 与提醒资源
 │   └── enemy_comps/ troops/            # 敌方组成和兵种数据
 ├── tests/                              # 单元测试、调试脚本与截图样本
+├── config/malwarfare_zh.json           # 净网行动 canonical ROI 与 UI profile
 ├── python/                             # Windows 嵌入式 Python 运行时
 ├── Keiframe.spec                       # PyInstaller 配置
 └── build-keiframe.bat                  # Windows 发布目录构建脚本
@@ -78,6 +81,9 @@ Keiframe/
 - `resources/enemy_comps/*.csv`：已确认敌方组成的 t1~t7 注意单位资料；提醒管理器通过共享 Advisor 一次性加载，并按英文或中文组成名查询。
 - `src/game_readers/enemy_composition_catalog.py`：19 条敌方组成的 canonical English、已验证中文名、种族和 OCR aliases；这是生产识别与展示的唯一 catalog source of truth。
 - `resources/templates/`：突变、种族、补给、小地图和特殊地图识别模板。
+- `resources/malwarfare/` 与 `config/malwarfare_zh.json`：既有中文“净网行动” 2560 OCR 的版本化 production bundle；旧模板仍供 legacy Handler 和英文兼容路径保留。
+- `resources/malwarfare_3840/`：默认关闭的原生 3840×2160 frozen Runtime Bundle，包含 manifest、模型哈希和纯推理资源，不依赖开发仓库的 analysis、recordings、Candidate、Shadow 或 GT。
+- `src/config.py` 的 `enable_malwarfare_3840_runtime` 是显式功能开关，默认 `False`；也可由 `settings.json` 同名布尔值覆盖，重新进入“净网行动”地图后生效。
 - `settings.json`：用户本地覆盖配置，不应提交。
 
 设置窗口支持地图/突变时间线的 Excel 导入导出。导入会覆盖涉及对象的原有数据库记录，修改数据前应先保留对应数据库备份。
@@ -88,7 +94,7 @@ Keiframe/
 
 ```powershell
 python -m compileall -q src
-python -m unittest tests.test_cradle_of_death_phase_detector tests.test_cradle_of_death_wave_manager
+python -m unittest tests.test_malwarfare_map_handler tests.test_malwarfare_runtime_3840 tests.test_malwarfare_3840_integration tests.test_cradle_of_death_phase_detector tests.test_cradle_of_death_wave_manager
 git diff --check
 ```
 
@@ -104,11 +110,17 @@ git diff --check
 .\build-keiframe.bat
 ```
 
-脚本会递归清理 `build/` 和 `dist/`，调用项目内嵌 Python 的 PyInstaller，然后将除 `resources/ocr/ppocrv5/` 外的运行时资源复制到主发布目录，并在 `dist/KeiFrame_PP-OCRv5_Addon/` 生成独立 OCR addon。主程序没有 addon 时仍可启动，但敌方组成识别会被禁用；安装 addon 后重启即可启用。生成物不应提交到仓库。
+脚本会递归清理 `build/` 和 `dist/`，调用项目内嵌 Python 的 PyInstaller，然后将除 `resources/ocr/ppocrv5/` 外的运行时资源复制到主发布目录，并在 `dist/KeiFrame_PP-OCRv5_Addon/` 生成独立 OCR addon。既有 2560 与可选 3840“净网行动” frozen Runtime 均由 spec 收集；3840 Bundle 还会把 manifest 声明的纯推理 Python 文件作为可校验数据纳入 onedir 包。两者都不依赖 PP-OCRv5 addon；主程序没有该 addon 时仍可启动，但敌方组成识别会被禁用。安装 addon 后重启即可启用敌方组成识别。生成物不应提交到仓库。
+
+## 独立的 Malwarfare 模板制作工具
+
+`开发辅助工具/malwarfare_template_maker_cpp/` 是面向群友的独立 Windows C++ Community Edition。它只处理用户主动打开的完整 SC2 截图，不依赖 Python 或 KeiFrame，也不会进入 `build-keiframe.bat` / `Keiframe.spec` 的正式构建。该目录自己的 README 记录 CMake 构建、配置快照同步和 Community 发布流程。
 
 ## 6119 端口
 
 无法读取游戏状态时，先确认 SC2 正在运行，并检查 `http://127.0.0.1:6119/game/` 与 `/ui/` 是否可访问。仓库中的 `端口修复.bat` 会以管理员权限调整 Windows 网络配置；仅在理解其影响且确实需要时运行。
+
+“净网行动”标准对局继续使用 6 人槽位规则。编辑器测试局仅在玩家 ID、类型、名称与顺序完整匹配已观测的 `1,3,4,5,6` 五人签名时识别为“净网行动”，不会把任意 5 人对局一概识别为该地图。运行日志使用 `[RuntimeDiag]`、`[MapDiag]`、`[CaptureDiag]`、`[HandlerDiag]`、`[PublishDiag]` 和 `[EventDiag]` 串联限频诊断。
 
 ## 当前限制
 
@@ -116,6 +128,7 @@ git diff --check
 - 敌方组成识别依赖独立 PP-OCRv5 addon；真实游戏中的 tooltip、覆盖层位置、5 秒隐藏和 DPI 组合仍需手工验收。
 - `resources/` 是运行时必需内容，源码运行和发布目录都必须保持其结构。
 - “死亡摇篮”倒计时、阶段和偷车波次组件已存在并有核心单元测试，但当前尚未接入主窗口的地图选择与生命周期流程。
+- 3840 frozen Bundle 的正式模型范围仍只有中文 `Normal` UI profile。KeiFrame 的非冻结适配层复用 2560 的六组 UI 纵向偏移，在 1920×1080 Canonical 帧上保持原 ROI 尺寸调用同一套纯推理；HSV 只筛选候选，必须由 Count Presence 唯一确认，颜色或 Profile 歧义时不发布 Count，而 Time/Paused 仍保留逐 Profile 诊断。`Normal` 已做冻结结果一致性验证；`Replay` 及其余 Profile 仅属于兼容性实验范围，真实游戏、窗口模式、DPI 与 UI 比例组合仍需手工验收。
 - README 只描述当前源码行为；普通用户操作流程以发行版使用说明为准。
 
 ## 贡献

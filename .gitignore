@@ -47,6 +47,9 @@ src/monkey.js
 /.venv
 settings.json
 
+# Keep this focused unit test visible while the large screenshot fixtures stay ignored.
+/tests/*
+
 #project embeddable required
 !/python/*.pyd
 !/python/*.dll
@@ -54,4 +57,9 @@ settings.json
 /.vs
 /debug
 /tests
-/tests
+
+# Keep the isolated Malwarfare Handler regression suite visible.
+!/tests/
+!/tests/test_malwarfare_map_handler.py
+!/tests/test_malwarfare_runtime_3840.py
+!/tests/test_malwarfare_3840_integration.py

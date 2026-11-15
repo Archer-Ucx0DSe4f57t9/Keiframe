@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 import threading
 import traceback
@@ -8,6 +9,7 @@ from PyQt5.QtWidgets import QApplication
 
 from src import (
     app_window_manager,
+    config,
     config_hotkeys,
     game_state_service,
     game_time_handler,
@@ -30,6 +32,7 @@ from src.presentation_modules.toast_manager import ToastManager
 from src.recognition_controller import RecognitionController
 from src.settings_window.settings_controller import SettingsController
 from src.ui.map_selection_controller import MapSelectionController
+from src.utils.fileutil import get_project_root
 from src.utils.logging_util import get_logger
 
 
@@ -87,6 +90,15 @@ class AppRuntime:
 
         window.logger = get_logger("src.qt_gui")
         window.logger.info("Keiframe 启动")
+        window.logger.warning(
+            "[RuntimeDiag] Keiframe 源码运行信息: project_root=%s, cwd=%s, "
+            "entry=%s, config=%s, enable_3840=%s",
+            get_project_root(),
+            os.getcwd(),
+            sys.argv[0],
+            getattr(config, "__file__", None),
+            getattr(config, "enable_malwarfare_3840_runtime", False),
+        )
 
         window.current_time = ""
         window._last_dispatch_game_second = None

@@ -64,13 +64,14 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 | 截图 asyncio task | `game_state_service.check_for_new_game_scheduler()` | 约每 0.1 秒捕获活动 SC2 窗口并更新共享截图 | 只写 `GlobalState`，使用锁 |
 | 突变/种族识别线程 | `Mutator_and_enemy_race_recognizer` | 从共享截图识别敌方种族和突变图标 | 通过 Qt signal 返回结果 |
 | 敌方组成被动更新 | 复用 `Mutator_and_enemy_race_recognizer` 的 perception loop | 使用锁内复制、锁外处理的最新截图执行 tooltip 检测、OCR 和匹配 | 确认后写入 `GlobalState.enemy_composition`，再通过 Qt signal 交给主线程 notifier |
-| 净网行动识别线程 | `MalwarfareMapHandler` | 识别颜色文字、倒计时、暂停和节点 | 主线程轮询其最新结构化数据 |
+| 净网行动识别线程 | `MalwarfareMapHandler` | 单序列调用 frozen OCR；Count 约 1 秒一次，Time/Paused 约 0.13 秒一次 | 主线程轮询其最新结构化数据 |
 | 小地图红点 worker | `MinimapRedDotDetector` | 按监控规则分析共享截图 | `MapVariantAutoResolver` 查询结果并切图 |
 | 死亡摇篮识别线程 | `CradleOfDeathMapHandler` | 识别倒计时并产生阶段事件 | 当前尚未由主窗口创建或消费 |
 
 线程安全规则：
 
 - `GlobalState.latest_screenshot`、时间戳和缩放信息在 `screenshot_lock` 下读写。
+- `GlobalState.latest_malwarfare_native_screenshot` 与标准帧在同一把锁、同一时间戳下交换；该字段只在 3840 开关开启且客户端区原生 shape 精确匹配时存在。
 - 识别器应在锁内复制截图，随后释放锁再做耗时计算。
 - `EnemyCompositionRecognizer` 是被动 update 组件，由已有视觉识别循环中的 `EnemyCompositionScheduler` 调用；它不创建自己的后台线程，且只在 tooltip 连续确认后执行 OCR。
 - `EnemyCompositionScheduler` 只发出确认回调/Qt signal，不直接操作 `MessagePresenter`；`EnemyCompositionNotifier` 在 Qt 主线程拥有独立 presenter，按 catalog 和当前语言显示一次、持续 5 秒并在 reset/shutdown 时清理。
@@ -129,7 +130,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 `src/game_state_service.py` 包含单例 `GlobalState` 以及两个主要循环：
 
 - `process_game_data()` 请求 `/game/` 和 `/ui/`，更新游戏时间、游戏 ID 和是否在局内；新游戏时尝试从玩家列表识别地图。
-- `screenshot_scheduler()` 定位活动 SC2 窗口，用 `mss` 截图，转换成 BGR，并按宽度标准化到 1920 像素。
+- `screenshot_scheduler()` 用 Win32 client rect 精确定位活动 SC2 客户端区，用 `mss` 截图并转换成 BGR；既有共享帧仍按宽度标准化到 1920 像素。3840 opt-in 开启且原生 shape 为 3840×2160 时，在缩放前另存原生帧。
 
 新游戏通过玩家列表的 JSON 哈希识别。检测到新局后，后台线程发出 `reset_game_info` 和可选的 `update_map` 信号，主线程负责清理与切换。
 
@@ -147,6 +148,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 `src/map_handlers/IdentifyMap.py`
 
 - 根据玩家数量和特定槽位的多语言单位名识别地图。
+- “净网行动”保留标准 6 人规则；编辑器测试局仅在 ID、类型、名称和顺序同时匹配已观测的五人签名时命中。
 
 `src/map_handlers/map_loader.py`
 
@@ -164,7 +166,13 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 
 `src/map_handlers/malwarfare_*`
 
-- 从动态画面倒计时驱动“净网行动”节点事件，不依赖固定绝对游戏时间。
+- 正式 Handler 把标准化完整帧传给 `src.malwarfare` production API，自身保留 UI profile/颜色探测、25 秒规则、暂停历史时间、单调保护和重定位状态机。
+- 开关关闭，或原生尺寸不是 3840×2160 时，上述既有路径不变。开关开启且原生尺寸精确匹配时，Handler 把原生帧交给 `MalwarfareRuntimeRouter`；Router 在内部 canonicalization 前确认分辨率并调用 3840 Bundle。
+- 3840 frozen Bundle 的正式验证范围仍只有 `Normal` UI profile；KeiFrame 非冻结适配层复用 2560 的六组纵向偏移，在 Canonical 帧上裁出与 Normal 完全同尺寸的 Count/Time/Paused ROI，再调用同一套冻结纯推理。Handler 的共享候选扫描先用 Green/Blue/Orange HSV 探针筛选，再以对应 Count Presence 唯一确认；低分 raw prediction 不算有效 Count，`Count=0` 保留合法语义，多颜色或多 Profile 歧义保持未知。逐 Profile 的 Count/Presence/score 和独立 Time/Paused 结果保存在诊断快照中，运行日志只输出限频摘要；确认后的结果继续进入同一个 25 秒、暂停历史、重定位和单调保护状态机。除 Normal 外均不得据此宣称冻结模型正式支持。
+- 开发诊断可在构造 Handler 时显式传入 `diagnostic_ui_profile_override="Normal"` 和 `diagnostic_count_color_override`；覆盖值只用于验证接入，不根据模型预测猜测颜色，也不会把 `Count=None` 发布为可信结果。
+- 3840 Runtime/manifest/model 初始化失败会明确报错；单帧执行失败会丢弃该帧，均不回退到 2560 模型。
+- `[RuntimeDiag]` 到 `[EventDiag]` 的限频日志覆盖运行路径、地图选择、截图、Handler、原始识别/发布和事件管理器入口；默认不会录制视频或逐帧刷屏。
+- `malwarfare_map_handler_legacy.py` 与旧模板 OCR/资源保持不变，作为英文过渡兼容实现；事件管理器和对外结果 contract 不变。
 
 `src/map_handlers/map_variant_auto_resolver.py`
 
@@ -286,8 +294,10 @@ mss 捕获 SC2 窗口
 ### 5.4 净网行动
 
 ```text
-共享截图
-  -> MalwarfareMapHandler 后台识别
+SC2 客户端区原生 BGR 帧
+  -> 始终生成既有 1920×1080 标准共享帧
+  -> 开关关闭 / 非 3840：既有 2560 frozen OCR
+  -> 开关开启 + 原生 3840×2160：保留原生帧 -> Runtime Router -> 3840 Bundle
   -> 最新节点 n、倒计时、暂停状态
   -> game_time_handler 每 200 ms 读取
   -> MapwarfareEventManager 按节点和剩余时间匹配事件
@@ -367,4 +377,5 @@ mss 捕获 SC2 窗口
 - 共享截图始终在锁保护下交换。
 - 新局、地图切换和退出不会遗留线程、Toast 或跨局状态。
 - 所有运行时资源通过统一路径工具定位，源码和 PyInstaller 目录结构都可用。
+- 3840 路由只使用缩放前的原生 shape，不从 1920 标准帧反推来源分辨率。
 - 数据库访问经过 DAO，用户本地 `settings.json` 不进入版本控制。

@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "task": "time",
+  "candidate_version": "malwarfare_zh_3840_candidate_v4",
+  "numeric_candidate_version": "malwarfare_zh_3840_candidate_v3",
+  "supported_native_resolution": {"width": 3840, "height": 2160},
+  "canonical_resolution": {"width": 1920, "height": 1080},
+  "rendering_profile": "native_3840_to_1920",
+  "numeric_inheritance": "inherited_candidate_v3_unchanged",
+  "three_five_discriminator": "inherited_candidate_v3_unchanged",
+  "presence_strategy": "candidate_v4_presence_threshold_relaxation_v1",
+  "presence_thresholds": {
+    "core_active_pixel_minimum": 54,
+    "core_strip_left_active_pixel_minimum": 17,
+    "core_strip_middle_active_pixel_minimum": 8,
+    "core_strip_right_active_pixel_minimum": 18,
+    "yellow_peak_minimum": 255
+  },
+  "model": {
+    "filename": "model.npz",
+    "sha256": "e827381a2edf7073ea8999c4229767907c501cb2c4dcc80284fb34b0fea7b0f7"
+  }
+}

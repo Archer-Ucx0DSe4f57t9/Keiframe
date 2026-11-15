@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "task": "time",
+  "language": "zh",
+  "resource_version": "time_zh_2560_v1",
+  "candidate_name": "poc_a_centroid_ncc_shift1",
+  "candidate_version": "malwarfare_time_poc_a_shift1_v1",
+  "model": {
+    "filename": "model.npz",
+    "sha256": "588b33571bc112b02b114691783bd10a21a2899cb83f6c8547925c7534c2d305"
+  },
+  "roi": {
+    "version": "malwarfare_time_canonical_53x29_v1",
+    "width": 53,
+    "height": 29
+  },
+  "slot_geometry": {
+    "minute": {"x": 15, "y": 7, "width": 8, "height": 11},
+    "seconds_tens": {"x": 27, "y": 7, "width": 8, "height": 11},
+    "seconds_ones": {"x": 35, "y": 7, "width": 8, "height": 11}
+  },
+  "colon_rect": {"x": 23, "y": 7, "width": 4, "height": 11},
+  "projection_version": "soft_yellow_projection_v1",
+  "translation_mode": "independent_per_slot_9_way_max_ncc",
+  "presence_version": "malwarfare_time_development_presence_v1",
+  "presence_thresholds": {
+    "yellow_peak_minimum": 169,
+    "core_active_pixel_minimum": 60,
+    "core_strip_left_active_pixel_minimum": 12,
+    "core_strip_middle_active_pixel_minimum": 12,
+    "core_strip_right_active_pixel_minimum": 12
+  },
+  "validation_limitation": "Time presence is a development candidate based on Round 1 development CV and is not independently validated.",
+  "provenance_note": "Production byte copy; development artifacts are not runtime dependencies."
+}
