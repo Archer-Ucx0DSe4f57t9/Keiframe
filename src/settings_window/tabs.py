@@ -421,6 +421,15 @@ class SettingsTabsBuilder:
             ])
         parent.add_row(gl_alert, "正常文本颜色:", 'MAP_ALERT_NORMAL_COLOR', 'color')
         parent.add_row(gl_alert, "警告文本颜色:", 'MAP_ALERT_WARNING_COLOR', 'color')
+        SettingsTabsBuilder._add_compact_row(parent, gl_alert, "闪烁设置:", [
+            ("启用闪烁:", 'MAP_ALERT_WARNING_FLASH_ENABLED', 'switch', {}),
+            (
+                "闪烁间隔(ms):",
+                'MAP_ALERT_WARNING_FLASH_INTERVAL_MS',
+                'spin',
+                {'min': 100, 'max': 5000},
+            ),
+        ])
         layout.addRow(gb_alert)
 
         # 2. 提示框通用布局 (Toast Layout)
@@ -463,6 +472,15 @@ class SettingsTabsBuilder:
         ])
         parent.add_row(gl_alert, "正常文本颜色:", 'MUTATOR_NORMAL_COLOR', 'color')
         parent.add_row(gl_alert, "警告文本颜色:", 'MUTATOR_WARNING_COLOR', 'color')
+        SettingsTabsBuilder._add_compact_row(parent, gl_alert, "闪烁设置:", [
+            ("启用闪烁:", 'MUTATOR_WARNING_FLASH_ENABLED', 'switch', {}),
+            (
+                "闪烁间隔(ms):",
+                'MUTATOR_WARNING_FLASH_INTERVAL_MS',
+                'spin',
+                {'min': 100, 'max': 5000},
+            ),
+        ])
         layout.addRow(gb_alert)
 
         # 3. 提示布局
@@ -587,6 +605,15 @@ class SettingsTabsBuilder:
         elif widget_type == 'color':
             widget = ColorInput(str(val) if val is not None else "")
             widget.setMinimumWidth(120)
+
+        elif widget_type == 'switch':
+            widget_data = parent.create_switch_widget(bool(val))
+            parent.widgets[key] = {
+                'widget': widget_data['button'],
+                'type': 'switch',
+                'label': label_text,
+            }
+            return widget_data['box']
 
         if widget:
             if isinstance(widget, (QSpinBox, QDoubleSpinBox)):

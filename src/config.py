@@ -62,16 +62,16 @@ MAP_ALERT_SECONDS = 30  # 提前提醒时间（秒）/ Time before alert (in sec
 MAP_ALERT_WARNING_THRESHOLD_SECONDS = 10  # 倒计时转为警告颜色的阈值（秒）
 MAP_ALERT_NORMAL_COLOR = 'rgb(239, 255, 238)'  # 倒计时提醒的正常颜色
 MAP_ALERT_WARNING_COLOR = 'rgb(255, 0, 0)'  # 倒计时提醒的警告颜色
-
-# warning 阶段颜色闪烁配置。闪烁使用现实时间，不跟随游戏时间速度变化。
-WARNING_FLASH_ENABLED = True
-WARNING_FLASH_INTERVAL_MS = 500
+MAP_ALERT_WARNING_FLASH_ENABLED = True  # warning 阶段是否在正常色与警告色之间闪烁
+MAP_ALERT_WARNING_FLASH_INTERVAL_MS = 500  # 闪烁使用现实时间，不跟随游戏时间速度变化
 
 # 突变因子提醒配置
 MUTATOR_ALERT_SECONDS = 49  # 突变因子提前提醒时间（秒）/ Mutation factor alert time (in seconds)，我还没做多重提醒，最长间隔就是49秒
 MUTATOR_WARNING_THRESHOLD_SECONDS = 10  # 倒计时转为警告颜色的阈值（秒）
 MUTATOR_NORMAL_COLOR = 'rgb(255, 255, 255)'  # 倒计时提醒的正常颜色
 MUTATOR_WARNING_COLOR = 'rgb(255, 0, 0)'  # 倒计时提醒的警告颜色
+MUTATOR_WARNING_FLASH_ENABLED = True  # warning 阶段是否在正常色与警告色之间闪烁
+MUTATOR_WARNING_FLASH_INTERVAL_MS = 500  # 闪烁使用现实时间，不跟随游戏时间速度变化
 MUTATOR_ALERT_OFFSET_Y = 324 # 提示列表距离顶部边框的像素距离 (原 0.35 -> 324px)
 MUTATOR_ALERT_OFFSET_X = 19 # 提示框距离左侧边框的像素距离 (原 0.01 -> 19px)
 MUTATOR_ALERT_LINE_HEIGHT = 32 # 提示框单行高度 (原 0.03 -> 32px)

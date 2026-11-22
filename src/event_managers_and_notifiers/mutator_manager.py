@@ -74,11 +74,11 @@ class MutatorManager(QWidget):
 
     @staticmethod
     def _warning_flash_enabled():
-        return bool(getattr(config, 'WARNING_FLASH_ENABLED', True))
+        return bool(getattr(config, 'MUTATOR_WARNING_FLASH_ENABLED', True))
 
     @staticmethod
     def _warning_flash_interval_ms():
-        return max(1, int(getattr(config, 'WARNING_FLASH_INTERVAL_MS', 500)))
+        return max(1, int(getattr(config, 'MUTATOR_WARNING_FLASH_INTERVAL_MS', 500)))
 
     def _start_warning_flash_timer(self):
         if not self._warning_flash_enabled():
