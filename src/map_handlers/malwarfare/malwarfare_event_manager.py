@@ -2,10 +2,13 @@ import traceback
 from PyQt5.QtGui import QBrush, QColor
 from PyQt5.QtCore import Qt
 import time, sys, os
-from src import config
+from src import config, game_state_service
+from src.game_readers.enemy_composition_unit_advisor import (
+    get_enemy_composition_unit_advisor,
+)
 
 class MapwarfareEventManager:
-    def __init__(self, table_area, toast_manager, logger):
+    def __init__(self, table_area, toast_manager, logger, advisor=None):
         """
         初始化净网地图事件管理器
         :param table_area: QTableWidget 实例
@@ -17,6 +20,39 @@ class MapwarfareEventManager:
         self.logger = logger
         self.last_count = -1
         self.last_seconds = -1
+        try:
+            self.enemy_composition_unit_advisor = (
+                advisor
+                if advisor is not None
+                else get_enemy_composition_unit_advisor()
+            )
+        except Exception as exc:
+            self.logger.error(
+                f'初始化 Enemy Composition unit advisor 失败: {exc}'
+            )
+            self.enemy_composition_unit_advisor = None
+        self._advisor_error_logged = False
+
+    def _get_attention_units(self, army_text):
+        """Return optional unit advice using only the army-column text."""
+
+        if self.enemy_composition_unit_advisor is None:
+            return None
+
+        try:
+            attention_units = self.enemy_composition_unit_advisor.get_attention_units(
+                game_state_service.state.enemy_composition,
+                army_text,
+            )
+            self._advisor_error_logged = False
+            return attention_units
+        except Exception as exc:
+            if not self._advisor_error_logged:
+                self.logger.error(
+                    f'Enemy Composition unit advisor 查询失败: {exc}'
+                )
+                self._advisor_error_logged = True
+            return None
 
     def _parse_time_to_seconds(self, time_str):
         """将 MM:SS 或 HH:MM:SS 格式的时间字符串转换为秒"""
@@ -123,6 +159,12 @@ class MapwarfareEventManager:
                         if 0 < time_diff <= config.MAP_ALERT_SECONDS:
                             toast_message = f'余{int(time_diff):0>2}秒  ' + f"  {time_item.text()}\t{event_item.text()}" + (
                                 f"\t{army_item.text()}" if army_item and army_item.text() else "")
+                            if army_item and army_item.text():
+                                attention_units = self._get_attention_units(
+                                    army_item.text()
+                                )
+                                if attention_units:
+                                    toast_message += f" 注意单位: {attention_units}"
                             self.toast_manager.show_map_countdown_alert(event_id, time_diff, toast_message, is_in_game)
                         else:
                             # 确保过时或远未到来的提示被移除

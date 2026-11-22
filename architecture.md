@@ -163,9 +163,11 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 - 比较当前游戏秒与表格中的地图事件。
 - 标记过去和下一事件，滚动表格。
 - 在配置的提前量内创建或移除 Toast。
+- 通过共享 `EnemyCompositionUnitAdvisor`，只根据 army 列和当前确认的敌方组成追加可选注意单位。
 
 `src/map_handlers/malwarfare/`
 
+- 事件管理器保持节点和剩余时间语义不变，只根据 army 列和当前确认的敌方组成，通过共享 `EnemyCompositionUnitAdvisor` 追加可选注意单位。
 - 正式 Handler 把标准化完整帧传给同目录的 production Runtime API，自身保留 UI profile/颜色探测、25 秒规则、暂停历史时间、单调保护和重定位状态机。
 - Handler 从同一截图事务的原生 shape 选择最近的 1920/2560/3840 Runtime；等距时选较小宽度。三套模型在 Handler 创建时加载并由 Router 缓存，切换分辨率只重置坐标及业务历史，不重复加载模型。旧 `enable_malwarfare_3840_runtime` 字段不再参与中文选型。
 - 3840 frozen Bundle 的正式验证范围仍只有 `Normal` UI profile；KeiFrame 非冻结适配层复用 2560 的六组纵向偏移，在 Canonical 帧上裁出与 Normal 完全同尺寸的 Count/Time/Paused ROI，再调用同一套冻结纯推理。Handler 的共享候选扫描先用 Green/Blue/Orange HSV 探针筛选，再以对应 Count Presence 唯一确认；低分 raw prediction 不算有效 Count，`Count=0` 保留合法语义，多颜色或多 Profile 歧义保持未知。逐 Profile 的 Count/Presence/score 和独立 Time/Paused 结果保存在诊断快照中，运行日志只输出限频摘要；确认后的结果继续进入同一个 25 秒、暂停历史、重定位和单调保护状态机。除 Normal 外均不得据此宣称冻结模型正式支持。
@@ -262,7 +264,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
   -> ToastManager / SoundManager 展示提醒
 ```
 
-标准地图事件和部署突变在构造提醒文本时读取最新的
+标准地图事件、部署突变和“净网行动”事件在构造提醒文本时读取最新的
 `GlobalState.enemy_composition`，通过共享的
 `EnemyCompositionUnitAdvisor` 做内存 lookup。组成尚未确认、没有匹配资料、tier
 为空或同一文本包含多个 tier 时，原始提醒照常显示且不追加内容；后续正常刷新
