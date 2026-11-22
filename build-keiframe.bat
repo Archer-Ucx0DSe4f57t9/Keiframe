@@ -6,7 +6,7 @@ setlocal enableextensions enabledelayedexpansion
 set "SCRIPT_DIR=%~dp0"
 set "PROJECT_NAME=Keiframe"
 set "SPEC_FILE=Keiframe.spec"
-set "RELEASE_DIR=%SCRIPT_DIR%dist\Keiframe_Release_v107b(2560_zh_ocr)"
+set "RELEASE_DIR=%SCRIPT_DIR%dist\Keiframe_Release_v108"
 set "ADDON_DIR=%SCRIPT_DIR%dist\KeiFrame_PP-OCRv5_Addon"
 set "OCR_SOURCE_DIR=%SCRIPT_DIR%resources\ocr\ppocrv5"
 :: =========================================
