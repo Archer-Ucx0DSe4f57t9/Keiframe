@@ -44,7 +44,7 @@ flowchart LR
 1. `src/main.py` 解析项目根目录。
 2. 在导入主要 PyQt UI 模块之前配置 Windows DPI awareness 与 Qt 固定物理像素环境变量。
 3. 设置 Qt 的高 DPI、原生对话框和原生控件相关属性。
-4. 配置日志、加载主 UI 字体并创建 `QApplication`。
+4. 先确定唯一的可写日志路径并完成超限轮换，再打开日志处理器；默认位置不可写时使用 LOCALAPPDATA，文件日志完全不可用时仍继续加载主 UI 字体并创建 `QApplication`。
 5. 创建 `TimerWindow`；窗口先保存普通组合对象 `AppRuntime`，再由它启动装配；装配时只尝试一次加载可选的 OpenCV DNN PP-OCRv5 addon。
 6. `AppRuntime` 打开地图和突变数据库连接，加载 `settings.json` 覆盖配置。
 7. `AppRuntime` 按原顺序装配 UI、Toast、地图分支解析器、识别器、倒计时、神器和补给提醒，组件仍保存为 `TimerWindow` 属性并沿用原 Qt parent。
