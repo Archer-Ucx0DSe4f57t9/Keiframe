@@ -1,4 +1,5 @@
 import builtins
+import io
 import logging
 import os
 import sys
@@ -89,6 +90,50 @@ class LoggingInitializationTests(unittest.TestCase):
             self.assertIn('default path message', default_log.read_text(encoding='utf-8'))
             self.assertFalse(fallback_log.exists())
             self._close_current_handlers()
+
+    def test_handlers_include_logger_name_and_preserve_level_filtering(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_file = Path(temp_dir) / 'Keiframe.log'
+            stream = io.StringIO()
+
+            with mock.patch.object(logging_util.config, 'LOG_LEVEL', 'WARNING'):
+                logging_util.setup_logger(log_file_path=str(log_file))
+            try:
+                stream_handler = next(
+                    handler
+                    for handler in logging.root.handlers
+                    if type(handler) is logging.StreamHandler
+                )
+                stream_handler.setStream(stream)
+                module_logger = logging_util.get_logger(__name__)
+                explicit_logger = logging_util.get_logger('setting window')
+                module_logger.debug('filtered debug message')
+                module_logger.warning('module logger message')
+                explicit_logger.error('explicit logger message')
+                for handler in logging.root.handlers:
+                    handler.flush()
+
+                expected_format = '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
+                self.assertTrue(logging.root.handlers)
+                self.assertTrue(
+                    all(
+                        handler.formatter._fmt == expected_format
+                        for handler in logging.root.handlers
+                    )
+                )
+
+                file_output = log_file.read_text(encoding='utf-8')
+                stream_output = stream.getvalue()
+                for output in (file_output, stream_output):
+                    self.assertIn(
+                        f' - WARNING - {__name__} - module logger message', output
+                    )
+                    self.assertIn(
+                        ' - ERROR - setting window - explicit logger message', output
+                    )
+                    self.assertNotIn('filtered debug message', output)
+            finally:
+                self._close_current_handlers()
 
     def test_permission_error_falls_back_to_local_appdata(self):
         with tempfile.TemporaryDirectory() as temp_dir:

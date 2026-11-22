@@ -122,7 +122,7 @@ def setup_logger(base_dir=None, log_file_path=_LOG_FILE_PATH_UNSET):
     # 配置根日志记录器
     logging.basicConfig(
         level=getattr(logging, config.LOG_LEVEL),
-        format='%(asctime)s - %(levelname)s - %(message)s',
+        format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
         handlers=handlers,
     )
     return final_log_file

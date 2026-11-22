@@ -29,7 +29,6 @@ class Mutator_and_enemy_race_recognizer:
     MUTATOR_TIMEOUT_AFTER_RACE = 10.0
 
     def __init__(self,recognition_signal = None):
-        self.logger = get_logger(__name__)
         self.recognition_signal = recognition_signal
         
         self._running = False
