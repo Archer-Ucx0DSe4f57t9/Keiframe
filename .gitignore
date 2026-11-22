@@ -63,3 +63,4 @@ settings.json
 !/tests/test_malwarfare_map_handler.py
 !/tests/test_malwarfare_runtime_3840.py
 !/tests/test_malwarfare_3840_integration.py
+!/tests/test_logging_startup.py
