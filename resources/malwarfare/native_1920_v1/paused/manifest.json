@@ -1,0 +1,14 @@
+{
+  "algorithm": "positive/negative soft-yellow full-ROI centroid margin",
+  "candidate_version": "malwarfare_native_1920_paused_candidate_v1",
+  "development_validation_source": "1920zerg02zweihaka",
+  "feature_version": "soft_yellow_full_l2_centroid_margin_v1",
+  "final_source_locked_not_inferred": "1920terran01_hero",
+  "max_shift": 0,
+  "model_filename": "paused_model.npz",
+  "model_sha256": "f3910208a1a3bd2e623c16777188236cb614ad77428fd0250cb6d41fe22bbb67",
+  "roi_contract": "uint8 BGR (32, 53, 3)",
+  "selected_round": "R2",
+  "threshold": 0.37539319379720837,
+  "training_source": "1920protoss01_normal"
+}

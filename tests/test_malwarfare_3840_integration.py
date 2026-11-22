@@ -10,6 +10,7 @@ from src import config
 from src.game_state_service import _capture_game_screen, state
 from src.game_time_handler import update_game_time
 from src.malwarfare.ocr_processor import MalwarfareOcrResult
+from src.malwarfare.runtime_router import MalwarfareRuntimeRouter
 from src.map_handlers import map_loader
 from src.map_handlers.IdentifyMap import identify_map
 from src.map_handlers.malwarfare_map_handler import MalwarfareMapHandler
@@ -227,6 +228,7 @@ class Malwarfare3840IntegrationTests(unittest.TestCase):
         handler._current_ui_profile = "Normal"
         handler._detected_count_color = "green"
         handler._latest_count = 2
+        handler._active_model_width = 3840
         return handler
 
     @classmethod
@@ -488,7 +490,7 @@ class Malwarfare3840IntegrationTests(unittest.TestCase):
         self.assertEqual("120", diagnostics["raw_time"])
         self.assertIsNone(handler.get_latest_data())
 
-    def test_default_disabled_keeps_old_path_even_with_native_3840(self):
+    def test_legacy_flag_false_does_not_block_automatic_3840_route(self):
         old = FakeOcr()
         router = FakeRouter()
         handler = self._known_handler(old, enabled=False, router=router)
@@ -499,9 +501,9 @@ class Malwarfare3840IntegrationTests(unittest.TestCase):
             now=0.0,
         )
 
-        self.assertEqual([], router.calls)
-        self.assertEqual(1, len(old.count_calls))
-        self.assertEqual(1, len(old.status_calls))
+        self.assertTrue(router.calls)
+        self.assertEqual([], old.count_calls)
+        self.assertEqual([], old.status_calls)
 
     def test_enabled_native_3840_routes_and_count_zero_is_preserved(self):
         old = FakeOcr()
@@ -525,24 +527,35 @@ class Malwarfare3840IntegrationTests(unittest.TestCase):
             handler.get_latest_data(),
         )
 
-    def test_enabled_native_2560_and_other_sizes_keep_old_path(self):
-        for native in (
-            self.native_2560,
-            np.zeros((1080, 1920, 3), dtype=np.uint8),
-            np.zeros((720, 1280, 3), dtype=np.uint8),
+    def test_1920_and_2560_shapes_use_their_selected_cached_runtime(self):
+        for native, expected_width in (
+            (self.native_2560, 2560),
+            (np.zeros((1080, 1920, 3), dtype=np.uint8), 1920),
+            (np.zeros((720, 1280, 3), dtype=np.uint8), 1920),
         ):
             with self.subTest(shape=native.shape):
-                old = FakeOcr()
-                router = FakeRouter()
-                handler = self._known_handler(old, enabled=True, router=router)
+                runtime_1920 = FakeOcr()
+                runtime_2560 = FakeOcr()
+                router = MalwarfareRuntimeRouter(
+                    runtime_1920=runtime_1920,
+                    runtime_2560=runtime_2560,
+                )
+                handler = MalwarfareMapHandler(
+                    ocr_processor=runtime_2560,
+                    runtime_router=router,
+                )
+                handler._switch_runtime(expected_width)
+                handler._current_ui_profile = "Normal"
+                handler._detected_count_color = "green"
+                handler._latest_count = 2
                 handler._process_frame(
                     self.canonical,
                     native_frame=native,
                     now=0.0,
                 )
-                self.assertEqual([], router.calls)
-                self.assertEqual(1, len(old.count_calls))
-                self.assertEqual(1, len(old.status_calls))
+                selected = runtime_1920 if expected_width == 1920 else runtime_2560
+                self.assertEqual(1, len(selected.count_calls))
+                self.assertEqual(1, len(selected.status_calls))
 
     def test_3840_pause_resume_retains_state_machine_contract(self):
         router = FakeRouter(
@@ -631,16 +644,13 @@ class Malwarfare3840IntegrationTests(unittest.TestCase):
     def test_3840_initialization_failure_is_explicit(self):
         with mock.patch(
             "src.map_handlers.malwarfare_map_handler."
-            "Malwarfare3840Runtime.from_default_resources",
+            "MalwarfareRuntimeRouter.from_default_resources",
             side_effect=ValueError("bundle missing"),
         ):
-            with self.assertRaisesRegex(RuntimeError, "不会静默回退"):
-                MalwarfareMapHandler(
-                    ocr_processor=FakeOcr(),
-                    enable_3840_runtime=True,
-                )
+            with self.assertRaisesRegex(RuntimeError, "不会静默改用"):
+                MalwarfareMapHandler()
 
-    def test_capture_preserves_native_3840_only_when_enabled(self):
+    def test_capture_preserves_native_3840_regardless_of_legacy_flag(self):
         fake_sct = mock.Mock()
         fake_sct.grab.return_value = object()
         native = np.broadcast_to(
@@ -700,7 +710,10 @@ class Malwarfare3840IntegrationTests(unittest.TestCase):
             mock.patch.object(config, "enable_malwarfare_3840_runtime", False),
         ):
             _capture_game_screen(fake_sct)
-        self.assertIsNone(state.latest_malwarfare_native_screenshot)
+        self.assertEqual(
+            (2160, 3840, 3),
+            state.latest_malwarfare_native_screenshot.shape,
+        )
 
     def test_capture_pauses_when_game_loses_focus_and_resumes_after_focus(self):
         fake_sct = mock.Mock()

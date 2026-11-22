@@ -11,9 +11,9 @@ pro_root = os.path.abspath(os.getcwd())
 # 这样可以解决你提到的大量 src.xxx.yyy 导入问题
 src_submodules = collect_submodules('src')
 
-# The frozen Malwarfare runtime resolves these production resources relative
-# to its packaged module location. Keep the small verified bundle inside the
-# PyInstaller onedir payload; the normal resources copy remains unchanged.
+# The 1920/2560 Malwarfare runtimes resolve production resources relative to
+# their packaged module location. The entire small inference-only tree is
+# included; recordings, GT, training code, and analysis outputs are excluded.
 malwarfare_runtime_datas = [
     (os.path.join(pro_root, 'config', 'malwarfare_zh.json'), 'config'),
     (
@@ -22,7 +22,7 @@ malwarfare_runtime_datas = [
     ),
 ]
 
-# The opt-in 3840 bundle verifies both its resource hashes and the declared
+# The 3840 bundle verifies both its resource hashes and the declared
 # pure-inference Python file inventory. Include exactly those manifest entries
 # in the onedir payload so the frozen app can verify itself without a source
 # checkout, analysis data, recordings, Candidate, Shadow, or GT artifacts.
@@ -48,14 +48,15 @@ for relative_path in malwarfare_3840_manifest['python_files']:
             os.path.dirname(relative_path),
         )
     )
-# The resolution Router composes the 2560 and 3840 bundles but is intentionally
-# outside the 3840-only manifest. Keep it visible in the packaged audit tree.
-malwarfare_runtime_datas.append(
-    (
-        os.path.join(pro_root, 'src', 'malwarfare', 'runtime_router.py'),
-        os.path.join('src', 'malwarfare'),
+# The resolution Router and native-1920 adapter are outside the 3840-only
+# manifest. Keep both visible in the packaged audit tree as well as in PYZ.
+for runtime_filename in ('runtime_router.py', 'runtime_1920.py'):
+    malwarfare_runtime_datas.append(
+        (
+            os.path.join(pro_root, 'src', 'malwarfare', runtime_filename),
+            os.path.join('src', 'malwarfare'),
+        )
     )
-)
 
 a = Analysis(
     ['src/main.py'],

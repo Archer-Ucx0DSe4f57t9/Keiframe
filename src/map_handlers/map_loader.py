@@ -7,12 +7,40 @@ from src.utils.fileutil import get_resources_dir
 from src.map_handlers.map_event_manager import MapEventManager
 from src.map_handlers.malwarfare_event_manager import MapwarfareEventManager
 from src.map_handlers.malwarfare_map_handler import MalwarfareMapHandler
+from src.map_handlers.malwarfare_map_handler_legacy import (
+    MalwarfareMapHandler as LegacyMalwarfareMapHandler,
+)
 from src.db.map_daos import load_map_by_name
 from src.ui.main_window_layout import (
     apply_malwarfare_table_columns,
     apply_standard_map_table_columns,
 )
-from src import game_state_service
+from src import config, game_state_service
+
+
+def create_malwarfare_handler(game_state):
+    """Create one language-specific handler; inference never rechecks language."""
+
+    language = str(config.current_game_language).lower()
+    if language == "zh":
+        return MalwarfareMapHandler(game_state=game_state)
+    if language == "en":
+        return LegacyMalwarfareMapHandler(game_state=game_state)
+    raise ValueError(f"不支持的净网行动游戏语言: {config.current_game_language!r}")
+
+
+def _handler_runtime_diagnostics(handler):
+    getter = getattr(handler, "get_runtime_diagnostics", None)
+    if callable(getter):
+        return getter()
+    worker = getattr(handler, "_running_thread", None)
+    worker_alive = bool(worker is not None and worker.is_alive())
+    return {
+        "runtime_enabled": False,
+        "handler_running_flag": bool(getattr(handler, "_running", False)),
+        "worker_alive": worker_alive,
+        "selected_model_width": None,
+    }
 
 def handle_version_selection(window):
     """处理地图版本按钮选择事件 (原 TimerWindow.on_version_selected)"""
@@ -111,11 +139,24 @@ def handle_map_selection(window, map_name):
         window.map_event_manager = MapwarfareEventManager(window.table_area, window.toast_manager, window.logger)
         window.is_map_Malwarfare = True
         
+        desired_language = str(config.current_game_language).lower()
+        if (
+            window.malwarfare_handler is not None
+            and getattr(window.malwarfare_handler, "lang", None) != desired_language
+        ):
+            window.logger.info(
+                "净网行动语言已从 %r 切换为 %r，重建 Handler 并清除旧 OCR 状态。",
+                getattr(window.malwarfare_handler, "lang", None),
+                desired_language,
+            )
+            window.malwarfare_handler.shutdown()
+            window.malwarfare_handler = None
+
         if window.malwarfare_handler is None:
             window.logger.info("创建并启动 MalwarfareMapHandler 实例。")
             try:
-                window.malwarfare_handler = MalwarfareMapHandler(
-                    game_state=window.game_state
+                window.malwarfare_handler = create_malwarfare_handler(
+                    window.game_state
                 )
             except Exception:
                 window.logger.exception(
@@ -124,7 +165,9 @@ def handle_map_selection(window, map_name):
                 raise
             window.malwarfare_handler.reset()
             window.malwarfare_handler.start()
-            runtime_diagnostics = window.malwarfare_handler.get_runtime_diagnostics()
+            runtime_diagnostics = _handler_runtime_diagnostics(
+                window.malwarfare_handler
+            )
             window.logger.warning(
                 "[HandlerDiag] MalwarfareMapHandler 已创建: enable_3840=%s, "
                 "running_flag=%s, worker_alive=%s",
@@ -133,7 +176,9 @@ def handle_map_selection(window, map_name):
                 runtime_diagnostics["worker_alive"],
             )
         else:
-            runtime_diagnostics = window.malwarfare_handler.get_runtime_diagnostics()
+            runtime_diagnostics = _handler_runtime_diagnostics(
+                window.malwarfare_handler
+            )
             window.logger.warning(
                 "[HandlerDiag] 复用现有 MalwarfareMapHandler: running_flag=%s, "
                 "worker_alive=%s",

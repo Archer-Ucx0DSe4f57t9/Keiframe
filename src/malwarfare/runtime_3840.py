@@ -28,7 +28,7 @@ from .runtime.paused_3840 import (
     load_paused_3840_model,
     predict_paused_3840,
 )
-from .runtime.time_3840 import (
+from .runtime.time_3840_v5 import (
     TIME_3840_MODEL_SHA256,
     TIME_3840_PRESENCE_THRESHOLDS,
     load_time_3840_model,
@@ -45,7 +45,7 @@ DEFAULT_RUNTIME_3840_RESOURCE_DIR = (
     Path(__file__).resolve().parents[2] / "resources" / "malwarfare_3840"
 )
 EXPECTED_BUNDLE_MANIFEST_SHA256 = (
-    "6c336934a992f8767efd7849564fd96934490d5636a625c98de3dbe2a9c2bfd1"
+    "694e4f5d0f27acfc619d2ecf648de209d564bfdfc0868f9eb05907f5816f26f2"
 )
 
 
@@ -139,7 +139,7 @@ def verify_runtime_bundle_3840(
         "ui_profile": SUPPORTED_UI_PROFILE_3840,
         "entrypoint": "src.malwarfare.Malwarfare3840Runtime.from_default_resources",
         "source_candidate_lock_sha256": (
-            "2e6ac6feea23a28bf812b3f2a0c9f12fd34c2cbae3a75b8d22f3a5d5eff6a113"
+            "c276f97c5994778a4d492a3d7f36d956a884f4ce20708a964fb3c2f6d3cdb6f1"
         ),
     }
     for key, value in expected.items():
@@ -550,7 +550,7 @@ class Malwarfare3840Runtime:
 
     def _load_time(self):
         manifest = _read_json(self._resource_dir / "time" / "manifest.json")
-        if manifest.get("candidate_version") != "malwarfare_zh_3840_candidate_v4":
+        if manifest.get("candidate_version") != "malwarfare_zh_3840_time_candidate_v5":
             raise ValueError("unexpected 3840 Time candidate identity")
         if manifest.get("presence_thresholds") != TIME_3840_PRESENCE_THRESHOLDS:
             raise ValueError("3840 Time presence thresholds changed")

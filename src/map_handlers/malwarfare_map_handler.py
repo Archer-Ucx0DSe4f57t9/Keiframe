@@ -18,7 +18,6 @@ from src.malwarfare.ocr_processor import (
     MalwarfareOcrProcessor,
 )
 from src.malwarfare.profile import load_profile
-from src.malwarfare.runtime_3840 import Malwarfare3840Runtime
 from src.malwarfare.runtime_router import MalwarfareRuntimeRouter
 from src.utils.logging_util import get_logger
 
@@ -70,8 +69,9 @@ class MalwarfareMapHandler:
         self.game_state = game_state or state
         self.lang = config.current_game_language
 
-        # Resource/manifest/SHA errors are intentionally not swallowed. The frozen
-        # runtime is loaded once for the lifetime of this handler.
+        # Resource/manifest errors are intentionally not swallowed. Every frozen
+        # runtime is loaded once and then cached by the resolution router.
+        injected_ocr = ocr_processor is not None
         self.ocr = ocr_processor or MalwarfareOcrProcessor.from_default_resources()
         self._ui_geometry = getattr(self.ocr, "profile", None) or load_profile(
             DEFAULT_PROFILE_PATH
@@ -83,11 +83,14 @@ class MalwarfareMapHandler:
         normal_count = self._ui_geometry.resolved_task("count", "Normal")[1]
         if self._roi_diagnostic(normal_count) != self.COUNT_PROBE_ROI:
             raise ValueError("Malwarfare Count probe does not match shared config")
-        self.enable_3840_runtime = (
-            getattr(config, "enable_malwarfare_3840_runtime", False) is True
+        configured_3840_flag = (
+            getattr(config, "enable_malwarfare_3840_runtime", False)
             if enable_3840_runtime is None
             else bool(enable_3840_runtime)
         )
+        # Retained only as a public diagnostic compatibility field. Chinese
+        # resolution routing is automatic and no longer gated by this setting.
+        self.enable_3840_runtime = True
         if diagnostic_ui_profile_override not in (None, *self.UI_PROFILES):
             raise ValueError(
                 "3840 diagnostic UI override must name a configured UI profile"
@@ -103,29 +106,31 @@ class MalwarfareMapHandler:
         self._diagnostic_count_color_override = diagnostic_count_color_override
         self._diagnostic_log_times = {}
         self.logger.warning(
-            "[HandlerDiag] Malwarfare Runtime 配置: enable_3840=%s, config_module=%s, "
+            "[HandlerDiag] Malwarfare 中文 Runtime 自动路由已启用: "
+            "legacy_enable_3840=%s (ignored), config_module=%s, "
             "ui_override=%r, color_override=%r",
-            self.enable_3840_runtime,
+            configured_3840_flag,
             getattr(config, "__file__", None),
             self._diagnostic_ui_profile_override,
             self._diagnostic_count_color_override,
         )
-        self.runtime_router = None
-        if self.enable_3840_runtime:
-            try:
-                runtime_3840 = (
-                    Malwarfare3840Runtime.from_default_resources()
-                    if runtime_router is None
-                    else None
-                )
-                self.runtime_router = runtime_router or MalwarfareRuntimeRouter(
+        try:
+            if runtime_router is not None:
+                self.runtime_router = runtime_router
+            elif injected_ocr:
+                # Unit/custom callers retain the historical single-runtime test
+                # seam. Production construction below always loads all three.
+                self.runtime_router = MalwarfareRuntimeRouter(
                     runtime_2560=self.ocr,
-                    runtime_3840=runtime_3840,
                 )
-            except Exception as exc:
-                raise RuntimeError(
-                    "Malwarfare 3840 Runtime 初始化失败；不会静默回退到 2560 模型"
-                ) from exc
+            else:
+                self.runtime_router = MalwarfareRuntimeRouter.from_default_resources(
+                    runtime_2560=self.ocr,
+                )
+        except Exception as exc:
+            raise RuntimeError(
+                "Malwarfare 中文 Runtime 初始化失败；不会静默改用其他分辨率模型"
+            ) from exc
 
         self._running = False
         self._running_thread = None
@@ -136,6 +141,8 @@ class MalwarfareMapHandler:
         self._status_timings_ms = deque(maxlen=120)
         self._count_timing_samples = 0
         self._status_timing_samples = 0
+        self._active_model_width = None
+        self._last_capture_status_timestamp = None
 
         self._count_probe_ranges = (
             (np.array([60, 70, 70]), np.array([90, 255, 255])),
@@ -144,6 +151,8 @@ class MalwarfareMapHandler:
         )
 
         self._reset_state()
+        if injected_ocr and runtime_router is None:
+            self._active_model_width = 2560
 
     def start(self):
         """Start the single sequential OCR worker."""
@@ -195,7 +204,7 @@ class MalwarfareMapHandler:
                     "latest_malwarfare_native_screenshot",
                     None,
                 )
-                if self.enable_3840_runtime and native_screenshot is not None:
+                if native_screenshot is not None:
                     native_frame = native_screenshot.copy()
                 else:
                     native_frame = None
@@ -204,6 +213,20 @@ class MalwarfareMapHandler:
                     "latest_screenshot_native_shape",
                     None,
                 )
+                capture_status_timestamp = getattr(
+                    self.game_state,
+                    "screenshot_status_timestamp",
+                    screenshot_timestamp,
+                )
+
+            if capture_status_timestamp != self._last_capture_status_timestamp:
+                self._last_capture_status_timestamp = capture_status_timestamp
+                if native_shape is None:
+                    self._invalidate_resolution_state(
+                        "SC2 客户端区几何信息不可用；已清除净网行动 OCR 状态。"
+                    )
+                    time.sleep(self.LOOP_IDLE_SECONDS)
+                    continue
 
             if (
                 frame is None
@@ -243,61 +266,172 @@ class MalwarfareMapHandler:
         native_shape=None,
     ):
         """Validate and synchronously dispatch due OCR operations for one frame."""
-        if not self._validate_frame(frame):
-            self._set_latest_count(None)
-            self._update_latest_result()
-            return
-
         source_shape = (
             tuple(native_shape)
             if native_shape is not None
-            else getattr(native_frame, "shape", None)
+            else (
+                tuple(native_frame.shape)
+                if isinstance(native_frame, np.ndarray)
+                else None
+            )
         )
-        if self.enable_3840_runtime and source_shape == self.NATIVE_3840_FRAME_SHAPE:
-            if not isinstance(native_frame, np.ndarray):
+        if source_shape is None:
+            # Historical unit/custom callers supplied only the canonical frame.
+            # Keep that seam on the established 2560 runtime.
+            if not self._validate_frame(frame):
+                self._invalidate_resolution_state("净网行动 OCR 截图尺寸无效。")
+                return
+            selected_width = 2560
+            canonical_frame = frame
+        else:
+            if not self._is_supported_client_shape(source_shape):
+                self._invalidate_resolution_state(
+                    f"不支持的 SC2 客户端区尺寸或纵横比: {source_shape}"
+                )
+                return
+            selected_width = MalwarfareRuntimeRouter.select_model_width(
+                int(source_shape[1])
+            )
+            canonical_frame = self._adapt_to_canonical(frame)
+            if canonical_frame is None:
+                self._invalidate_resolution_state(
+                    f"SC2 截图无法安全适配到 1920x1080: {getattr(frame, 'shape', None)}"
+                )
+                return
+
+        if selected_width != self._active_model_width:
+            self._switch_runtime(selected_width)
+
+        if selected_width == 3840:
+            if (
+                source_shape == self.NATIVE_3840_FRAME_SHAPE
+                and not isinstance(native_frame, np.ndarray)
+            ):
                 if not self._missing_native_3840_reported:
                     self.logger.error(
-                        "检测到原生 3840x2160 客户端区，但原生帧不可用；"
-                        "本帧不会回退到 2560 模型。"
+                        "检测到原生 3840x2160 客户端区但原生帧不可用；"
+                        "本帧不会改用其他分辨率模型。"
                     )
                     self._missing_native_3840_reported = True
                 return
             self._log_diagnostic(
                 "route_3840",
                 "warning",
-                "[HandlerDiag] 3840 Runtime 已进入: canonical=%s %s, native=%s %s",
-                getattr(frame, "shape", None),
-                getattr(frame, "dtype", None),
-                getattr(native_frame, "shape", None),
-                getattr(native_frame, "dtype", None),
+                "[HandlerDiag] 3840 Runtime 已进入: canonical=%s %s, native_shape=%s",
+                getattr(canonical_frame, "shape", None),
+                getattr(canonical_frame, "dtype", None),
+                source_shape,
             )
-            self._process_3840_frame(frame, native_frame, now=now)
+            self._process_3840_frame(
+                canonical_frame,
+                native_frame=native_frame,
+                source_shape=source_shape,
+                now=now,
+            )
             return
 
         if self._current_ui_profile is None:
-            if not self._detect_and_set_ui_state(frame):
+            if not self._detect_and_set_ui_state(canonical_frame):
                 return
 
         current_time = time.perf_counter() if now is None else float(now)
 
         if self._is_due(current_time, self._last_count_update, self.COUNT_INTERVAL_SECONDS):
             self._last_count_update = current_time
-            self._ocr_and_process_count(frame)
+            self._ocr_and_process_count(canonical_frame)
 
         if self._is_due(current_time, self._last_status_update, self.STATUS_INTERVAL_SECONDS):
             self._last_status_update = current_time
-            self._ocr_and_process_time_and_paused(frame)
+            self._ocr_and_process_time_and_paused(canonical_frame)
 
         self._update_latest_result()
 
-    def _process_3840_frame(self, canonical_frame, native_frame, *, now=None):
-        """Route a confirmed native 3840 frame without any 2560 fallback."""
+    @staticmethod
+    def _is_supported_client_shape(shape):
+        if (
+            not isinstance(shape, tuple)
+            or len(shape) != 3
+            or shape[2] != 3
+        ):
+            return False
+        height, width, _channels = shape
+        if (
+            isinstance(width, bool)
+            or isinstance(height, bool)
+            or not isinstance(width, numbers.Integral)
+            or not isinstance(height, numbers.Integral)
+            or width <= 0
+            or height <= 0
+        ):
+            return False
+        return abs(float(height) - float(width) * 9.0 / 16.0) <= 2.0
+
+    def _adapt_to_canonical(self, frame):
+        if not isinstance(frame, np.ndarray) or frame.dtype != np.uint8:
+            return None
+        if frame.ndim != 3 or frame.shape[2] != 3:
+            return None
+        if frame.shape == self.CANONICAL_FRAME_SHAPE:
+            return frame
+
+        source_height, source_width = frame.shape[:2]
+        if source_height <= 0 or source_width <= 0:
+            return None
+        scale = min(1920.0 / source_width, 1080.0 / source_height)
+        target_width = max(1, min(1920, int(round(source_width * scale))))
+        target_height = max(1, min(1080, int(round(source_height * scale))))
+        if (target_width, target_height) == (source_width, source_height):
+            resized = frame
+        else:
+            interpolation = cv2.INTER_AREA if scale < 1.0 else cv2.INTER_LINEAR
+            resized = cv2.resize(
+                frame,
+                (target_width, target_height),
+                interpolation=interpolation,
+            )
+        canvas = np.zeros(self.CANONICAL_FRAME_SHAPE, dtype=np.uint8)
+        left = (1920 - target_width) // 2
+        top = (1080 - target_height) // 2
+        canvas[top : top + target_height, left : left + target_width] = resized
+        return canvas
+
+    def _switch_runtime(self, selected_width):
+        previous_width = self._active_model_width
+        self._reset_state()
+        self._active_model_width = int(selected_width)
+        if selected_width in (1920, 2560):
+            self.ocr = self.runtime_router.runtime_for_width(selected_width)
+        self.logger.warning(
+            "[HandlerDiag] Malwarfare 中文 OCR Runtime 切换: %r -> %s",
+            previous_width,
+            selected_width,
+        )
+
+    def _invalidate_resolution_state(self, message):
+        if self._active_model_width is not None or self.get_latest_data() is not None:
+            self.logger.warning("[HandlerDiag] %s", message)
+        self._active_model_width = None
+        self._reset_state()
+
+    def _process_3840_frame(
+        self,
+        canonical_frame,
+        native_frame=None,
+        source_shape=None,
+        *,
+        now=None,
+    ):
+        """Run the preserved 3840 canonical adapter with no model fallback."""
         with self._state_lock:
             self._latest_3840_diagnostics.update(
                 {
                     "route_reached": True,
                     "canonical_frame_shape": tuple(canonical_frame.shape),
-                    "native_frame_shape": tuple(native_frame.shape),
+                    "native_frame_shape": (
+                        tuple(native_frame.shape)
+                        if isinstance(native_frame, np.ndarray)
+                        else source_shape
+                    ),
                 }
             )
         if self.runtime_router is None:
@@ -1056,6 +1190,7 @@ class MalwarfareMapHandler:
             result.update(
                 {
                     "runtime_enabled": self.enable_3840_runtime,
+                    "selected_model_width": self._active_model_width,
                     "handler_running_flag": bool(self._running),
                     "worker_alive": bool(
                         self._running_thread is not None
@@ -1093,6 +1228,8 @@ class MalwarfareMapHandler:
     def reset(self):
         """Reset game/UI state without reloading frozen OCR resources."""
         self.logger.info("重置 MalwarfareMapHandler...")
+        self._active_model_width = None
+        self._last_capture_status_timestamp = None
         self._reset_state()
 
     def _reset_state(self):

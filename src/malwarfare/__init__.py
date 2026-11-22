@@ -9,6 +9,7 @@ as an import-time side effect.
 from .profile import MalwarfareProfile, load_profile
 
 __all__ = [
+    "Malwarfare1920Runtime",
     "Malwarfare3840Runtime",
     "MalwarfareOcrProcessor",
     "MalwarfareOcrResult",
@@ -26,6 +27,10 @@ def __getattr__(name: str):
             "MalwarfareOcrProcessor": MalwarfareOcrProcessor,
             "MalwarfareOcrResult": MalwarfareOcrResult,
         }[name]
+    if name == "Malwarfare1920Runtime":
+        from .runtime_1920 import Malwarfare1920Runtime
+
+        return Malwarfare1920Runtime
     if name == "Malwarfare3840Runtime":
         from .runtime_3840 import Malwarfare3840Runtime
 

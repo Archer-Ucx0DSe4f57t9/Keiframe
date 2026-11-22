@@ -10,6 +10,7 @@
     "src/__init__.py",
     "src/malwarfare/__init__.py",
     "src/malwarfare/ocr_processor.py",
+    "src/malwarfare/runtime_1920.py",
     "src/malwarfare/profile.py",
     "src/malwarfare/paused_recognizer.py",
     "src/malwarfare/runtime/__init__.py",
@@ -28,7 +29,15 @@
     "resources/malwarfare/time_zh_2560_v1/model.npz",
     "resources/malwarfare/paused_zh_2560_v1/manifest.json",
     "resources/malwarfare/paused_zh_2560_v1/paused_v01_yellow.png",
-    "resources/malwarfare/paused_zh_2560_v1/paused_v02_white.png"
+    "resources/malwarfare/paused_zh_2560_v1/paused_v02_white.png",
+    "resources/malwarfare/native_1920_v1/count/manifest.json",
+    "resources/malwarfare/native_1920_v1/count/blue/centroid_ncc_shift1.npz",
+    "resources/malwarfare/native_1920_v1/count/green/centroid_ncc_shift1.npz",
+    "resources/malwarfare/native_1920_v1/count/orange/centroid_ncc_shift1.npz",
+    "resources/malwarfare/native_1920_v1/time/manifest.json",
+    "resources/malwarfare/native_1920_v1/time/model.npz",
+    "resources/malwarfare/native_1920_v1/paused/manifest.json",
+    "resources/malwarfare/native_1920_v1/paused/paused_model.npz"
   ],
   "excluded_runtime_directories": [
     "analysis",

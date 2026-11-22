@@ -7,18 +7,19 @@
   "candidate_provenance": {
     "count": "3840 Candidate v1",
     "paused": "3840 Candidate v2",
-    "time_numeric": "3840 Candidate v3",
-    "time_three_five": "3840 Candidate v3",
-    "time_presence": "3840 Candidate v4"
+    "time_numeric": "3840 Time Candidate v5",
+    "time_three_five": "not used by Candidate v5",
+    "time_presence": "3840 Time Candidate v5"
   },
   "model_file_sha256": {
     "count/blue.npz": "bf9f3256cbfae74287b8b8487a59a769a36005b2c49eec4fe079d4327a6ea516",
     "count/green.npz": "9de265b747ae3c4bd4bc92af5627193704a374bdb1b308e56d0239cc39be4d7f",
     "count/orange.npz": "27ad964db3e8ae2da7b411bf36b41b8da348aeb5ba0147ed4fceaec09f0f1235",
     "time/model.npz": "e827381a2edf7073ea8999c4229767907c501cb2c4dcc80284fb34b0fea7b0f7",
+    "time/model_v5.npz": "ca27ffe2330c677733d706e2d28f1365a0fd3c57d090c7ef68a6ea469e935340",
     "paused/model.npz": "c63580ac829ce5e074819566404b446f6cf1fffa11e64de71075eb99faa76419"
   },
-  "source_candidate_lock_sha256": "2e6ac6feea23a28bf812b3f2a0c9f12fd34c2cbae3a75b8d22f3a5d5eff6a113",
+  "source_candidate_lock_sha256": "c276f97c5994778a4d492a3d7f36d956a884f4ce20708a964fb3c2f6d3cdb6f1",
   "python_files": [
     "src/__init__.py",
     "src/malwarfare/__init__.py",
@@ -31,6 +32,7 @@
     "src/malwarfare/runtime/paused_3840.py",
     "src/malwarfare/runtime/time.py",
     "src/malwarfare/runtime/time_3840.py",
+    "src/malwarfare/runtime/time_3840_v5.py",
     "src/malwarfare/runtime_3840.py"
   ],
   "resource_files": [
@@ -42,6 +44,7 @@
     "resources/malwarfare_3840/count/orange.npz",
     "resources/malwarfare_3840/time/manifest.json",
     "resources/malwarfare_3840/time/model.npz",
+    "resources/malwarfare_3840/time/model_v5.npz",
     "resources/malwarfare_3840/paused/manifest.json",
     "resources/malwarfare_3840/paused/model.npz",
     "resources/malwarfare_3840/paused/baseline/manifest.json",
@@ -54,8 +57,9 @@
     "resources/malwarfare_3840/count/blue.npz": "bf9f3256cbfae74287b8b8487a59a769a36005b2c49eec4fe079d4327a6ea516",
     "resources/malwarfare_3840/count/green.npz": "9de265b747ae3c4bd4bc92af5627193704a374bdb1b308e56d0239cc39be4d7f",
     "resources/malwarfare_3840/count/orange.npz": "27ad964db3e8ae2da7b411bf36b41b8da348aeb5ba0147ed4fceaec09f0f1235",
-    "resources/malwarfare_3840/time/manifest.json": "1c01699f4c159a7ffe88e33d9c89d9ac6817d34bbca2f00ba32599195510e6ac",
+    "resources/malwarfare_3840/time/manifest.json": "39491dc032ec88fdea8c23398118172fd91cba8289d908e7dd4f758213fa8127",
     "resources/malwarfare_3840/time/model.npz": "e827381a2edf7073ea8999c4229767907c501cb2c4dcc80284fb34b0fea7b0f7",
+    "resources/malwarfare_3840/time/model_v5.npz": "ca27ffe2330c677733d706e2d28f1365a0fd3c57d090c7ef68a6ea469e935340",
     "resources/malwarfare_3840/paused/manifest.json": "0ff7f6c6df9168478eefa7b77d922ddf5283037b521f4b54d39fa44715b7543f",
     "resources/malwarfare_3840/paused/model.npz": "c63580ac829ce5e074819566404b446f6cf1fffa11e64de71075eb99faa76419",
     "resources/malwarfare_3840/paused/baseline/manifest.json": "b1393fb02f406f11015252c2abcb153ea0e13e40c0bddb83364b2d73eaf21d77",

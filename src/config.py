@@ -19,7 +19,8 @@ FONT_MESSAGE_STYLE = None
 current_game_language = 'zh'  # 当前游戏语言 / Current game language
 current_language = 'zh'  # 当前语言 / Current language
 
-# Opt-in only. Native 3840x2160 Malwarfare frames use the frozen 3840 Runtime.
+# Deprecated compatibility field. Chinese Malwarfare now selects 1920/2560/3840
+# automatically from the SC2 client width; this value no longer gates routing.
 enable_malwarfare_3840_runtime = True
 
 # 快捷键
