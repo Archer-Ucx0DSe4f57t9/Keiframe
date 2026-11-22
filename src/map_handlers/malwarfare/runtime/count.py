@@ -23,9 +23,11 @@ COUNT_RUNTIME_CANDIDATE_VERSION = "count_zh_2560_v1"
 LEGACY_COUNT_RUNTIME_CANDIDATE_VERSION = "count_presence_zh_2560_v1"
 COUNT_RUNTIME_PROFILES = ("orange", "blue", "green")
 DEFAULT_COUNT_RUNTIME_RESOURCE_DIR = (
-    Path(__file__).resolve().parents[3]
+    Path(__file__).resolve().parents[4]
     / "resources"
+    / "templates"
     / "malwarfare"
+    / "runtime_1920_2560"
     / COUNT_RUNTIME_CANDIDATE_VERSION
 )
 # Compatibility name retained for callers of the former count_presence module.

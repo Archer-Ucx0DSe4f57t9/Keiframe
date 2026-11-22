@@ -2,7 +2,7 @@
 
 The production OCR exports remain available from this package, but they are
 loaded lazily. Dataset preparation and human-only annotation modules can
-therefore import ``src.malwarfare.*`` without importing production inference
+therefore import ``src.map_handlers.malwarfare.*`` without importing production inference
 as an import-time side effect.
 """
 

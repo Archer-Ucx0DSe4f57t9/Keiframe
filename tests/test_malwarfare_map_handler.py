@@ -1,4 +1,5 @@
 import hashlib
+import importlib
 import json
 from pathlib import Path
 import unittest
@@ -6,16 +7,20 @@ from unittest.mock import patch
 
 import numpy as np
 
-from src.malwarfare import MalwarfareOcrProcessor
-from src.map_handlers.malwarfare_map_handler import MalwarfareMapHandler
-from src.map_handlers.malwarfare_map_handler_legacy import (
+from src.map_handlers.malwarfare import MalwarfareOcrProcessor
+from src.map_handlers.malwarfare.malwarfare_map_handler import MalwarfareMapHandler
+from src.map_handlers.malwarfare.malwarfare_map_handler_legacy import (
     MalwarfareMapHandler as LegacyMalwarfareMapHandler,
 )
+from src.map_handlers.malwarfare.malwarfate_ocr_processor import (
+    MalwarfareOcrProcessor as LegacyOcrProcessor,
+)
+from src.map_handlers.malwarfare.runtime_router import MalwarfareRuntimeRouter
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LEGACY_HANDLER_SHA256 = (
-    "b33774e12e667227c897924cd402bec29fad38c8a218f6af9ec24c671065be52"
+    "a513d94e040fa3eae42fc4bb94f738c5f8a04a280441202e4a7a801083884a87"
 )
 
 
@@ -70,7 +75,11 @@ class MalwarfareMapHandlerTest(unittest.TestCase):
 
     def test_legacy_backup_integrity_and_import(self):
         legacy_path = (
-            PROJECT_ROOT / "src" / "map_handlers" / "malwarfare_map_handler_legacy.py"
+            PROJECT_ROOT
+            / "src"
+            / "map_handlers"
+            / "malwarfare"
+            / "malwarfare_map_handler_legacy.py"
         )
         digest = hashlib.sha256(legacy_path.read_bytes()).hexdigest()
 
@@ -79,7 +88,11 @@ class MalwarfareMapHandlerTest(unittest.TestCase):
 
     def test_new_handler_has_no_old_ocr_or_executor_dependency(self):
         source = (
-            PROJECT_ROOT / "src" / "map_handlers" / "malwarfare_map_handler.py"
+            PROJECT_ROOT
+            / "src"
+            / "map_handlers"
+            / "malwarfare"
+            / "malwarfare_map_handler.py"
         ).read_text(encoding="utf-8")
 
         self.assertNotIn("malwarfate_ocr_processor", source)
@@ -88,7 +101,12 @@ class MalwarfareMapHandlerTest(unittest.TestCase):
 
     def test_runtime_manifest_files_exist_and_default_engine_loads(self):
         manifest_path = (
-            PROJECT_ROOT / "resources" / "malwarfare" / "runtime_bundle_manifest.json"
+            PROJECT_ROOT
+            / "resources"
+            / "templates"
+            / "malwarfare"
+            / "runtime_1920_2560"
+            / "runtime_bundle_manifest.json"
         )
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         for relative_path in manifest["python_files"] + manifest["resource_files"]:
@@ -96,6 +114,52 @@ class MalwarfareMapHandlerTest(unittest.TestCase):
 
         engine = MalwarfareOcrProcessor.from_default_resources()
         self.assertIsInstance(engine, MalwarfareOcrProcessor)
+
+    def test_new_package_imports_and_all_default_runtimes_load(self):
+        modules = (
+            "src.map_handlers.malwarfare.ocr_processor",
+            "src.map_handlers.malwarfare.paused_recognizer",
+            "src.map_handlers.malwarfare.profile",
+            "src.map_handlers.malwarfare.runtime_1920",
+            "src.map_handlers.malwarfare.runtime_3840",
+            "src.map_handlers.malwarfare.runtime_router",
+            "src.map_handlers.malwarfare.malwarfare_event_manager",
+            "src.map_handlers.malwarfare.malwarfare_map_handler",
+            "src.map_handlers.malwarfare.malwarfare_map_handler_legacy",
+            "src.map_handlers.malwarfare.malwarfate_ocr_processor",
+        )
+        for module_name in modules:
+            with self.subTest(module_name=module_name):
+                self.assertIsNotNone(importlib.import_module(module_name))
+
+        router = MalwarfareRuntimeRouter.from_default_resources()
+        for model_width in (1920, 2560, 3840):
+            with self.subTest(model_width=model_width):
+                self.assertIsNotNone(router.runtime_for_width(model_width))
+
+    def test_legacy_english_templates_load_from_consolidated_directory(self):
+        processor = LegacyOcrProcessor(lang="en")
+        for color in ("yellow", "green", "blue", "orange"):
+            with self.subTest(color=color):
+                self.assertTrue(processor.templates[color])
+
+    def test_old_code_and_resource_roots_are_absent(self):
+        old_paths = (
+            PROJECT_ROOT / "src" / "malwarfare",
+            PROJECT_ROOT / "resources" / "malwarfare",
+            PROJECT_ROOT / "resources" / "malwarfare_3840",
+        )
+        for path in old_paths:
+            with self.subTest(path=path):
+                self.assertFalse(path.exists())
+
+    def test_pyinstaller_spec_uses_consolidated_paths(self):
+        spec = (PROJECT_ROOT / "Keiframe.spec").read_text(encoding="utf-8")
+        self.assertIn("'src', 'map_handlers', 'malwarfare'", spec)
+        self.assertIn("'runtime_1920_2560'", spec)
+        self.assertIn("'malwarfare', 'runtime_3840'", spec)
+        self.assertNotIn("'resources', 'malwarfare_3840'", spec)
+        self.assertNotIn("'src', 'malwarfare'", spec)
 
     def test_runtime_initialization_errors_fail_fast(self):
         with patch.object(

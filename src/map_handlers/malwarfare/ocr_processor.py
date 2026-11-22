@@ -35,7 +35,7 @@ from .runtime.time import (
 
 
 DEFAULT_PROFILE_PATH = (
-    Path(__file__).resolve().parents[2] / "config" / "malwarfare_zh.json"
+    Path(__file__).resolve().parents[3] / "config" / "malwarfare_zh.json"
 )
 CANONICAL_FRAME_SHAPE = (CANONICAL_HEIGHT, CANONICAL_WIDTH, 3)
 # Historical patch point retained without importing the former comparison module.

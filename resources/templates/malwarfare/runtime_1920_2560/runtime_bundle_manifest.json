@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "bundle_id": "malwarfare_ocr_runtime_zh_2560_v1",
+  "entrypoint": "src.map_handlers.malwarfare.MalwarfareOcrProcessor.from_default_resources",
+  "external_dependencies": [
+    "numpy",
+    "opencv-python"
+  ],
+  "python_files": [
+    "src/__init__.py",
+    "src/map_handlers/malwarfare/__init__.py",
+    "src/map_handlers/malwarfare/ocr_processor.py",
+    "src/map_handlers/malwarfare/runtime_1920.py",
+    "src/map_handlers/malwarfare/profile.py",
+    "src/map_handlers/malwarfare/paused_recognizer.py",
+    "src/map_handlers/malwarfare/runtime/__init__.py",
+    "src/map_handlers/malwarfare/runtime/geometry.py",
+    "src/map_handlers/malwarfare/runtime/count.py",
+    "src/map_handlers/malwarfare/runtime/time.py"
+  ],
+  "resource_files": [
+    "config/malwarfare_zh.json",
+    "resources/templates/malwarfare/runtime_1920_2560/runtime_bundle_manifest.json",
+    "resources/templates/malwarfare/runtime_1920_2560/count_zh_2560_v1/manifest.json",
+    "resources/templates/malwarfare/runtime_1920_2560/count_zh_2560_v1/orange.npz",
+    "resources/templates/malwarfare/runtime_1920_2560/count_zh_2560_v1/blue.npz",
+    "resources/templates/malwarfare/runtime_1920_2560/count_zh_2560_v1/green.npz",
+    "resources/templates/malwarfare/runtime_1920_2560/time_zh_2560_v1/manifest.json",
+    "resources/templates/malwarfare/runtime_1920_2560/time_zh_2560_v1/model.npz",
+    "resources/templates/malwarfare/runtime_1920_2560/paused_zh_2560_v1/manifest.json",
+    "resources/templates/malwarfare/runtime_1920_2560/paused_zh_2560_v1/paused_v01_yellow.png",
+    "resources/templates/malwarfare/runtime_1920_2560/paused_zh_2560_v1/paused_v02_white.png",
+    "resources/templates/malwarfare/runtime_1920_2560/native_1920_v1/count/manifest.json",
+    "resources/templates/malwarfare/runtime_1920_2560/native_1920_v1/count/blue/centroid_ncc_shift1.npz",
+    "resources/templates/malwarfare/runtime_1920_2560/native_1920_v1/count/green/centroid_ncc_shift1.npz",
+    "resources/templates/malwarfare/runtime_1920_2560/native_1920_v1/count/orange/centroid_ncc_shift1.npz",
+    "resources/templates/malwarfare/runtime_1920_2560/native_1920_v1/time/manifest.json",
+    "resources/templates/malwarfare/runtime_1920_2560/native_1920_v1/time/model.npz",
+    "resources/templates/malwarfare/runtime_1920_2560/native_1920_v1/paused/manifest.json",
+    "resources/templates/malwarfare/runtime_1920_2560/native_1920_v1/paused/paused_model.npz"
+  ],
+  "excluded_runtime_directories": [
+    "analysis",
+    "recordings",
+    "tests",
+    "tools"
+  ],
+  "profile_single_source_of_truth": "config/malwarfare_zh.json"
+}

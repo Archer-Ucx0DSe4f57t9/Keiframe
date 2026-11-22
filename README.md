@@ -50,6 +50,7 @@ Keiframe/
 │   ├── game_state_service.py           # 6119 轮询、截图和共享游戏状态
 │   ├── game_readers/                   # 底层画面识别器
 │   ├── map_handlers/                   # 地图时间线、分支和特殊地图状态机
+│   │   └── malwarfare/                 # 净网 Handler、事件与 1920/2560/3840 Runtime
 │   ├── event_managers_and_notifiers/   # 倒计时、突变、神器、补给和敌方组成提醒
 │   ├── presentation_modules/           # Toast、文字覆盖层和声音播放
 │   ├── settings_window/                # 设置、校验及 Excel 导入导出界面
@@ -58,9 +59,8 @@ Keiframe/
 │   └── utils/                          # 路径、日志、DPI、窗口等工具
 ├── resources/
 │   ├── db/                             # 地图、突变和敌方组成数据库
-│   ├── malwarfare/                     # 1920/2560 净网行动模型、manifest 与暂停模板
-│   ├── malwarfare_3840/                # 原生 3840 Runtime 的冻结 Bundle
 │   ├── templates/                      # 图像识别模板
+│   │   └── malwarfare/                 # 净网专属 Runtime 与中英文 legacy 模板
 │   ├── memo/                           # 地图笔记图片
 │   ├── icons/ fonts/ sounds/           # UI 与提醒资源
 │   └── enemy_comps/ troops/            # 敌方组成和兵种数据
@@ -81,8 +81,9 @@ Keiframe/
 - `resources/enemy_comps/*.csv`：已确认敌方组成的 t1~t7 注意单位资料；提醒管理器通过共享 Advisor 一次性加载，并按英文或中文组成名查询。
 - `src/game_readers/enemy_composition_catalog.py`：19 条敌方组成的 canonical English、已验证中文名、种族和 OCR aliases；这是生产识别与展示的唯一 catalog source of truth。
 - `resources/templates/`：突变、种族、补给、小地图和特殊地图识别模板。
-- `resources/malwarfare/` 与 `config/malwarfare_zh.json`：中文“净网行动” 1920/2560 版本化推理资源；旧模板仍供英文 legacy Handler 保留。
-- `resources/malwarfare_3840/`：原生 3840×2160 frozen Runtime Bundle，Time 使用独立验证通过的 Candidate-v5（Normal-only Centroid NCC + v5 Presence）；包含 manifest、模型哈希和纯推理资源，不依赖开发仓库的 analysis、recordings、Candidate、Shadow 或 GT。
+- `resources/templates/malwarfare/runtime_1920_2560/` 与 `config/malwarfare_zh.json`：中文“净网行动” 1920/2560 版本化推理资源。
+- `resources/templates/malwarfare/runtime_3840/`：原生 3840×2160 frozen Runtime Bundle，Time 使用独立验证通过的 Candidate-v5（Normal-only Centroid NCC + v5 Presence）；包含 manifest、模型哈希和纯推理资源，不依赖开发仓库的 analysis、recordings、Candidate、Shadow 或 GT。
+- `resources/templates/malwarfare/en_*` 与 `zh_*`：旧模板 OCR 资源，继续供英文 legacy Handler 等兼容路径使用。
 - 中文 Runtime 依据截图同时记录的客户端区宽度按最近距离选择 1920/2560/3840，等距时选较小宽度；`enable_malwarfare_3840_runtime` 仅保留为旧设置兼容字段，不再阻止自动选择 3840。
 - `settings.json`：用户本地覆盖配置，不应提交。
 

@@ -13,12 +13,12 @@ import numpy as np
 
 from src import config
 from src.game_state_service import state
-from src.malwarfare.ocr_processor import (
+from src.map_handlers.malwarfare.ocr_processor import (
     DEFAULT_PROFILE_PATH,
     MalwarfareOcrProcessor,
 )
-from src.malwarfare.profile import load_profile
-from src.malwarfare.runtime_router import MalwarfareRuntimeRouter
+from src.map_handlers.malwarfare.profile import load_profile
+from src.map_handlers.malwarfare.runtime_router import MalwarfareRuntimeRouter
 from src.utils.logging_util import get_logger
 
 

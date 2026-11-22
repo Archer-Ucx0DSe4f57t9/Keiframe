@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "bundle_id": "malwarfare_ocr_runtime_zh_3840_v1",
+  "supported_native_resolution": {"width": 3840, "height": 2160},
+  "canonical_resolution": {"width": 1920, "height": 1080},
+  "ui_profile": "Normal",
+  "candidate_provenance": {
+    "count": "3840 Candidate v1",
+    "paused": "3840 Candidate v2",
+    "time_numeric": "3840 Time Candidate v5",
+    "time_three_five": "not used by Candidate v5",
+    "time_presence": "3840 Time Candidate v5"
+  },
+  "model_file_sha256": {
+    "count/blue.npz": "bf9f3256cbfae74287b8b8487a59a769a36005b2c49eec4fe079d4327a6ea516",
+    "count/green.npz": "9de265b747ae3c4bd4bc92af5627193704a374bdb1b308e56d0239cc39be4d7f",
+    "count/orange.npz": "27ad964db3e8ae2da7b411bf36b41b8da348aeb5ba0147ed4fceaec09f0f1235",
+    "time/model.npz": "e827381a2edf7073ea8999c4229767907c501cb2c4dcc80284fb34b0fea7b0f7",
+    "time/model_v5.npz": "ca27ffe2330c677733d706e2d28f1365a0fd3c57d090c7ef68a6ea469e935340",
+    "paused/model.npz": "c63580ac829ce5e074819566404b446f6cf1fffa11e64de71075eb99faa76419"
+  },
+  "source_candidate_lock_sha256": "c276f97c5994778a4d492a3d7f36d956a884f4ce20708a964fb3c2f6d3cdb6f1",
+  "python_files": [
+    "src/__init__.py",
+    "src/map_handlers/malwarfare/__init__.py",
+    "src/map_handlers/malwarfare/ocr_processor.py",
+    "src/map_handlers/malwarfare/paused_recognizer.py",
+    "src/map_handlers/malwarfare/profile.py",
+    "src/map_handlers/malwarfare/runtime/__init__.py",
+    "src/map_handlers/malwarfare/runtime/count.py",
+    "src/map_handlers/malwarfare/runtime/geometry.py",
+    "src/map_handlers/malwarfare/runtime/paused_3840.py",
+    "src/map_handlers/malwarfare/runtime/time.py",
+    "src/map_handlers/malwarfare/runtime/time_3840.py",
+    "src/map_handlers/malwarfare/runtime/time_3840_v5.py",
+    "src/map_handlers/malwarfare/runtime_3840.py"
+  ],
+  "resource_files": [
+    "resources/templates/malwarfare/runtime_3840/runtime_bundle_manifest.json",
+    "resources/templates/malwarfare/runtime_3840/profile.json",
+    "resources/templates/malwarfare/runtime_3840/count/manifest.json",
+    "resources/templates/malwarfare/runtime_3840/count/blue.npz",
+    "resources/templates/malwarfare/runtime_3840/count/green.npz",
+    "resources/templates/malwarfare/runtime_3840/count/orange.npz",
+    "resources/templates/malwarfare/runtime_3840/time/manifest.json",
+    "resources/templates/malwarfare/runtime_3840/time/model.npz",
+    "resources/templates/malwarfare/runtime_3840/time/model_v5.npz",
+    "resources/templates/malwarfare/runtime_3840/paused/manifest.json",
+    "resources/templates/malwarfare/runtime_3840/paused/model.npz",
+    "resources/templates/malwarfare/runtime_3840/paused/baseline/manifest.json",
+    "resources/templates/malwarfare/runtime_3840/paused/baseline/paused_v01_yellow.png",
+    "resources/templates/malwarfare/runtime_3840/paused/baseline/paused_v02_white.png"
+  ],
+  "resource_file_sha256": {
+    "resources/templates/malwarfare/runtime_3840/profile.json": "36fc5c8e1e1d80f0122b86fce18fa21b3682d9b55a86d47d8f5f1e47cd7649df",
+    "resources/templates/malwarfare/runtime_3840/count/manifest.json": "9b0b0f38cd84536a8a7425547ce39df0ba1efe9476ae48211baf28895a1bc854",
+    "resources/templates/malwarfare/runtime_3840/count/blue.npz": "bf9f3256cbfae74287b8b8487a59a769a36005b2c49eec4fe079d4327a6ea516",
+    "resources/templates/malwarfare/runtime_3840/count/green.npz": "9de265b747ae3c4bd4bc92af5627193704a374bdb1b308e56d0239cc39be4d7f",
+    "resources/templates/malwarfare/runtime_3840/count/orange.npz": "27ad964db3e8ae2da7b411bf36b41b8da348aeb5ba0147ed4fceaec09f0f1235",
+    "resources/templates/malwarfare/runtime_3840/time/manifest.json": "956359ace9a70175c9ac9b370047948fcc4da2e57e9f81fcfa2f9dbeb0d7a3f9",
+    "resources/templates/malwarfare/runtime_3840/time/model.npz": "e827381a2edf7073ea8999c4229767907c501cb2c4dcc80284fb34b0fea7b0f7",
+    "resources/templates/malwarfare/runtime_3840/time/model_v5.npz": "ca27ffe2330c677733d706e2d28f1365a0fd3c57d090c7ef68a6ea469e935340",
+    "resources/templates/malwarfare/runtime_3840/paused/manifest.json": "afb040faef15c39eea335f3e6d0aa3f7bc49be051c0e2d8ec94229ce0c9bc2ac",
+    "resources/templates/malwarfare/runtime_3840/paused/model.npz": "c63580ac829ce5e074819566404b446f6cf1fffa11e64de71075eb99faa76419",
+    "resources/templates/malwarfare/runtime_3840/paused/baseline/manifest.json": "25bdfe5e24e23c6cbd467ddc84d9e32011310bf70e572ac4635cf59905d6645a",
+    "resources/templates/malwarfare/runtime_3840/paused/baseline/paused_v01_yellow.png": "8d0e1e098d1299e1be3d107cbd97ecf188f153f419e67c74bf8685be6fcfd5d0",
+    "resources/templates/malwarfare/runtime_3840/paused/baseline/paused_v02_white.png": "b7718a3077e66f9dd98a2b8e991d7e298e4e164b47fe6c74b11e9d90295932ba"
+  },
+  "external_dependencies": ["numpy", "opencv-python"],
+  "entrypoint": "src.map_handlers.malwarfare.Malwarfare3840Runtime.from_default_resources",
+  "excluded_runtime_directories": ["analysis", "recordings", "tests", "tools"]
+}

@@ -23,9 +23,11 @@ CANDIDATE_VERSION = "paused_zh_2560_v1"
 PREPROCESSING_VERSION = "legacy_yellow_v1"
 ROI_SHAPE = (32, 53, 3)
 DEFAULT_RESOURCE_DIR = (
-    Path(__file__).resolve().parents[2]
+    Path(__file__).resolve().parents[3]
     / "resources"
+    / "templates"
     / "malwarfare"
+    / "runtime_1920_2560"
     / CANDIDATE_VERSION
 )
 

@@ -8,7 +8,9 @@ import os
 
 # 自带模块
 from src.utils.logging_util import get_logger
-from src.map_handlers.malwarfate_ocr_processor import MalwarfareOcrProcessor
+from src.map_handlers.malwarfare.malwarfate_ocr_processor import (
+    MalwarfareOcrProcessor,
+)
 from src import config
 from src.game_state_service import state
 from src.utils.fileutil import get_project_root

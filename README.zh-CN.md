@@ -77,9 +77,7 @@ Keiframe/
 │   │   ├── IdentifyMap.py            # 地图识别逻辑
 │   │   ├── map_event_manager.py      # 通用地图事件调度
 │   │   ├── map_loader.py             # 地图配置加载
-│   │   ├── malwarfare_map_handler.py # 净网行动的画面识别模块
-│   │   ├── malwarfare_event_manager.py # 净网行动的事件管理器
-│   │   └── malwarfate_ocr_processor.py # 净网行动的OCR文本识别引擎
+│   │   └── malwarfare/               # 净网行动 Handler、事件与 OCR Runtime
 │   ├── mutaor_handlers/              # 突变和种族识别
 │   │   ├── mutator_and_enemy_race_recognizer.py # 模板匹配识别器
 │   │   └── mutator_manager.py        # 突变数据管理

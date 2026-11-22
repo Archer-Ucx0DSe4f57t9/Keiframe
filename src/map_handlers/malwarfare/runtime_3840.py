@@ -42,10 +42,14 @@ NATIVE_FRAME_SHAPE_3840 = (2160, 3840, 3)
 CANONICAL_FRAME_SHAPE = (CANONICAL_HEIGHT, CANONICAL_WIDTH, 3)
 SUPPORTED_UI_PROFILE_3840 = "Normal"
 DEFAULT_RUNTIME_3840_RESOURCE_DIR = (
-    Path(__file__).resolve().parents[2] / "resources" / "malwarfare_3840"
+    Path(__file__).resolve().parents[3]
+    / "resources"
+    / "templates"
+    / "malwarfare"
+    / "runtime_3840"
 )
 EXPECTED_BUNDLE_MANIFEST_SHA256 = (
-    "694e4f5d0f27acfc619d2ecf648de209d564bfdfc0868f9eb05907f5816f26f2"
+    "f9efc63f09259bbade11a97bf6e0dc35c30ee606f51ee313a7ed585d8731504f"
 )
 
 
@@ -121,7 +125,7 @@ def verify_runtime_bundle_3840(
     """Verify the bundle root manifest and every declared resource hash."""
 
     resource_root = Path(resource_dir).resolve()
-    bundle_root = resource_root.parents[1]
+    bundle_root = resource_root.parents[3]
     manifest_path = resource_root / "runtime_bundle_manifest.json"
     actual_manifest_sha256 = _sha256_file(manifest_path)
     if actual_manifest_sha256 != EXPECTED_BUNDLE_MANIFEST_SHA256:
@@ -137,7 +141,10 @@ def verify_runtime_bundle_3840(
         "supported_native_resolution": {"width": 3840, "height": 2160},
         "canonical_resolution": {"width": 1920, "height": 1080},
         "ui_profile": SUPPORTED_UI_PROFILE_3840,
-        "entrypoint": "src.malwarfare.Malwarfare3840Runtime.from_default_resources",
+        "entrypoint": (
+            "src.map_handlers.malwarfare."
+            "Malwarfare3840Runtime.from_default_resources"
+        ),
         "source_candidate_lock_sha256": (
             "c276f97c5994778a4d492a3d7f36d956a884f4ce20708a964fb3c2f6d3cdb6f1"
         ),
@@ -156,7 +163,10 @@ def verify_runtime_bundle_3840(
         raise ValueError("3840 runtime resource_files must be a non-empty list")
     if not isinstance(file_sha256, dict):
         raise ValueError("3840 runtime resource_file_sha256 is missing")
-    manifest_relative = "resources/malwarfare_3840/runtime_bundle_manifest.json"
+    manifest_relative = (
+        "resources/templates/malwarfare/runtime_3840/"
+        "runtime_bundle_manifest.json"
+    )
     if manifest_relative not in resource_files:
         raise ValueError("3840 bundle manifest is not declared as a resource")
     hashed_resources = set(resource_files) - {manifest_relative}

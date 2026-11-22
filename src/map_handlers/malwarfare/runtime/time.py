@@ -46,9 +46,11 @@ CORE_STRIP_RECTS = {
     "right": {"x": 32, "y": 7, "width": 8, "height": 11},
 }
 DEFAULT_TIME_RUNTIME_RESOURCE_DIR = (
-    Path(__file__).resolve().parents[3]
+    Path(__file__).resolve().parents[4]
     / "resources"
+    / "templates"
     / "malwarfare"
+    / "runtime_1920_2560"
     / RESOURCE_VERSION
 )
 
