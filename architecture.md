@@ -63,7 +63,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 | 游戏检查线程 | `AppRuntime` 创建，入口仍为 `TimerWindow._run_async_game_scheduler()` | 运行 asyncio 循环、轮询 6119、调度截图 | 通过 `progress_signal` 通知主线程 |
 | 截图 asyncio task | `game_state_service.check_for_new_game_scheduler()` | 约每 0.1 秒捕获活动 SC2 窗口并更新共享截图 | 只写 `GlobalState`，使用锁 |
 | 突变/种族识别线程 | `Mutator_and_enemy_race_recognizer` | 从共享截图识别敌方种族和突变图标 | 通过 Qt signal 返回结果 |
-| 敌方组成被动更新 | 复用 `Mutator_and_enemy_race_recognizer` 的 perception loop | 使用锁内复制、锁外处理的最新截图执行 tooltip 检测、OCR 和匹配 | 确认后写入 `GlobalState.enemy_composition`，再通过 Qt signal 交给主线程 notifier |
+| 敌方组成被动更新 | 复用 `Mutator_and_enemy_race_recognizer` 的 perception loop | 使用锁内复制、锁外处理的最新截图执行 tooltip 检测、OCR 和匹配 | 真实 `PANEL_FOUND`、确认和 expiry 分别通过 Qt signal 交给主线程；只有确认写入 `GlobalState.enemy_composition` |
 | 净网行动识别线程 | `MalwarfareMapHandler` | 单序列调用 frozen OCR；Count 约 1 秒一次，Time/Paused 约 0.13 秒一次 | 主线程轮询其最新结构化数据 |
 | 小地图红点 worker | `MinimapRedDotDetector` | 按监控规则分析共享截图 | `MapVariantAutoResolver` 查询结果并切图 |
 | 死亡摇篮识别线程 | `CradleOfDeathMapHandler` | 识别倒计时并产生阶段事件 | 当前尚未由主窗口创建或消费 |
@@ -74,7 +74,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 - `GlobalState.latest_malwarfare_native_screenshot` 与标准帧在同一把锁、同一时间戳下交换；客户端区原生 shape 始终记录，精确 3840×2160 时保留原生帧。几何获取失败会更新截图状态时间戳，使 Handler 能清除旧结果。
 - 识别器应在锁内复制截图，随后释放锁再做耗时计算。
 - `EnemyCompositionRecognizer` 是被动 update 组件，由已有视觉识别循环中的 `EnemyCompositionScheduler` 调用；它不创建自己的后台线程，且只在 tooltip 连续确认后执行 OCR。
-- `EnemyCompositionScheduler` 只发出确认回调/Qt signal，不直接操作 `MessagePresenter`；`EnemyCompositionNotifier` 在 Qt 主线程拥有独立 presenter，按 catalog 和当前语言显示一次、持续 5 秒并在 reset/shutdown 时清理。
+- `EnemyCompositionScheduler` 只发出 panel-found、确认和 expiry 回调/Qt signal，不直接操作 `MessagePresenter`；同一连续 panel 序列只发一次 panel-found。`EnemyCompositionNotifier` 在 Qt 主线程拥有独立 presenter，以 generation 隔离旧 timer，并在 reset/shutdown 时清理。
 - 后台线程不能直接修改 Qt 控件。
 - 退出时先设置 `state.app_closing`，再停止识别器和专用 handler，最后关闭数据库连接和 Qt 窗口。
 
@@ -104,7 +104,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 `src/recognition_controller.py`
 
 - 在原启动阶段装配可选的敌方组成 OCR provider、matcher、recognizer 和 scheduler。
-- 过滤已确认敌方组成的空结果、过期结果和退出阶段结果，再同步转发给主线程 notifier。
+- 过滤敌方组成的 stale generation、addon disabled、已确认、过期和退出阶段事件，再同步转发给主线程 notifier。
 - 按原顺序协调敌方种族、当前地图重载、已有突变状态与新突变结果。
 - 不拥有 Qt 信号、线程或定时器；`enemy_composition_*` 实例仍由 `TimerWindow` 持有，识别器启停、新局重置与退出清理由 `AppRuntime` 按原生命周期驱动。
 
@@ -205,7 +205,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 - `map_event_manager.py`：标准地图事件时间线、颜色和 Toast；只从 army 列文本追加可选注意单位。
 - 地图 Toast 与突变提醒 manager 各自维护 warning 状态、现实时间 QTimer 闪烁相位和一次性 warning 音效；`MessagePresenter` 只接收最终文字与颜色。
 - `artifact_notifier.py`：基于游戏时间和画面状态的泽拉图神器提醒。
-- `enemy_composition_notifier.py`：在主线程显示无 icon、无声音的中英文 Enemy Composition 名称。
+- `enemy_composition_notifier.py`：在主线程维护 `IDLE / RECOGNIZING / FAILED / CONFIRMED / EXPIRED` 展示状态；全部提示无 icon、无声音且为白色。
 - `supply_notifier.py`：补给识别、阈值判断和闪烁/声音节流。
 
 `src/presentation_modules/`
@@ -283,13 +283,21 @@ mss 捕获 SC2 窗口
 ```text
 敌方组成 tooltip 的共享截图
   -> Mutator_and_enemy_race_recognizer perception loop
-  -> EnemyCompositionScheduler 被动收集连续 title crop
+  -> EnemyCompositionScheduler 在首个真实 panel frame 发出 PANEL_FOUND
+  -> Qt 主线程显示“正在识别中”，从此刻开始 8 秒 UI attempt timeout
+  -> recognizer 被动收集连续 title crop
   -> tooltip 确认后执行 OCR 与 race 限定匹配
   -> canonical English composition
   -> GlobalState.enemy_composition（仅 CONFIRMED 写入）
   -> enemy_composition_confirmed_signal
-  -> Qt 主线程 EnemyCompositionNotifier / MessagePresenter（白色、5 秒、无声音）
+  -> Qt 主线程直接把状态替换为中英文组成名（白色、5 秒、无声音）
 ```
+
+用户从未 hover、只有敌方种族确认、scheduler 启动或 recognizer 处于
+`SEARCHING` 时不产生展示。单次 UI attempt 超时只把提示替换为悬停重试，
+不会写入失败事实或停止 recognizer；必须等待 tooltip 消失后再次真实出现才会
+产生新的 `PANEL_FOUND`。recognizer 在游戏时间大于 300 秒后进入既有 expiry，
+此时 notifier 静默隐藏状态而不提示继续悬停。
 
 ### 5.4 净网行动
 
@@ -321,7 +329,7 @@ SC2 客户端区原生 BGR 帧
 - 清除识别确认、倒计时、提醒和地图分支状态。
 - 清除地图 Toast 与突变提醒 manager 的 warning 闪烁状态和定时器。
 - 清除敌方组成识别器及 `GlobalState.enemy_composition`。
-- 清除 `EnemyCompositionNotifier` 的当前 overlay 和本局已提示标志；下一局允许再次提示。
+- 清除 `EnemyCompositionNotifier` 的当前 overlay、attempt/failure timer generation 和本局已提示标志；下一局保持 `IDLE`，等待新的真实 `PANEL_FOUND`。
 - 下一次地图识别重新加载时间线。
 
 ### 应用退出

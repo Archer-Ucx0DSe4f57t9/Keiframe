@@ -119,6 +119,14 @@ class AppRuntime:
             window.handle_enemy_composition_confirmed,
             Qt.QueuedConnection,
         )
+        window.enemy_composition_panel_found_signal.connect(
+            window.handle_enemy_composition_panel_found,
+            Qt.QueuedConnection,
+        )
+        window.enemy_composition_expired_signal.connect(
+            window.handle_enemy_composition_expired,
+            Qt.QueuedConnection,
+        )
         window._initialize_enemy_composition_recognition()
         window.mutator_and_enemy_race_recognizer.reset_and_start()
 
