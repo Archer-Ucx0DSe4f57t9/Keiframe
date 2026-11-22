@@ -112,7 +112,7 @@ class SettingsTabsBuilder:
 
     @staticmethod
     def create_auto_alert_tab(parent):
-        """自动读取画面触发的提示配置：神器提醒 / 人口提醒"""
+        """自动读取画面触发的提示配置。"""
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
 
@@ -183,7 +183,33 @@ class SettingsTabsBuilder:
 
 
         # =========================
-        # 2. 人口提醒设置
+        # 2. 敌方特殊单位识别与提醒
+        # =========================
+        gb_enemy_composition = QGroupBox(
+            "敌方特殊单位识别与提醒 (Enemy Composition)"
+        )
+        gl_enemy_composition = QFormLayout(gb_enemy_composition)
+        gl_enemy_composition.setVerticalSpacing(10)
+        gl_enemy_composition.setFieldGrowthPolicy(
+            QFormLayout.AllNonFixedFieldsGrow
+        )
+
+        hint_enemy_composition = SettingsTabsBuilder._create_hint_label(
+            "启用后识别到敌方 AI 构成时，会根据识别结果在相关事件中提示需要注意的特殊单位。"
+        )
+        gl_enemy_composition.addRow(hint_enemy_composition)
+
+        parent.add_row(
+            gl_enemy_composition,
+            "启用敌方特殊单位识别和提醒:",
+            'ENEMY_COMPOSITION_ENABLED',
+            'switch',
+        )
+        layout.addRow(gb_enemy_composition)
+
+
+        # =========================
+        # 3. 人口提醒设置
         # =========================
         gb_supply = QGroupBox("人口提醒设置 (Supply Alert)")
         gl_supply = QFormLayout(gb_supply)

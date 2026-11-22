@@ -94,6 +94,8 @@ class EnemyCompositionNotifier:
     def handle_panel_found(self) -> bool:
         """Start one UI attempt after a real panel detection."""
 
+        if not self._feature_enabled():
+            return False
         if self._shutdown or self._shown_this_game:
             return False
         if self._state in {
@@ -123,6 +125,9 @@ class EnemyCompositionNotifier:
     @pyqtSlot(int)
     def _handle_timeout_for_generation(self, generation: int) -> None:
         if self._shutdown or generation != self._timer_generation:
+            return
+        if not self._feature_enabled():
+            self.reset()
             return
         if self._state != EnemyCompositionNotificationState.RECOGNIZING:
             return
@@ -160,6 +165,9 @@ class EnemyCompositionNotifier:
     def handle_expired(self) -> None:
         """End an in-progress status silently when recognition expires."""
 
+        if not self._feature_enabled():
+            self.reset()
+            return
         if (
             self._shutdown
             or self._state == EnemyCompositionNotificationState.CONFIRMED
@@ -172,6 +180,8 @@ class EnemyCompositionNotifier:
     def show(self, canonical_composition: str) -> bool:
         """Replace any active status with the confirmed composition name."""
 
+        if not self._feature_enabled():
+            return False
         if self._shutdown or self._shown_this_game:
             return False
         if self._state == EnemyCompositionNotificationState.CONFIRMED:
@@ -215,6 +225,9 @@ class EnemyCompositionNotifier:
         self._hide_message()
 
     def _display_message(self, message: str) -> bool:
+        if not self._feature_enabled():
+            return False
+
         sc2_rect = self._geometry_provider()
         if not sc2_rect:
             self.logger.debug(
@@ -259,6 +272,10 @@ class EnemyCompositionNotifier:
         recognizer = getattr(self.parent, "enemy_composition_recognizer", None)
         state = getattr(recognizer, "state", None)
         return getattr(state, "value", state) == "EXPIRED"
+
+    @staticmethod
+    def _feature_enabled() -> bool:
+        return bool(getattr(config, "ENEMY_COMPOSITION_ENABLED", True))
 
     @staticmethod
     def _recognition_timeout_ms() -> int:

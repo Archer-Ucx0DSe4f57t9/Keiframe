@@ -68,6 +68,17 @@ class SettingsController:
         for key, value in new_settings.items():
             setattr(self.config, key, value)
 
+        if "ENEMY_COMPOSITION_ENABLED" in new_settings:
+            recognition_controller = getattr(
+                window,
+                "recognition_controller",
+                None,
+            )
+            if recognition_controller is not None:
+                recognition_controller.set_enemy_composition_enabled(
+                    bool(new_settings["ENEMY_COMPOSITION_ENABLED"])
+                )
+
         control_font_size = get_control_font_size()
         if hasattr(window, "search_box"):
             from src.utils.font_uitils import set_font_size

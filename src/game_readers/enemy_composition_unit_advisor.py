@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Mapping, Optional, Union
 
+from src import config
 from src.utils.fileutil import get_resources_dir
 from src.utils.logging_util import get_logger
 
@@ -220,6 +221,9 @@ class EnemyCompositionUnitAdvisor:
         """
 
         try:
+            if not bool(getattr(config, "ENEMY_COMPOSITION_ENABLED", True)):
+                return None
+
             if composition is None:
                 return None
 

@@ -1,6 +1,6 @@
 """Recognition pipeline assembly and result coordination for ``TimerWindow``."""
 
-from src import game_state_service
+from src import config, game_state_service
 from src.game_readers.enemy_composition_matcher import EnemyCompositionMatcher
 from src.game_readers.enemy_composition_panel_detector import (
     detect_enemy_composition_panel,
@@ -46,16 +46,61 @@ class RecognitionController:
         self.window = window
         self.game_state = game_state
         self.map_loader = map_loader_module
+        self._enemy_composition_initialization_attempted = False
 
     def initialize_enemy_composition_recognition(self):
         """Assemble the optional production Enemy Composition pipeline once."""
 
         window = self.window
-        window.enemy_composition_matcher = EnemyCompositionMatcher()
-        window.enemy_composition_panel_detector = detect_enemy_composition_panel
-        window.enemy_composition_ocr_provider = (
-            create_production_enemy_composition_ocr_provider(window.logger)
+
+        if not self._enemy_composition_enabled():
+            window.enemy_composition_ocr_provider = None
+            window.enemy_composition_recognizer = None
+            window.enemy_composition_scheduler = None
+            window.mutator_and_enemy_race_recognizer.set_enemy_composition_scheduler(
+                None
+            )
+            window.logger.info(
+                "Enemy composition recognition disabled by user setting"
+            )
+            return False
+
+        existing_scheduler = getattr(
+            window,
+            "enemy_composition_scheduler",
+            None,
         )
+        if (
+            existing_scheduler is not None
+            and getattr(window, "enemy_composition_ocr_provider", None) is not None
+        ):
+            window.mutator_and_enemy_race_recognizer.set_enemy_composition_scheduler(
+                existing_scheduler
+            )
+            return True
+
+        if (
+            self._enemy_composition_initialization_attempted
+            and getattr(window, "enemy_composition_ocr_provider", None) is None
+        ):
+            window.mutator_and_enemy_race_recognizer.set_enemy_composition_scheduler(
+                None
+            )
+            window.logger.info("Enemy composition recognition disabled")
+            return False
+
+        if getattr(window, "enemy_composition_matcher", None) is None:
+            window.enemy_composition_matcher = EnemyCompositionMatcher()
+        if getattr(window, "enemy_composition_panel_detector", None) is None:
+            window.enemy_composition_panel_detector = (
+                detect_enemy_composition_panel
+            )
+
+        if getattr(window, "enemy_composition_ocr_provider", None) is None:
+            self._enemy_composition_initialization_attempted = True
+            window.enemy_composition_ocr_provider = (
+                create_production_enemy_composition_ocr_provider(window.logger)
+            )
         window.enemy_composition_recognizer = None
         window.enemy_composition_scheduler = None
 
@@ -66,7 +111,7 @@ class RecognitionController:
                 None
             )
             window.logger.info("Enemy composition recognition disabled")
-            return
+            return False
 
         window.enemy_composition_recognizer = EnemyCompositionRecognizer(
             panel_detector=window.enemy_composition_panel_detector,
@@ -103,11 +148,81 @@ class RecognitionController:
             window.enemy_composition_scheduler
         )
         window.logger.info("Enemy composition recognizer initialized")
+        return True
+
+    def set_enemy_composition_enabled(self, enabled: bool) -> bool:
+        """Enable or disable the complete Enemy Composition runtime pipeline."""
+
+        enabled = bool(enabled)
+        config.ENEMY_COMPOSITION_ENABLED = enabled
+        window = self.window
+        perception_recognizer = getattr(
+            window,
+            "mutator_and_enemy_race_recognizer",
+            None,
+        )
+
+        if not enabled:
+            scheduler = getattr(window, "enemy_composition_scheduler", None)
+            if scheduler is not None:
+                scheduler.reset()
+            if perception_recognizer is not None:
+                perception_recognizer.set_enemy_composition_scheduler(None)
+
+            notifier = getattr(window, "enemy_composition_notifier", None)
+            if notifier is not None:
+                notifier.reset()
+
+            window.logger.info(
+                "Enemy composition recognition disabled by user setting"
+            )
+            return False
+
+        # A confirmed composition remains a valid game fact while the feature
+        # is off.  Re-enabling advice does not require another OCR attempt.
+        if getattr(self.game_state, "enemy_composition", None) is not None:
+            scheduler = getattr(window, "enemy_composition_scheduler", None)
+            if scheduler is not None and perception_recognizer is not None:
+                # Keep the existing pipeline attached for the next game.  Its
+                # is_finished() guard prevents OCR while this fact is present.
+                perception_recognizer.set_enemy_composition_scheduler(
+                    scheduler
+                )
+            window.logger.info(
+                "Enemy composition recognition enabled; reusing confirmed composition"
+            )
+            return True
+
+        scheduler = getattr(window, "enemy_composition_scheduler", None)
+        if scheduler is None:
+            self.initialize_enemy_composition_recognition()
+            scheduler = getattr(window, "enemy_composition_scheduler", None)
+        else:
+            scheduler.reset()
+            if perception_recognizer is not None:
+                perception_recognizer.set_enemy_composition_scheduler(scheduler)
+
+        if scheduler is None:
+            return False
+
+        # The shared perception loop may have naturally stopped after race and
+        # mutator recognition completed while Enemy Composition was disabled.
+        # Restarting it preserves those confirmed results and adds no thread.
+        if (
+            perception_recognizer is not None
+            and not getattr(perception_recognizer, "_running", False)
+        ):
+            perception_recognizer.start()
+
+        window.logger.info("Enemy composition recognition enabled")
+        return True
 
     def handle_enemy_composition_confirmed(self, canonical_composition):
         """Render a worker confirmation after filtering stale results."""
 
         window = self.window
+        if not self._enemy_composition_enabled():
+            return
         if getattr(window, "_safe_exiting", False):
             return
         if not canonical_composition:
@@ -133,6 +248,8 @@ class RecognitionController:
     def handle_enemy_composition_panel_found(self, generation):
         """Start status presentation for a current, real panel detection."""
 
+        if not self._enemy_composition_enabled():
+            return
         if not self._is_current_enemy_composition_event(generation):
             return
 
@@ -151,6 +268,8 @@ class RecognitionController:
     def handle_enemy_composition_expired(self, generation):
         """Silently clear status when the recognizer reaches expiry."""
 
+        if not self._enemy_composition_enabled():
+            return
         if not self._is_current_enemy_composition_event(generation):
             return
         notifier = getattr(self.window, "enemy_composition_notifier", None)
@@ -159,12 +278,18 @@ class RecognitionController:
 
     def _is_current_enemy_composition_event(self, generation):
         window = self.window
+        if not self._enemy_composition_enabled():
+            return False
         if getattr(window, "_safe_exiting", False):
             return False
         scheduler = getattr(window, "enemy_composition_scheduler", None)
         if scheduler is None:
             return False
         return scheduler.generation == generation
+
+    @staticmethod
+    def _enemy_composition_enabled() -> bool:
+        return bool(getattr(config, "ENEMY_COMPOSITION_ENABLED", True))
 
     def handle_mutator_and_enemy_race_recognition_update(self, results):
         """Coordinate race and mutator recognition with map/button state."""

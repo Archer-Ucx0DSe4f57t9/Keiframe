@@ -103,8 +103,9 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 
 `src/recognition_controller.py`
 
-- 在原启动阶段装配可选的敌方组成 OCR provider、matcher、recognizer 和 scheduler。
-- 过滤敌方组成的 stale generation、addon disabled、已确认、过期和退出阶段事件，再同步转发给主线程 notifier。
+- 在原启动阶段按用户总开关装配可选的敌方组成 OCR provider、matcher、recognizer 和 scheduler；启动时关闭不会加载 OCR model。
+- 集中处理运行时启停：关闭时 reset、从共享 perception loop 卸载 scheduler 并隐藏 notifier，重开时复用已有 provider 或按需首次初始化；已确认的 `GlobalState.enemy_composition` 不因设置切换而清空。
+- 过滤敌方组成的 feature disabled、stale generation、addon disabled、已确认、过期和退出阶段事件，再同步转发给主线程 notifier。
 - 按原顺序协调敌方种族、当前地图重载、已有突变状态与新突变结果。
 - 不拥有 Qt 信号、线程或定时器；`enemy_composition_*` 实例仍由 `TimerWindow` 持有，识别器启停、新局重置与退出清理由 `AppRuntime` 按原生命周期驱动。
 
@@ -189,7 +190,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 - `mutator_and_enemy_race_recognizer.py`：模板匹配敌方种族和突变图标。
 - `enemy_composition_recognizer.py`：在共享截图上检测敌方组成 tooltip，收集标题 crop 并通过 OCR/匹配确认 canonical English 名称；由 `RecognitionController` 在 `AppRuntime` 保留的原启动点装配，并由 `EnemyCompositionScheduler` 接入已有视觉识别循环。
 - `enemy_composition_catalog.py`：生产使用的 19 条 canonical English、已验证中文名、种族和 aliases 的唯一来源。
-- `enemy_composition_unit_advisor.py`：启动时一次性读取 `resources/enemy_comps/*.csv`，为英文/中文组成名建立同一份 t1~t7 注意单位 lookup；只消费确认后的状态，不参与 OCR。
+- `enemy_composition_unit_advisor.py`：启动时一次性读取 `resources/enemy_comps/*.csv`，为英文/中文组成名建立同一份 t1~t7 注意单位 lookup；只消费确认后的状态，不参与 OCR，并在总开关关闭时统一返回无增强结果。
 - `ppocr_opencv_provider.py`：使用本地 addon 中的 PP-OCRv5 recognition model，通过 OpenCV DNN 在进程内只初始化一次；缺少 model/dict 时只禁用敌方组成识别。
 - `ocr_provider.py`：提供与识别器解耦的 OCRProvider 接口；其中的 RapidOCR provider 和 Tesseract provider 仅用于 benchmark、开发测试和回归比较，不进入生产装配。
 - `white_supply_recognizer.py`：从白色 UI 数字读取当前/最大补给。

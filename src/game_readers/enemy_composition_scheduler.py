@@ -11,6 +11,7 @@ from __future__ import annotations
 import threading
 from typing import Any, Callable, Optional
 
+from src import config
 from src.game_readers.enemy_composition_recognizer import EnemyCompositionState
 from src.utils.logging_util import get_logger
 
@@ -56,6 +57,12 @@ class EnemyCompositionScheduler:
         passive: no enemy race or an already confirmed composition means no
         recognizer call.
         """
+
+        # This gate must precede screenshot_lock acquisition and frame copying.
+        # Runtime detachment is the primary stop mechanism; this second gate
+        # protects against an update already fetched by the perception loop.
+        if not bool(getattr(config, "ENEMY_COMPOSITION_ENABLED", True)):
+            return False
 
         game_state = self._game_state
         if not getattr(game_state, "is_in_game", False):

@@ -140,6 +140,9 @@ ARTIFACT_ALERT_TEXT = "神器已经就绪"
 ARTIFACT_ALERT_COLOR = "rgb(80,255,120)"
 ARTIFACT_ALERT_SOUND = "Artifact.mp3"
 
+# ===== Enemy Composition =====
+ENEMY_COMPOSITION_ENABLED = True
+
 # 敌方组成识别状态提示。仅在真实检测到 tooltip panel 后开始计时。
 ENEMY_COMPOSITION_RECOGNITION_TIMEOUT_SECONDS = 8
 
