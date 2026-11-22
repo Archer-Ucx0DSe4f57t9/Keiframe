@@ -24,13 +24,29 @@ class EnemyCompositionScheduler:
         game_state: Any,
         logger: Optional[Any] = None,
         confirmation_callback: Optional[Callable[[str], None]] = None,
+        panel_found_callback: Optional[Callable[[int], None]] = None,
+        expiry_callback: Optional[Callable[[int], None]] = None,
     ):
         self._recognizer = recognizer
         self._game_state = game_state
         self._logger = logger or get_logger(__name__)
         self._confirmation_callback = confirmation_callback
+        self._panel_found_callback = panel_found_callback
+        self._expiry_callback = expiry_callback
         self._confirmation_emitted = False
+        self._panel_sequence_active = False
+        self._expiry_emitted = False
+        self._generation = 0
         self._recognizer_lock = threading.RLock()
+
+    @property
+    def generation(self) -> int:
+        """Return the current per-game generation for queued-event filtering."""
+
+        # Reading an integer is sufficient here and must never make the Qt
+        # main thread wait for an in-flight detector/OCR call holding the
+        # recognizer lock.  Reset still mutates the value under that lock.
+        return self._generation
 
     def update(self) -> bool:
         """Process the newest frame when composition recognition is eligible.
@@ -70,6 +86,8 @@ class EnemyCompositionScheduler:
         )
 
         confirmed_composition = None
+        panel_found_generation = None
+        expiry_generation = None
         with self._recognizer_lock:
             try:
                 result = self._recognizer.update(
@@ -85,6 +103,28 @@ class EnemyCompositionScheduler:
                 )
                 return False
 
+            panel_found_streak = int(
+                getattr(result, "panel_found_streak", 0) or 0
+            )
+            if panel_found_streak > 0:
+                if (
+                    not self._panel_sequence_active
+                    and getattr(result, "state", None)
+                    != EnemyCompositionState.EXPIRED
+                ):
+                    panel_found_generation = self._generation
+                self._panel_sequence_active = True
+            else:
+                self._panel_sequence_active = False
+
+            if (
+                getattr(result, "state", None)
+                == EnemyCompositionState.EXPIRED
+                and not self._expiry_emitted
+            ):
+                self._expiry_emitted = True
+                expiry_generation = self._generation
+
             if (
                 getattr(result, "state", None) == EnemyCompositionState.CONFIRMED
                 and getattr(result, "enemy_composition", None)
@@ -97,6 +137,22 @@ class EnemyCompositionScheduler:
                 game_state.enemy_composition = result.enemy_composition
                 self._confirmation_emitted = True
                 confirmed_composition = result.enemy_composition
+
+        # These callbacks run on the perception worker.  Production callbacks
+        # only emit Qt signals; they never touch MessagePresenter directly.
+        if panel_found_generation is not None:
+            self._emit_lifecycle_callback(
+                self._panel_found_callback,
+                panel_found_generation,
+                "panel-found",
+            )
+
+        if expiry_generation is not None:
+            self._emit_lifecycle_callback(
+                self._expiry_callback,
+                expiry_generation,
+                "expiry",
+            )
 
         if confirmed_composition:
             self._logger.info(
@@ -113,12 +169,31 @@ class EnemyCompositionScheduler:
 
         return True
 
+    def _emit_lifecycle_callback(
+        self,
+        callback: Optional[Callable[[int], None]],
+        generation: int,
+        event_name: str,
+    ) -> None:
+        if callback is None:
+            return
+        try:
+            callback(generation)
+        except Exception:
+            self._logger.exception(
+                "[EnemyCompositionScheduler] %s callback failed",
+                event_name,
+            )
+
     def reset(self) -> None:
         """Reset the recognizer without racing an in-flight perception call."""
 
         with self._recognizer_lock:
+            self._generation += 1
             self._recognizer.reset()
             self._confirmation_emitted = False
+            self._panel_sequence_active = False
+            self._expiry_emitted = False
 
     def is_finished(self) -> bool:
         """Return whether this scheduler no longer needs perception frames."""

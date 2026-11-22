@@ -79,11 +79,25 @@ class RecognitionController:
             None,
         )
         confirmation_callback = getattr(confirmation_signal, "emit", None)
+        panel_found_signal = getattr(
+            window,
+            "enemy_composition_panel_found_signal",
+            None,
+        )
+        panel_found_callback = getattr(panel_found_signal, "emit", None)
+        expiry_signal = getattr(
+            window,
+            "enemy_composition_expired_signal",
+            None,
+        )
+        expiry_callback = getattr(expiry_signal, "emit", None)
         window.enemy_composition_scheduler = EnemyCompositionScheduler(
             recognizer=window.enemy_composition_recognizer,
             game_state=window.game_state,
             logger=window.logger,
             confirmation_callback=confirmation_callback,
+            panel_found_callback=panel_found_callback,
+            expiry_callback=expiry_callback,
         )
         window.mutator_and_enemy_race_recognizer.set_enemy_composition_scheduler(
             window.enemy_composition_scheduler
@@ -115,6 +129,42 @@ class RecognitionController:
         notifier = getattr(window, "enemy_composition_notifier", None)
         if notifier is not None:
             notifier.show(canonical_composition)
+
+    def handle_enemy_composition_panel_found(self, generation):
+        """Start status presentation for a current, real panel detection."""
+
+        if not self._is_current_enemy_composition_event(generation):
+            return
+
+        window = self.window
+        if getattr(window.game_state, "enemy_composition", None) is not None:
+            return
+        if not str(getattr(window.game_state, "enemy_race", None) or "").strip():
+            return
+        if getattr(window, "enemy_composition_ocr_provider", None) is None:
+            return
+
+        notifier = getattr(window, "enemy_composition_notifier", None)
+        if notifier is not None:
+            notifier.handle_panel_found()
+
+    def handle_enemy_composition_expired(self, generation):
+        """Silently clear status when the recognizer reaches expiry."""
+
+        if not self._is_current_enemy_composition_event(generation):
+            return
+        notifier = getattr(self.window, "enemy_composition_notifier", None)
+        if notifier is not None:
+            notifier.handle_expired()
+
+    def _is_current_enemy_composition_event(self, generation):
+        window = self.window
+        if getattr(window, "_safe_exiting", False):
+            return False
+        scheduler = getattr(window, "enemy_composition_scheduler", None)
+        if scheduler is None:
+            return False
+        return scheduler.generation == generation
 
     def handle_mutator_and_enemy_race_recognition_update(self, results):
         """Coordinate race and mutator recognition with map/button state."""

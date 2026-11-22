@@ -16,6 +16,8 @@ class TimerWindow(QMainWindow):
     toggle_artifact_signal = pyqtSignal()
     mutator_and_enemy_race_recognition_signal = QtCore.pyqtSignal(dict)
     enemy_composition_confirmed_signal = QtCore.pyqtSignal(str)
+    enemy_composition_panel_found_signal = QtCore.pyqtSignal(int)
+    enemy_composition_expired_signal = QtCore.pyqtSignal(int)
     
 
     # 定义信号，用于线程安全地激活各种快捷键
@@ -135,6 +137,18 @@ class TimerWindow(QMainWindow):
     def handle_enemy_composition_confirmed(self, canonical_composition):
         self.recognition_controller.handle_enemy_composition_confirmed(
             canonical_composition
+        )
+
+    @QtCore.pyqtSlot(int)
+    def handle_enemy_composition_panel_found(self, generation):
+        self.recognition_controller.handle_enemy_composition_panel_found(
+            generation
+        )
+
+    @QtCore.pyqtSlot(int)
+    def handle_enemy_composition_expired(self, generation):
+        self.recognition_controller.handle_enemy_composition_expired(
+            generation
         )
 
     def handle_progress_update(self, data):

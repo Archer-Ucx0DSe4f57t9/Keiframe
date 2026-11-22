@@ -63,7 +63,7 @@ class EnemyCompositionConfig:
     minimum_vote_lead: int = 1
     match_score_threshold: float = 70.0
     match_margin_threshold: float = 30.0
-    game_time_expiry_seconds: float = 500.0
+    game_time_expiry_seconds: float = 300.0
 
     def __post_init__(self) -> None:
         if self.panel_found_streak_required < 1:
@@ -262,12 +262,17 @@ class EnemyCompositionRecognizer:
         detection = self._detect(image_bgr)
         if not self._detection_found(detection):
             if (
-                self._state == EnemyCompositionState.COLLECTING
-                and not self._panel_confirmed
+                self._state in {
+                    EnemyCompositionState.COLLECTING,
+                    EnemyCompositionState.CONFIRMING,
+                }
+                and not self.is_confirmed
             ):
                 # A missing frame breaks the consecutive-found requirement.
-                # Discarding the incomplete tooltip also prevents crops from
-                # one hover from being mixed into the next hover.
+                # Discarding an unconfirmed tooltip also prevents crops and
+                # OCR votes from one hover from being mixed into a later
+                # retry.  A new hover can therefore produce a new, real
+                # PANEL_FOUND transition.
                 self._discard_incomplete_collection()
             return self._snapshot()
 
@@ -590,7 +595,12 @@ class EnemyCompositionRecognizer:
 
     def _discard_incomplete_collection(self) -> None:
         self._panel_found_streak = 0
+        self._panel_confirmed = False
         self._collected_crops.clear()
+        self._ocr_results.clear()
+        self._valid_match_results.clear()
+        self._match_results.clear()
+        self._votes.clear()
         self._ocr_processed_count = 0
         self._ocr_started = False
         self._set_state(EnemyCompositionState.SEARCHING)
