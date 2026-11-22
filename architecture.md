@@ -164,9 +164,9 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 - 标记过去和下一事件，滚动表格。
 - 在配置的提前量内创建或移除 Toast。
 
-`src/map_handlers/malwarfare_*`
+`src/map_handlers/malwarfare/`
 
-- 正式 Handler 把标准化完整帧传给 `src.malwarfare` production API，自身保留 UI profile/颜色探测、25 秒规则、暂停历史时间、单调保护和重定位状态机。
+- 正式 Handler 把标准化完整帧传给同目录的 production Runtime API，自身保留 UI profile/颜色探测、25 秒规则、暂停历史时间、单调保护和重定位状态机。
 - Handler 从同一截图事务的原生 shape 选择最近的 1920/2560/3840 Runtime；等距时选较小宽度。三套模型在 Handler 创建时加载并由 Router 缓存，切换分辨率只重置坐标及业务历史，不重复加载模型。旧 `enable_malwarfare_3840_runtime` 字段不再参与中文选型。
 - 3840 frozen Bundle 的正式验证范围仍只有 `Normal` UI profile；KeiFrame 非冻结适配层复用 2560 的六组纵向偏移，在 Canonical 帧上裁出与 Normal 完全同尺寸的 Count/Time/Paused ROI，再调用同一套冻结纯推理。Handler 的共享候选扫描先用 Green/Blue/Orange HSV 探针筛选，再以对应 Count Presence 唯一确认；低分 raw prediction 不算有效 Count，`Count=0` 保留合法语义，多颜色或多 Profile 歧义保持未知。逐 Profile 的 Count/Presence/score 和独立 Time/Paused 结果保存在诊断快照中，运行日志只输出限频摘要；确认后的结果继续进入同一个 25 秒、暂停历史、重定位和单调保护状态机。除 Normal 外均不得据此宣称冻结模型正式支持。
 - 开发诊断可在构造 Handler 时显式传入 `diagnostic_ui_profile_override="Normal"` 和 `diagnostic_count_color_override`；覆盖值只用于验证接入，不根据模型预测猜测颜色，也不会把 `Count=None` 发布为可信结果。

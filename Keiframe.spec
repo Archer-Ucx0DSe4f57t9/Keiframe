@@ -17,8 +17,19 @@ src_submodules = collect_submodules('src')
 malwarfare_runtime_datas = [
     (os.path.join(pro_root, 'config', 'malwarfare_zh.json'), 'config'),
     (
-        os.path.join(pro_root, 'resources', 'malwarfare'),
-        os.path.join('resources', 'malwarfare'),
+        os.path.join(
+            pro_root,
+            'resources',
+            'templates',
+            'malwarfare',
+            'runtime_1920_2560',
+        ),
+        os.path.join(
+            'resources',
+            'templates',
+            'malwarfare',
+            'runtime_1920_2560',
+        ),
     ),
 ]
 
@@ -29,15 +40,19 @@ malwarfare_runtime_datas = [
 malwarfare_3840_manifest_path = os.path.join(
     pro_root,
     'resources',
-    'malwarfare_3840',
+    'templates',
+    'malwarfare',
+    'runtime_3840',
     'runtime_bundle_manifest.json',
 )
 with open(malwarfare_3840_manifest_path, 'r', encoding='utf-8') as manifest_file:
     malwarfare_3840_manifest = json.load(manifest_file)
 malwarfare_runtime_datas.append(
     (
-        os.path.join(pro_root, 'resources', 'malwarfare_3840'),
-        os.path.join('resources', 'malwarfare_3840'),
+        os.path.join(
+            pro_root, 'resources', 'templates', 'malwarfare', 'runtime_3840'
+        ),
+        os.path.join('resources', 'templates', 'malwarfare', 'runtime_3840'),
     )
 )
 for relative_path in malwarfare_3840_manifest['python_files']:
@@ -53,8 +68,14 @@ for relative_path in malwarfare_3840_manifest['python_files']:
 for runtime_filename in ('runtime_router.py', 'runtime_1920.py'):
     malwarfare_runtime_datas.append(
         (
-            os.path.join(pro_root, 'src', 'malwarfare', runtime_filename),
-            os.path.join('src', 'malwarfare'),
+            os.path.join(
+                pro_root,
+                'src',
+                'map_handlers',
+                'malwarfare',
+                runtime_filename,
+            ),
+            os.path.join('src', 'map_handlers', 'malwarfare'),
         )
     )
 

@@ -40,9 +40,11 @@ COUNT_ROI_SHAPE = (31, 47, 3)
 TIME_ROI_SHAPE = (29, 53, 3)
 PAUSED_ROI_SHAPE = (32, 53, 3)
 DEFAULT_RUNTIME_1920_RESOURCE_DIR = (
-    Path(__file__).resolve().parents[2]
+    Path(__file__).resolve().parents[3]
     / "resources"
+    / "templates"
     / "malwarfare"
+    / "runtime_1920_2560"
     / "native_1920_v1"
 )
 

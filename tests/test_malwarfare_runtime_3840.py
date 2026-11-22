@@ -9,21 +9,23 @@ from unittest import mock
 
 import numpy as np
 
-from src.malwarfare.ocr_processor import MalwarfareOcrResult
-from src.malwarfare.profile import load_profile
-from src.malwarfare.runtime_3840 import (
+from src.map_handlers.malwarfare.ocr_processor import MalwarfareOcrResult
+from src.map_handlers.malwarfare.profile import load_profile
+from src.map_handlers.malwarfare.runtime_3840 import (
     BUNDLE_ID_3840,
     Malwarfare3840Runtime,
     verify_runtime_bundle_3840,
 )
-from src.malwarfare.runtime_router import (
+from src.map_handlers.malwarfare.runtime_router import (
     BUNDLE_ID_2560,
     MalwarfareRuntimeRouter,
 )
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RESOURCE_ROOT = ROOT / "resources" / "malwarfare_3840"
+RESOURCE_ROOT = (
+    ROOT / "resources" / "templates" / "malwarfare" / "runtime_3840"
+)
 
 
 class Runtime3840Tests(unittest.TestCase):
@@ -43,7 +45,7 @@ class Runtime3840Tests(unittest.TestCase):
         for relative, expected in manifest["model_file_sha256"].items():
             self.assertEqual(
                 manifest["resource_file_sha256"][
-                    f"resources/malwarfare_3840/{relative}"
+                    f"resources/templates/malwarfare/runtime_3840/{relative}"
                 ],
                 expected,
             )
@@ -131,7 +133,7 @@ class Runtime3840Tests(unittest.TestCase):
             )
 
     def test_model_files_load_only_during_initialization(self) -> None:
-        import src.malwarfare.runtime_3840 as runtime_module
+        import src.map_handlers.malwarfare.runtime_3840 as runtime_module
 
         with (
             mock.patch.object(
@@ -167,21 +169,21 @@ class Runtime3840Tests(unittest.TestCase):
 
     def test_tampered_manifest_model_and_missing_resource_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            copied = Path(temporary) / "resources" / "malwarfare_3840"
+            copied = Path(temporary) / "resources" / "templates" / "malwarfare" / "runtime_3840"
             shutil.copytree(RESOURCE_ROOT, copied)
             manifest = copied / "runtime_bundle_manifest.json"
             manifest.write_bytes(manifest.read_bytes() + b"\n")
             with self.assertRaisesRegex(ValueError, "manifest SHA-256 mismatch"):
                 verify_runtime_bundle_3840(copied)
         with tempfile.TemporaryDirectory() as temporary:
-            copied = Path(temporary) / "resources" / "malwarfare_3840"
+            copied = Path(temporary) / "resources" / "templates" / "malwarfare" / "runtime_3840"
             shutil.copytree(RESOURCE_ROOT, copied)
             model = copied / "time" / "model.npz"
             model.write_bytes(model.read_bytes() + b"tamper")
             with self.assertRaisesRegex(ValueError, "resource SHA-256 mismatch"):
                 verify_runtime_bundle_3840(copied)
         with tempfile.TemporaryDirectory() as temporary:
-            copied = Path(temporary) / "resources" / "malwarfare_3840"
+            copied = Path(temporary) / "resources" / "templates" / "malwarfare" / "runtime_3840"
             shutil.copytree(RESOURCE_ROOT, copied)
             (copied / "count" / "blue.npz").unlink()
             with self.assertRaisesRegex(ValueError, "missing or escaped"):

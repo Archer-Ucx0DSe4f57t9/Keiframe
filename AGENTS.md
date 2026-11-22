@@ -44,13 +44,13 @@ python -m src.main
 - `src/app_runtime.py`：普通组合类，按既有顺序装配服务、识别器和管理器，并执行对局重置及两条既有退出清理路径；组件仍由 `TimerWindow` 持有。
 - `src/game_state_service.py`：6119 API 轮询、SC2 窗口截图与共享 `GlobalState`。它只应维护事实状态，不承载 UI 展示。
 - `src/game_readers/`：底层图像识别。尽量输出结构化识别结果，不直接控制界面。
-- `src/map_handlers/`：地图加载、事件调度、地图分支和地图专属状态机。
+- `src/map_handlers/`：地图加载、事件调度、地图分支和地图专属状态机；净网专属代码集中在 `src/map_handlers/malwarfare/`。
 - `src/event_managers_and_notifiers/`：倒计时、突变、神器、补给等提醒业务。
 - `src/presentation_modules/`：Toast、覆盖文字与音频播放。
 - `src/settings_window/`、`src/ui/`、`src/ui_setup.py`：设置窗口及主界面布局。
 - `src/db/`：SQLite 连接与 DAO；业务层通过这里访问数据库。
 - `src/utils/`：路径、日志、DPI、窗口、校验及 Excel 工具。
-- `resources/`：运行时数据库、模板、图标、字体、声音和地图笔记；目录结构属于发布接口的一部分。
+- `resources/`：运行时数据库、模板、图标、字体、声音和地图笔记；净网专属资源集中在 `resources/templates/malwarfare/`，目录结构属于发布接口的一部分。
 - `tests/`：少量可稳定运行的 `unittest` 与大量人工调试脚本、截图样本的混合目录。
 - `python/`：随项目分发的 Python 3.10 嵌入式运行时，不是普通源码目录。
 - `build/`、`dist/`、`debug/`、日志、缓存、IDE 元数据和本地 `settings.json`：生成物或用户状态，不作为源码修改。

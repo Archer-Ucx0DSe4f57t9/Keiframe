@@ -20,7 +20,7 @@ class MalwarfareOcrProcessor:
         # ... (这部分加载代码保持不变，省略以节省空间，直接复用之前的即可) ...
         colors = ['yellow', 'green', 'blue', 'orange']
         self.logger.info(f"=== 初始化 OCR ({self.lang}) ===")
-        template_all_dir = get_resources_dir('templates')
+        template_all_dir = get_resources_dir('templates', 'malwarfare')
         
 
         for color in colors:

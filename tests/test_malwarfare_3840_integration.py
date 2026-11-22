@@ -9,11 +9,13 @@ import numpy as np
 from src import config
 from src.game_state_service import _capture_game_screen, state
 from src.game_time_handler import update_game_time
-from src.malwarfare.ocr_processor import MalwarfareOcrResult
-from src.malwarfare.runtime_router import MalwarfareRuntimeRouter
+from src.map_handlers.malwarfare.ocr_processor import MalwarfareOcrResult
+from src.map_handlers.malwarfare.runtime_router import MalwarfareRuntimeRouter
 from src.map_handlers import map_loader
 from src.map_handlers.IdentifyMap import identify_map
-from src.map_handlers.malwarfare_map_handler import MalwarfareMapHandler
+from src.map_handlers.malwarfare.malwarfare_map_handler import (
+    MalwarfareMapHandler,
+)
 
 
 class FakeOcr:
@@ -643,7 +645,7 @@ class Malwarfare3840IntegrationTests(unittest.TestCase):
 
     def test_3840_initialization_failure_is_explicit(self):
         with mock.patch(
-            "src.map_handlers.malwarfare_map_handler."
+            "src.map_handlers.malwarfare.malwarfare_map_handler."
             "MalwarfareRuntimeRouter.from_default_resources",
             side_effect=ValueError("bundle missing"),
         ):
