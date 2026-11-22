@@ -126,7 +126,7 @@ class MemoOverlay(QWidget):
                 new_w = int(img_w * scale_ratio)
                 new_h = int(img_h * scale_ratio)
                 memo_pixmap = memo_pixmap.scaled(new_w, new_h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                logger.info(f"Memo 图片已缩放至: {new_w}x{new_h}")
+                logger.debug(f"Memo 图片已缩放至: {new_w}x{new_h}")
         
         self.memo_label.setPixmap(memo_pixmap)
         self.memo_label.resize(new_w, new_h)

@@ -39,7 +39,7 @@ class TroopLoader:
                     file_path = fileutil.get_file_path(race_dir, troop_file)
                     if file_path:
                         try:
-                            logger.info(f'=====加载兵种配置文件：{file_path} ====')                            
+                            logger.debug(f'=====加载兵种配置文件：{file_path} ====')
                             # 读取文件内容并构建缓存
                             with open(file_path, 'r', encoding='utf-8') as f:
                                 lines = f.readlines()
@@ -47,7 +47,7 @@ class TroopLoader:
                                 for line in lines:
                                     line = line.strip()
                                     if line and not line.startswith('#'):                            
-                                        logger.info(f'{line}')
+                                        logger.debug(f'{line}')
                                         parts = line.split('\t')
                                         if len(parts) >= 2:
                                             troop_dict[parts[0]] = parts[1]
@@ -66,14 +66,14 @@ class TroopLoader:
 
     def get_troop_config(self, troop, level):
         # 先通过映射获取实际的文件名
-        logger.info(f'获取兵种配置：{troop} T{level}')
+        logger.debug(f'获取兵种配置：{troop} T{level}')
         actual_file_name = self.name_mapping.get(troop, troop)
-        logger.info(f'获取兵种配置-数据文件：{actual_file_name} T{level}')
+        logger.debug(f'获取兵种配置-数据文件：{actual_file_name} T{level}')
         if actual_file_name in self.troop_cache and str(level) in self.troop_cache[actual_file_name]:
             return self.troop_cache[actual_file_name][str(level)]
         return None
 
     def get_army(self, army_name):
         # 通过中文或英文名称获取军队类型
-        logger.info(f'获取军队类型：{army_name}')
+        logger.debug(f'获取军队类型：{army_name}')
         return self.army_name_mapping.get(army_name)

@@ -107,7 +107,7 @@ def handle_map_selection(window, map_name):
             window.logger.info('用户手动选择了地图')
         
     previous_map = game_state_service.state.current_selected_map
-    window.logger.warning(
+    window.logger.debug(
         "[MapDiag] 地图选择进入: requested=%r, ui_current=%r, previous_state=%r, "
         "handler_exists=%s",
         map_name,
@@ -170,7 +170,7 @@ def handle_map_selection(window, map_name):
             runtime_diagnostics = _handler_runtime_diagnostics(
                 window.malwarfare_handler
             )
-            window.logger.warning(
+            window.logger.debug(
                 "[HandlerDiag] MalwarfareMapHandler 已创建: enable_3840=%s, "
                 "running_flag=%s, worker_alive=%s",
                 runtime_diagnostics["runtime_enabled"],
@@ -181,7 +181,7 @@ def handle_map_selection(window, map_name):
             runtime_diagnostics = _handler_runtime_diagnostics(
                 window.malwarfare_handler
             )
-            window.logger.warning(
+            window.logger.debug(
                 "[HandlerDiag] 复用现有 MalwarfareMapHandler: running_flag=%s, "
                 "worker_alive=%s",
                 runtime_diagnostics["handler_running_flag"],
@@ -258,11 +258,11 @@ def handle_map_selection(window, map_name):
             window.logger.info(f'成功从数据库读取地图数据: {map_name}，记录数: {len(map_data)}')
             # 清空表格现有内容
             window.table_area.setRowCount(0)
-            window.logger.info('已清空表格现有内容')
+            window.logger.debug('已清空表格现有内容')
             
             # 设置表格行数
             window.table_area.setRowCount(len(map_data))
-            window.logger.info(f'设置表格行数为: {len(map_data)}')
+            window.logger.debug(f'设置表格行数为: {len(map_data)}')
             
             # 填充表格内容
             for row, map_row in enumerate(map_data):

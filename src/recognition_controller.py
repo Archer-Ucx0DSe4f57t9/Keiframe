@@ -311,7 +311,7 @@ class RecognitionController:
                 and window.mutator_manager
                 and self.game_state.active_mutators is not None
             ):
-                window.logger.info(
+                window.logger.debug(
                     f"种族已更新{race}，强制重新同步突变因子变式。"
                 )
                 window.mutator_manager.sync_mutator_toggles(

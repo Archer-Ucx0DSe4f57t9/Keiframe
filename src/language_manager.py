@@ -24,7 +24,7 @@ def on_language_changed(window, lang):
     """处理语言切换事件 (原 TimerWindow.on_language_changed)"""
     # 1. 更新 config.py 中的语言配置
     config_file = os.path.join(get_project_root(), 'src', 'config.py')
-    window.logger.info(f"load config: {config_file}")
+    window.logger.debug(f"load config: {config_file}")
 
     try:
         with open(config_file, 'r', encoding='utf-8') as f:

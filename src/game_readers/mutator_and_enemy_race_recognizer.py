@@ -61,7 +61,7 @@ class Mutator_and_enemy_race_recognizer:
             self.logger.error(f"模板目录不存在: {directory_path}")
             return templates
 
-        self.logger.info(f"正在从 {directory_path} 加载模板...")
+        self.logger.debug(f"正在从 {directory_path} 加载模板...")
         for filename in os.listdir(directory_path):
             if filename.lower().endswith('.png'):
                 try:
@@ -72,7 +72,7 @@ class Mutator_and_enemy_race_recognizer:
                     template_img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
                     if template_img is not None:
                         templates[template_name] = template_img
-                        self.logger.info(f" -> 已加载模板: {filename}")
+                        self.logger.debug(f" -> 已加载模板: {filename}")
                     else:
                         self.logger.warning(f"无法加载图片: {path}")
                 except Exception as e:
@@ -81,7 +81,7 @@ class Mutator_and_enemy_race_recognizer:
 
     def _reset_state(self):
         """重置所有识别状态和结果，用于开始新一轮的识别。"""
-        self.logger.info("正在重置 Mutator_and_enemy_race_recognizer 状态...")
+        self.logger.debug("正在重置 Mutator_and_enemy_race_recognizer 状态...")
 
         # 最终识别结果
         self.recognized_race = None
@@ -141,7 +141,7 @@ class Mutator_and_enemy_race_recognizer:
         }
     
     def update_game_time(self,game_time_seconds):
-        self.logger.info(f"已经接收到游戏时间{game_time_seconds}")
+        self.logger.debug(f"已经接收到游戏时间{game_time_seconds}")
         self._current_game_time = game_time_seconds
 
     def set_enemy_composition_scheduler(self, scheduler):
@@ -174,7 +174,7 @@ class Mutator_and_enemy_race_recognizer:
 
             # 如果最佳匹配发生变化（异常情况），清空所有计数，但保持1秒模式
             if self._last_best_race_match != best_match_name:
-                self.logger.info(f"种族识别目标改变: {self._last_best_race_match} -> {best_match_name}。重置计数。")
+                self.logger.debug(f"种族识别目标改变: {self._last_best_race_match} -> {best_match_name}。重置计数。")
                 self.race_candidates = {n: 0 for n in self.race_templates.keys()}
 
             self.race_candidates[best_match_name] += 1
@@ -193,7 +193,7 @@ class Mutator_and_enemy_race_recognizer:
         else:
             # 如果完全没找到匹配，且之前有潜在目标，则清空计数
             if self._last_best_race_match is not None:
-                 self.logger.info(f"种族识别目标 '{self._last_best_race_match}' 丢失。重置计数。")
+                 self.logger.debug(f"种族识别目标 '{self._last_best_race_match}' 丢失。重置计数。")
                  self.race_candidates = {n: 0 for n in self.race_templates.keys()}
                  self._last_best_race_match = None
             # 注意：此处不改回5秒，一旦进入确认模式，除非重置，否则不退出
@@ -222,7 +222,7 @@ class Mutator_and_enemy_race_recognizer:
             else:
                 # 如果之前正在计数（异常情况），则清零
                 if self.mutator_candidates[name] > 0:
-                    self.logger.info(f"突变因子识别目标 '{name}' 丢失。重置其计数。")
+                    self.logger.debug(f"突变因子识别目标 '{name}' 丢失。重置其计数。")
                     self.mutator_candidates[name] = 0
 
             if self.mutator_candidates[name] >= self.CONSECUTIVE_MATCH_REQUIREMENT:
@@ -256,13 +256,13 @@ class Mutator_and_enemy_race_recognizer:
                     self._enemy_composition_scheduler is None
                     or self._enemy_composition_scheduler.is_finished()
                 ):
-                    self.logger.info("所有识别任务已完成，进入等待状态。")
+                    self.logger.debug("所有识别任务已完成，进入等待状态。")
                     self._running = False # 设置标志位以表明我们想停止
                     continue
 
             # 条件：已超过 60 秒 AND 突变因子检测未完成
             if self._current_game_time >= 60 and not self.mutator_detection_complete:
-                self.logger.info("游戏时间已超过 60 秒，且突变因子未确认，将结果确认为空。")
+                self.logger.debug("游戏时间已超过 60 秒，且突变因子未确认，将结果确认为空。")
                 self.recognized_mutators = [] # 确认结果为空列表
                 self.mutator_detection_complete = True
                 self.recognition_signal.emit({'race': None, 'mutators': self.recognized_mutators})
@@ -277,7 +277,7 @@ class Mutator_and_enemy_race_recognizer:
                                     current_time - self._last_mutator_scan_time >= self._mutator_scan_interval
 
             # 如果有任何一个任务需要扫描，才执行截图和预处理
-            self.logger.info(f"检测到种族或突变因子扫描任务到期，准备识别...当前种族{is_race_scan_due}，突变因子{is_mutator_scan_due},窗口状态{state.is_in_game}")
+            self.logger.debug(f"检测到种族或突变因子扫描任务到期，准备识别...当前种族{is_race_scan_due}，突变因子{is_mutator_scan_due},窗口状态{state.is_in_game}")
             if is_race_scan_due or is_mutator_scan_due:
                 if not is_game_active():
                     time.sleep(0.5)
@@ -287,7 +287,7 @@ class Mutator_and_enemy_race_recognizer:
                     game_screen = state.latest_screenshot
                     game_screen_time_stamp = state.screenshot_timestamp
                     scale_factor = state.scale_factor
-                self.logger.info("截图已获取，准备进行识别处理。")
+                self.logger.debug("截图已获取，准备进行识别处理。")
 
                 # 没新截图就不处理
                 if game_screen is None or game_screen_time_stamp == last_game_screen_time_stamp:
@@ -305,12 +305,12 @@ class Mutator_and_enemy_race_recognizer:
 
                 # 执行到期的任务
                 if is_race_scan_due:
-                    self.logger.info(f"执行种族扫描 (间隔: {self._race_scan_interval}s)")
+                    self.logger.debug(f"执行种族扫描 (间隔: {self._race_scan_interval}s)")
                     self._scan_for_races(screenshot_gray, scale_factor)
                     self._last_race_scan_time = current_time
 
                 if is_mutator_scan_due:
-                    self.logger.info(f"执行突变因子扫描 (间隔: {self._mutator_scan_interval}s)")
+                    self.logger.debug(f"执行突变因子扫描 (间隔: {self._mutator_scan_interval}s)")
                     self._scan_for_mutators(screenshot_gray, scale_factor)
                     self._last_mutator_scan_time = current_time
 

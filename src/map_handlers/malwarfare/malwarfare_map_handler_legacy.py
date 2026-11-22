@@ -115,7 +115,7 @@ class MalwarfareMapHandler:
         探测UI的当前垂直偏移状态。
         它会检查 `count` 区域的所有可能位置，找到有效信息后，设置全局的ROI。
         """
-        self.logger.info("正在探测UI偏移状态...")
+        self.logger.debug("正在探测UI偏移状态...")
         
         # 遍历所有定义好的偏移状态
         for base_index, base_offset in enumerate(self.UI_STATE_OFFSETS):
@@ -130,7 +130,7 @@ class MalwarfareMapHandler:
                     self._base_count_roi[3] + y_offset
                 )
 
-                self.logger.info(f"尝试探测UI状态: base={base_index}, replay={replay_offset != 0}, ROI={probe_roi_coords}")
+                self.logger.debug(f"尝试探测UI状态: base={base_index}, replay={replay_offset != 0}, ROI={probe_roi_coords}")
                 
                 x0, y0, x1, y1 = probe_roi_coords
                 # 安全检查，确保ROI在图像范围内
@@ -157,7 +157,7 @@ class MalwarfareMapHandler:
 
 
                 nonzero = cv2.countNonZero(combined_mask) # 统计ROI内符合任一颜色的像素数量，作为是否存在有效信息的粗筛依据
-                self.logger.info(
+                self.logger.debug(
                     f"UI探测候选: base={base_index}, replay={replay_offset != 0}, "
                     f"y_offset={y_offset}, ROI={probe_roi_coords}, color_pixels={nonzero}"
                 )
@@ -177,7 +177,7 @@ class MalwarfareMapHandler:
                         debug_show=False
                     )
 
-                    self.logger.info(
+                    self.logger.debug(
                         f"UI探测OCR验证: y_offset={y_offset}, color={color_name}, result={result_text!r}"
                     )
 
@@ -187,7 +187,7 @@ class MalwarfareMapHandler:
                         break
 
                 if detected_color is None:
-                    self.logger.info(
+                    self.logger.debug(
                         f"UI探测候选被拒绝: y_offset={y_offset}, 原因=颜色像素存在但count OCR不合法"
                     )
                     continue
@@ -195,7 +195,7 @@ class MalwarfareMapHandler:
                 self._current_ui_offset_state = base_index
                 self._detected_count_color = detected_color
 
-                self.logger.info(
+                self.logger.debug(
                     f"UI状态探测成功: base={base_index}, replay={replay_offset != 0}, "
                     f"总偏移={y_offset}, count_color={detected_color}, count_text={detected_text!r}"
                 )
@@ -213,7 +213,7 @@ class MalwarfareMapHandler:
             
 
             
-        self.logger.info("UI状态探测失败，所有预设位置均未找到有效信息。")
+        self.logger.debug("UI状态探测失败，所有预设位置均未找到有效信息。")
 
         return False
 
@@ -254,7 +254,7 @@ class MalwarfareMapHandler:
                 continue
             
             if self._current_ui_offset_state == -1:
-                self.logger.info("正在探测ui状态...")
+                self.logger.debug("正在探测ui状态...")
                 if not self._detect_and_set_ui_state(game_screen):
                     time.sleep(0.5)
                     continue
@@ -282,7 +282,7 @@ class MalwarfareMapHandler:
         if n_value is None:
             return None
         if (n_value == 8 or n_value == 9) and self._last_valid_parsed and self._last_valid_parsed.get('n') == 2:
-            self.logger.warning("OCR识别到n=8/9，但前一个状态为n=2，修正为n=3。")
+            self.logger.debug("OCR识别到n=8/9，但前一个状态为n=2，修正为n=3。")
             return 3
         return n_value
 
@@ -302,7 +302,7 @@ class MalwarfareMapHandler:
         try:
             # --- 步骤1: 颜色校准 (仅在颜色未知时运行) ---
             if self._detected_count_color is None:
-                self.logger.info("正在尝试自动校准'Count'区域的颜色...")
+                self.logger.debug("正在尝试自动校准'Count'区域的颜色...")
                 
                 for color_name in self._possible_colors:
                     # 尝试用每种颜色的配置去识别
@@ -459,7 +459,7 @@ class MalwarfareMapHandler:
             if self._current_ui_offset_state != -1:
                 self._consecutive_failures += 1
                 if self._consecutive_failures > 30:
-                    self.logger.info("已连续识别失败超过阈值，重置UI状态...")
+                    self.logger.debug("已连续识别失败超过阈值，重置UI状态...")
                     self.reset()
             return
 
@@ -472,7 +472,7 @@ class MalwarfareMapHandler:
                 sec_val = int(latest_time[1:])
                 
                 if min_val > 3 or sec_val > 59:
-                    self.logger.warning(f"时间值超出范围: M={min_val}, S={sec_val}")
+                    self.logger.debug(f"时间值超出范围: M={min_val}, S={sec_val}")
                 else:
                     current_total_seconds = min_val * 60 + sec_val
                     
@@ -498,7 +498,7 @@ class MalwarfareMapHandler:
 
 
             except Exception as e:
-                self.logger.warning(f"时间处理错误 '{latest_time}': {e}")
+                self.logger.debug(f"时间处理错误 '{latest_time}': {e}")
         
         # Case 2: 暂停或无时间
         elif latest_paused:
@@ -520,7 +520,7 @@ class MalwarfareMapHandler:
         if parsed:
             self._consecutive_failures = 0
             if self._last_valid_parsed is None or parsed != self._last_valid_parsed:
-                self.logger.info(f"状态更新: {parsed}")
+                self.logger.debug(f"状态更新: {parsed}")
                 self._last_valid_parsed = parsed
 
         with self._result_lock:
@@ -543,7 +543,7 @@ class MalwarfareMapHandler:
     def reset(self):
         """重置状态"""
     
-        self.logger.info("重置 MalwarfareMapHandler...")
+        self.logger.debug("重置 MalwarfareMapHandler...")
         try:
             self._executor.shutdown(wait=False)
         except Exception:

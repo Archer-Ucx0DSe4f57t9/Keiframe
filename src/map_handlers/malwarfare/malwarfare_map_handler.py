@@ -105,7 +105,7 @@ class MalwarfareMapHandler:
         self._diagnostic_ui_profile_override = diagnostic_ui_profile_override
         self._diagnostic_count_color_override = diagnostic_count_color_override
         self._diagnostic_log_times = {}
-        self.logger.warning(
+        self.logger.debug(
             "[HandlerDiag] Malwarfare 中文 Runtime 自动路由已启用: "
             "legacy_enable_3840=%s (ignored), config_module=%s, "
             "ui_override=%r, color_override=%r",
@@ -164,7 +164,7 @@ class MalwarfareMapHandler:
                 daemon=True,
             )
             self._running_thread.start()
-            self.logger.warning(
+            self.logger.debug(
                 "[HandlerDiag] MalwarfareMapHandler 已启动: running_flag=%s, "
                 "worker_alive=%s",
                 self._running,
@@ -234,7 +234,7 @@ class MalwarfareMapHandler:
             ):
                 self._log_diagnostic(
                     "waiting_for_frame",
-                    "warning",
+                    "debug",
                     "[HandlerDiag] 等待新截图: frame=%s, timestamp=%r, "
                     "is_in_game=%r, app_closing=%r",
                     frame is not None,
@@ -316,7 +316,7 @@ class MalwarfareMapHandler:
                 return
             self._log_diagnostic(
                 "route_3840",
-                "warning",
+                "debug",
                 "[HandlerDiag] 3840 Runtime 已进入: canonical=%s %s, native_shape=%s",
                 getattr(canonical_frame, "shape", None),
                 getattr(canonical_frame, "dtype", None),
@@ -401,7 +401,7 @@ class MalwarfareMapHandler:
         self._active_model_width = int(selected_width)
         if selected_width in (1920, 2560):
             self.ocr = self.runtime_router.runtime_for_width(selected_width)
-        self.logger.warning(
+        self.logger.info(
             "[HandlerDiag] Malwarfare 中文 OCR Runtime 切换: %r -> %s",
             previous_width,
             selected_width,
@@ -739,7 +739,7 @@ class MalwarfareMapHandler:
         }
         self._log_diagnostic(
             "initial_probe",
-            "warning",
+            "debug",
             "[HandlerDiag] 3840 UI Profile 探测: candidates=%s, selected=%s, summary=%s",
             candidates,
             selected,
@@ -752,7 +752,7 @@ class MalwarfareMapHandler:
             )
             return False
 
-        self.logger.info(
+        self.logger.debug(
             "3840 UI 状态探测成功: profile=%s, y_offset=%s, "
             "count_color=%s, count=%s",
             selected[0],
@@ -808,7 +808,7 @@ class MalwarfareMapHandler:
 
     def _detect_and_set_ui_state(self, frame):
         """Find a unique UI profile/color pair using production Count OCR."""
-        self.logger.info("正在使用新版 Count OCR 探测 UI profile 和颜色...")
+        self.logger.debug("正在使用新版 Count OCR 探测 UI profile 和颜色...")
         def read_count(ui_profile, color_profile, _rois):
             count = self._timed_recognize_count(
                 frame,
@@ -834,7 +834,7 @@ class MalwarfareMapHandler:
         selected = self._select_ui_candidate(candidates)
         if selected is None:
             if candidates:
-                self.logger.warning("UI 探测结果不唯一，暂不采用: %s", candidates)
+                self.logger.debug("UI 探测结果不唯一，暂不采用: %s", candidates)
             else:
                 self.logger.debug("UI 探测未找到可见的 Count。")
             return False
@@ -845,7 +845,7 @@ class MalwarfareMapHandler:
             self._detected_count_color = color_profile
             self._latest_count = count
             self._last_successful_ui_profile = ui_profile
-        self.logger.info(
+        self.logger.debug(
             "UI 状态探测成功: profile=%s, count_color=%s, count=%s",
             ui_profile,
             color_profile,
@@ -910,7 +910,7 @@ class MalwarfareMapHandler:
 
             if len(color_results) != 1:
                 if color_results:
-                    self.logger.warning("Count 颜色探测结果不唯一: %s", color_results)
+                    self.logger.debug("Count 颜色探测结果不唯一: %s", color_results)
                 self._set_latest_count(None)
                 return
             self._detected_count_color, parsed_count = color_results[0]
@@ -1026,7 +1026,7 @@ class MalwarfareMapHandler:
         samples.append(float(elapsed_ms))
         self.logger.debug("Malwarfare %s OCR 耗时 %.2f ms", operation, elapsed_ms)
         if sample_count % 50 == 0:
-            self.logger.info(
+            self.logger.debug(
                 "Malwarfare %s OCR 最近 %d 次平均 %.2f ms，最大 %.2f ms。",
                 operation,
                 len(samples),
@@ -1060,7 +1060,7 @@ class MalwarfareMapHandler:
         if latest_count is None:
             self._log_diagnostic(
                 "publish_blocked_count_none",
-                "warning",
+                "debug",
                 "[PublishDiag] 结果暂不发布: Count=None, profile=%r, color=%r, "
                 "raw_time=%r, raw_paused=%r",
                 self._current_ui_profile,
@@ -1071,7 +1071,7 @@ class MalwarfareMapHandler:
             if self._current_ui_profile is not None:
                 self._consecutive_failures += 1
                 if self._consecutive_failures > self.FAILURE_RELOCATION_THRESHOLD:
-                    self.logger.info("Count 连续识别失败，重新定位 UI profile。")
+                    self.logger.debug("Count 连续识别失败，重新定位 UI profile。")
                     recent_profile = self._current_ui_profile
                     self.reset()
                     # A relocation may yield more than one Count candidate. Keep
@@ -1102,7 +1102,7 @@ class MalwarfareMapHandler:
                     ):
                         final_time = self._last_valid_parsed.get("time")
             else:
-                self.logger.warning("时间处理错误: %r", latest_time)
+                self.logger.error("时间处理错误: %r", latest_time)
         elif latest_paused and self._last_valid_parsed:
             final_time = self._last_valid_parsed.get("time")
 
@@ -1114,7 +1114,7 @@ class MalwarfareMapHandler:
         }
         self._consecutive_failures = 0
         if self._last_valid_parsed is None or parsed != self._last_valid_parsed:
-            self.logger.warning("[PublishDiag] 最新状态已生成: %s", parsed)
+            self.logger.debug("[PublishDiag] 最新状态已生成: %s", parsed)
             self._last_valid_parsed = parsed
 
         with self._result_lock:
@@ -1227,7 +1227,7 @@ class MalwarfareMapHandler:
 
     def reset(self):
         """Reset game/UI state without reloading frozen OCR resources."""
-        self.logger.info("重置 MalwarfareMapHandler...")
+        self.logger.debug("重置 MalwarfareMapHandler...")
         self._active_model_width = None
         self._last_capture_status_timestamp = None
         self._reset_state()

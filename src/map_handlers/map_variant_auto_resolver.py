@@ -157,7 +157,7 @@ class MapVariantAutoResolver:
         self.disabled_by_manual = False
         self.manual_disable_reason = None
         self._hide_variant_message()
-        self.logger.info("[MapVariantAutoResolver] reset completed")
+        self.logger.debug("[MapVariantAutoResolver] reset completed")
         
     def disable_by_manual(self, reason: str = "manual_selection") -> None:
         """
@@ -280,7 +280,7 @@ class MapVariantAutoResolver:
 
         self.monitor_ids[rule.rule_id] = monitor_id
 
-        self.logger.info(
+        self.logger.debug(
             "[MapVariantAutoResolver] monitor started: "
             "rule=%s monitor=%s window=%s-%s region=%s mode=%s",
             rule.rule_id,
@@ -396,7 +396,7 @@ class MapVariantAutoResolver:
         self.resolved_rule_ids.add(rule.rule_id)
         self._stop_monitor_for_rule(rule.rule_id)
 
-        self.logger.info(
+        self.logger.debug(
             "[MapVariantAutoResolver] rule finished without switch: "
             "rule=%s reason=%s result=%s",
             rule.rule_id,
@@ -426,7 +426,7 @@ class MapVariantAutoResolver:
         current_map = self._get_current_map_name()
 
         if current_map == target_map:
-            self.logger.info(
+            self.logger.debug(
                 "[MapVariantAutoResolver] target map already selected: %s",
                 target_map,
             )

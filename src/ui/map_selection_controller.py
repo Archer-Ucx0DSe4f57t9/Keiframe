@@ -68,7 +68,7 @@ class MapSelectionController:
 
     def process_map_switch_logic(self):
         window = self.window
-        window.logger.info(f"检测到地图切换快捷键组合: {config.MAP_SHORTCUT}")
+        window.logger.debug(f"检测到地图切换快捷键组合: {config.MAP_SHORTCUT}")
         if window.map_version_group.isVisible():
             current_btn = None
             for btn in window.version_buttons:
@@ -85,14 +85,14 @@ class MapSelectionController:
                 )
                 window.version_buttons[next_idx].click()
         else:
-            window.logger.info("当前地图不支持A/B版本切换")
+            window.logger.debug("当前地图不支持A/B版本切换")
 
     def handle_map_update(self, map_name):
         window = self.window
-        window.logger.info(f"收到地图更新信号: {map_name}")
+        window.logger.debug(f"收到地图更新信号: {map_name}")
         index = window.combo_box.findText(map_name)
         if index >= 0:
-            window.logger.info(f"找到地图 {map_name}，更新下拉框选择")
+            window.logger.debug(f"找到地图 {map_name}，更新下拉框选择")
             window.manual_map_selection = False
             window.combo_box.setCurrentIndex(index)
             self.map_selection_handler(window, map_name)

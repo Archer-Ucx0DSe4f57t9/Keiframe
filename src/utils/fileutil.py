@@ -43,7 +43,7 @@ def get_resources_dir(*subdirs):
         logger.error(f'资源目录不存在: {resources_dir}')
         return None
 
-    logger.info(f'使用资源目录: {resources_dir}')
+    logger.debug(f'使用资源目录: {resources_dir}')
     return resources_dir
 
 def list_files(directory):

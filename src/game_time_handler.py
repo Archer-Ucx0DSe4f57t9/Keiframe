@@ -19,7 +19,7 @@ def _log_malwarfare_event_diagnostic(window, key, message, *args):
     ):
         return
     log_times[key] = now
-    window.logger.warning("[EventDiag] " + message, *args)
+    window.logger.debug("[EventDiag] " + message, *args)
 
 
 def update_game_time(window):
@@ -120,7 +120,7 @@ def update_game_time(window):
                                             window.game_state.is_in_game
                                         )
                                     else:
-                                        window.logger.warning(f"从OCR接收到无效的时间格式: {time_str}")
+                                        window.logger.error(f"从OCR接收到无效的时间格式: {time_str}")
                                 except (ValueError, TypeError) as e:
                                     window.logger.error(f"解析OCR时间 '{time_str}' 失败: {e}")
                             else:

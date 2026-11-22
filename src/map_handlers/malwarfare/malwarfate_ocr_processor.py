@@ -19,7 +19,7 @@ class MalwarfareOcrProcessor:
     def _load_all_templates(self):
         # ... (这部分加载代码保持不变，省略以节省空间，直接复用之前的即可) ...
         colors = ['yellow', 'green', 'blue', 'orange']
-        self.logger.info(f"=== 初始化 OCR ({self.lang}) ===")
+        self.logger.debug(f"=== 初始化 OCR ({self.lang}) ===")
         template_all_dir = get_resources_dir('templates', 'malwarfare')
         
 
@@ -31,7 +31,7 @@ class MalwarfareOcrProcessor:
                 self.logger.error(f"❌ {color} 的模板目录不存在: {template_base_dir}")
                 continue
             
-            self.logger.info(f"加载模板目录: {template_base_dir}")
+            self.logger.debug(f"加载模板目录: {template_base_dir}")
             count = 0
             for fname in os.listdir(template_base_dir):
                 if not fname.lower().endswith('.png'): continue
@@ -46,7 +46,7 @@ class MalwarfareOcrProcessor:
                         self.templates[color][key] = []
                     self.templates[color][key].append(templ_img)
                     count += 1
-            self.logger.info(f" -> 加载 {color}: {count} 个模板")
+            self.logger.debug(f" -> 加载 {color}: {count} 个模板")
 
     def recognize(self, roi_img, color_type, confidence_thresh=0.7, debug_show=False):
         """

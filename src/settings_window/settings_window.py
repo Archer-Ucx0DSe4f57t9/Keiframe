@@ -467,7 +467,7 @@ class SettingsWindow(QDialog):
         title_geom = self.title_bar.geometry() if hasattr(self, "title_bar") else QRect()
         title_visible = self.title_bar.isVisible() if hasattr(self, "title_bar") else False
 
-        self.logger.info(
+        self.logger.debug(
             "设置窗口 DPI=%s scale=%.2f screen=%s available=%s geometry=%s "
             "title_bar=%s title_visible=%s",
             self._dpi,

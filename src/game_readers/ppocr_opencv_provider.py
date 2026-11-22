@@ -323,7 +323,7 @@ class OpenCVDNNPPOCRv5Provider:
         self.last_inference_elapsed_ms = elapsed_ms
         if self.inference_count == 1:
             self.first_inference_elapsed_ms = elapsed_ms
-            self._logger.info(
+            self._logger.debug(
                 "[OpenCV-PPOCR] OCR_FIRST elapsed_ms=%.1f",
                 elapsed_ms,
             )

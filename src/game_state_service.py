@@ -81,7 +81,7 @@ def get_troop_from_game():
 
 
 async def process_game_data(session: aiohttp.ClientSession, progress_callback: QtCore.pyqtSignal) -> None:
-    logger.info('check_for_new_game函数启动')
+    logger.debug('check_for_new_game函数启动')
     if state.app_closing:
         return
 
@@ -102,13 +102,13 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
         logger.debug('SC2请求失败。游戏未运行。')
         return
     except asyncio.TimeoutError:
-        logger.info('请求超时')
+        logger.debug('请求超时')
         return
     except json.JSONDecodeError:
-        logger.info('SC2请求json解码失败')
+        logger.warning('SC2请求json解码失败')
         return
     except Exception:
-        logger.info(traceback.format_exc())
+        logger.exception('处理 SC2 状态请求失败')
         return
 
     # 更新游戏数据相关
@@ -128,7 +128,7 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
         # 如果游戏ID发生变化，说明是新游戏
         if new_game_id != state.current_game_id:
             state.current_game_id = new_game_id
-            logger.warning(
+            logger.debug(
                 "[MapDiag] /game/ 玩家解析成功: count=%d, players=%s",
                 len(players),
                 [
@@ -146,7 +146,7 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
             progress_callback.emit(['reset_game_info'])
             # 更新全局变量
             state.game_time = current_time
-            logger.info(f'新游戏更新游戏时间: {state.game_time}')
+            logger.debug(f'新游戏更新游戏时间: {state.game_time}')
 
             
             '''
@@ -161,15 +161,15 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
             '''
 
             formatted_time = time.strftime("%M:%S", time.gmtime(game_data['displayTime']))
-            logger.info(f'游戏时间更新: {formatted_time}, 原始数据: {game_data["displayTime"]}')
+            logger.debug(f'游戏时间更新: {formatted_time}, 原始数据: {game_data["displayTime"]}')
 
             # 识别地图
             try:
-                logger.info('开始识别地图...')
-                logger.info(f'玩家数据: {json.dumps(players, ensure_ascii=False, indent=2)}')
+                logger.debug('开始识别地图...')
+                logger.debug(f'玩家数据: {json.dumps(players, ensure_ascii=False, indent=2)}')
                 map_found = identify_map(players)
                 if map_found:
-                    logger.warning(
+                    logger.debug(
                         "[MapDiag] identify_map(players)=%r，准备发出 update_map",
                         map_found,
                     )
@@ -178,7 +178,7 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
                     # 更新全局变量中的地图信息
                     state.current_selected_map = map_found
                 else:
-                    logger.warning(
+                    logger.debug(
                         "[MapDiag] identify_map(players)=None，不会发出 update_map"
                     )
             except Exception:
@@ -208,7 +208,7 @@ async def process_game_data(session: aiohttp.ClientSession, progress_callback: Q
     new_is_in_game = not bool(active_screens)
     state.is_in_game = new_is_in_game
     if previous_is_in_game is not new_is_in_game:
-        logger.warning(
+        logger.debug(
             "[CaptureDiag] is_in_game 变化: %r -> %r, activeScreens=%s",
             previous_is_in_game,
             new_is_in_game,
@@ -232,7 +232,7 @@ def _capture_game_screen(sct):
         if not is_game_active(): # 如果你需要只在游戏窗口激活时截图，保留此行；否则可去掉
             _log_capture_diagnostic(
                 "inactive",
-                "warning",
+                "debug",
                 "[CaptureDiag] SC2 截图暂停: is_game_active=False, is_in_game=%r",
                 state.is_in_game,
             )
@@ -307,7 +307,7 @@ def _capture_game_screen(sct):
             state.screenshot_status_timestamp = updated_timestamp
         _log_capture_diagnostic(
             "capture_active",
-            "warning",
+            "debug",
             "[CaptureDiag] SC2 截图已更新: rect=%s, native=%s %s, canonical=%s %s, "
             "native_3840_preserved=%s, timestamp=%.6f",
             sc2_rect,
@@ -355,7 +355,7 @@ async def check_for_new_game_scheduler(progress_callback: QtCore.pyqtSignal) -> 
     # 在调度器中创建会话，并确保其关闭
     async with aiohttp.ClientSession() as session:
         await asyncio.sleep(4)  # 游戏初始化等待
-        logger.info('游戏初始化等待完成')
+        logger.debug('游戏初始化等待完成')
 
         asyncio.create_task(screenshot_scheduler())
         

@@ -171,7 +171,7 @@ class MainWindowMenuController(QObject):
 
     def set_artifact_notifier(self, artifact_notifier):
         self._artifact_notifier = artifact_notifier
-        self.logger.info(
+        self.logger.debug(
             f"主菜单绑定 ArtifactNotifier："
             f"is_none={artifact_notifier is None}, "
             f"id={id(artifact_notifier) if artifact_notifier is not None else None}"

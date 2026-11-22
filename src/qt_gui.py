@@ -89,7 +89,7 @@ class TimerWindow(QMainWindow):
 
     def process_lock_logic(self):
         """主线程执行：实际UI操作"""
-        self.logger.info(f'检测到锁定快捷键组合: {config.LOCK_SHORTCUT}')
+        self.logger.debug(f'检测到锁定快捷键组合: {config.LOCK_SHORTCUT}')
         if self.control_window:
             self.control_window.is_locked = not self.control_window.is_locked
             self.control_window.update_icon()
@@ -200,7 +200,7 @@ class TimerWindow(QMainWindow):
         try:
             # 假设 game_state_service 已在 TimerWindow 的模块中导入
             current_map = game_state_service.state.current_selected_map
-            self.logger.info(f"通过 game_state_service 获取地图: {current_map}")
+            self.logger.debug(f"通过 game_state_service 获取地图: {current_map}")
         except Exception:
             current_map = "Unknown_Map"
             self.logger.warning("无法从 game_state_service 获取当前地图名称，使用默认值。")
@@ -258,7 +258,7 @@ class TimerWindow(QMainWindow):
             # 只有当控制窗口不是明确解锁时，才恢复锁定
             if not is_control_unlocked:
                 self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-                self.logger.info("搜索框失去焦点，已恢复窗口锁定（事件穿透）。")
+                self.logger.debug("搜索框失去焦点，已恢复窗口锁定（事件穿透）。")
                 self.is_temp_unlocked = False # 重置临时标志
             # else: 如果控制窗口已经是解锁状态，则不设置穿透属性，保持解锁
             

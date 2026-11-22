@@ -285,7 +285,7 @@ class MutatorManager(QWidget):
             if(self.is_muatator_required_to_notify(mutator_name)==True):
                 time_points = self.load_mutator_config(mutator_name)
                 self.active_mutator_time_points[mutator_name] = time_points
-                self.logger.info(f"手动加载 {mutator_name} 配置。时间点数量: {len(time_points)}")
+                self.logger.debug(f"手动加载 {mutator_name} 配置。时间点数量: {len(time_points)}")
         else:
             button.setIcon(button.gray_icon)
             button.setGraphicsEffect(None)
@@ -348,7 +348,7 @@ class MutatorManager(QWidget):
             return
 
         self._activation_notice_pending.add(mutator_name)
-        self.logger.info(f"已登记 {mutator_name} 的因子提醒激活提示。")
+        self.logger.debug(f"已登记 {mutator_name} 的因子提醒激活提示。")
 
 
     def _clear_activation_notice_runtime(self, mutator_name):
@@ -408,7 +408,7 @@ class MutatorManager(QWidget):
                     current_seconds + duration
                 )
 
-                self.logger.info(
+                self.logger.debug(
                     f"显示 {mutator_name} 激活提示，"
                     f"current={current_seconds}, "
                     f"until={self._activation_notice_until[mutator_name]}。"
@@ -697,14 +697,14 @@ class MutatorManager(QWidget):
         
         confirmed_mutators = list(confirmed_mutators or [])
 
-        self.logger.info(
+        self.logger.debug(
             f"同步突变因子按钮状态: {confirmed_mutators}"
         )
 
 
         if 'AggressiveDeployment' in confirmed_mutators and game_state.enemy_race == 'Protoss':
             self.logger.info("检测到 AggressiveDeployment 且敌方种族为 Protoss，切换到 AggressiveDeploymentProtoss 变式。")
-            self.logger.info(
+            self.logger.debug(
                 f"AggressiveDeploymentProtoss 状态："
                 f"in_mutators={'AggressiveDeploymentProtoss' in self.mutator_names}, "
                 f"in_notify={'AggressiveDeploymentProtoss' in self.notify_mutator_names}"
@@ -730,7 +730,7 @@ class MutatorManager(QWidget):
                     config_name_to_load = mutator_name
                     if mutator_name == 'AggressiveDeployment' and game_state.enemy_race == 'Protoss':
                         config_name_to_load = 'AggressiveDeploymentProtoss'
-                        self.logger.info(f"应用变式: {mutator_name} + {game_state.enemy_race } -> 加载 {config_name_to_load}")
+                        self.logger.debug(f"应用变式: {mutator_name} + {game_state.enemy_race } -> 加载 {config_name_to_load}")
 
                     # 同步 UI 状态（图标和阴影）
                     btn.setIcon(btn.original_icon)
@@ -746,7 +746,7 @@ class MutatorManager(QWidget):
                     time_points = self.load_mutator_config(config_name_to_load)
 
                     if time_points:
-                        self.logger.info(f"配置 '{config_name_to_load}' 已成功加载 {len(time_points)} 个时间点。")
+                        self.logger.debug(f"配置 '{config_name_to_load}' 已成功加载 {len(time_points)} 个时间点。")
                     else:
                         # 如果没有时间点，可能是文件缺失或格式错误
                         self.logger.error(f"警告：配置 '{config_name_to_load}' 加载后时间点列表为空。")

@@ -274,7 +274,7 @@ class ToastManager:
         return event_id in self.map_alerts
 
     def clear_all_alerts(self):
-        self.logger.info("正在清除所有屏幕提示 (toasts)...")
+        self.logger.debug("正在清除所有屏幕提示 (toasts)...")
         # 使用 list() 来创建一个字典值的副本进行迭代，
         # 这样在循环内部修改字典是安全的。
         for alert_id in list(self.map_alerts.keys()):

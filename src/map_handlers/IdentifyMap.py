@@ -221,7 +221,7 @@ def _matches_malwarfare_editor_test(player_data: List[Dict[str, Any]]) -> bool:
 def identify_map(player_data: List[Dict[str, Any]]) -> Optional[str]:
     """ Identify a map based on the list of players """
     if _matches_malwarfare_editor_test(player_data):
-        logger.warning(
+        logger.debug(
             "[MapDiag] 识别到净网行动编辑器 5 人签名: ids=%s, names=%s",
             [player.get('id') for player in player_data],
             [player.get('name') for player in player_data],
@@ -234,21 +234,21 @@ def identify_map(player_data: List[Dict[str, Any]]) -> Optional[str]:
 
         # First check if the length of players is correct
         if length != map_checks[m]['total_players']:
-            logger.info(f'地图{m}玩家数量不匹配: 当前={length}, 期望={map_checks[m]["total_players"]}')
+            logger.debug(f'地图{m}玩家数量不匹配: 当前={length}, 期望={map_checks[m]["total_players"]}')
             continue
         
-        logger.info(f'检查地图{m}的玩家名称匹配情况')
+        logger.debug(f'检查地图{m}的玩家名称匹配情况')
         # Then go over two players, and check if both their names are in correct set of localized strings
         for p in map_checks[m]['check']:
             player_name = player_data[p]['name']
             if not player_name in map_checks[m]['check'][p]:
-                logger.info(f'地图{m}的第{p}号位玩家名称不匹配: {player_name} 不在预期列表中')
+                logger.debug(f'地图{m}的第{p}号位玩家名称不匹配: {player_name} 不在预期列表中')
                 found = False
                 break
-            logger.info(f'地图{m}的第{p}号位玩家名称匹配成功: {player_name}')
+            logger.debug(f'地图{m}的第{p}号位玩家名称匹配成功: {player_name}')
         if found:
             logger.info(f'地图识别成功: {m}')
             return m
 
-    logger.info('未能识别地图')
+    logger.debug('未能识别地图')
     return None

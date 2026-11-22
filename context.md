@@ -63,7 +63,7 @@ KeiFrame 是《星际争霸 II》合作模式的局内信息辅助工具。它�
 - 相对 SC2 窗口定位的提示文字和地图笔记覆盖层。
 - 系统声音提醒。
 - 设置保存、数据库时间线导入与 Excel 导出。
-- `Keiframe.log` 运行日志；默认写入项目根目录或 exe 所在目录，不可写时回退到 `%LOCALAPPDATA%\Keiframe\logs\Keiframe.log`，两处都不可写时仅保留其他可用日志输出。
+- `Keiframe.log` 运行日志；默认写入项目根目录或 exe 所在目录，不可写时回退到 `%LOCALAPPDATA%\Keiframe\logs\Keiframe.log`，两处都不可写时仅保留其他可用日志输出。默认 `WARNING` 等级只记录可继续运行但值得关注的非预期情况，开发诊断位于 `DEBUG`。
 
 ## 5. 产品边界
 

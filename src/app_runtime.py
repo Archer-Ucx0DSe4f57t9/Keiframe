@@ -90,7 +90,7 @@ class AppRuntime:
 
         window.logger = get_logger("src.qt_gui")
         window.logger.info("Keiframe 启动")
-        window.logger.warning(
+        window.logger.debug(
             "[RuntimeDiag] Keiframe 源码运行信息: project_root=%s, cwd=%s, "
             "entry=%s, config=%s, enable_3840=%s",
             get_project_root(),
@@ -261,7 +261,7 @@ class AppRuntime:
             and window.enemy_composition_scheduler
         ):
             window.enemy_composition_scheduler.reset()
-            window.logger.info("Enemy composition recognizer reset")
+            window.logger.debug("Enemy composition recognizer reset")
         elif (
             hasattr(window, "enemy_composition_recognizer")
             and window.enemy_composition_recognizer

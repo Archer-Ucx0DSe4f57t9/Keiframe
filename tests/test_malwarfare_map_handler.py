@@ -2,12 +2,18 @@ import hashlib
 import importlib
 import json
 from pathlib import Path
+import re
+from types import SimpleNamespace
 import unittest
+from unittest import mock
 from unittest.mock import patch
 
 import numpy as np
 
+from src import game_state_service
+from src.game_time_handler import _log_malwarfare_event_diagnostic
 from src.map_handlers.malwarfare import MalwarfareOcrProcessor
+from src.map_handlers.IdentifyMap import identify_map
 from src.map_handlers.malwarfare.malwarfare_map_handler import MalwarfareMapHandler
 from src.map_handlers.malwarfare.malwarfare_map_handler_legacy import (
     MalwarfareMapHandler as LegacyMalwarfareMapHandler,
@@ -20,7 +26,7 @@ from src.map_handlers.malwarfare.runtime_router import MalwarfareRuntimeRouter
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LEGACY_HANDLER_SHA256 = (
-    "a513d94e040fa3eae42fc4bb94f738c5f8a04a280441202e4a7a801083884a87"
+    "85a99999206d61d35d08bf0b9c81c25c63be7992d2ac55b7686a3af8396179c3"
 )
 
 
@@ -353,6 +359,102 @@ class MalwarfareMapHandlerTest(unittest.TestCase):
         handler._update_latest_result()
 
         self.assertEqual("1:00", handler.get_latest_data()["time"])
+
+
+class LoggingSemanticsTest(unittest.TestCase):
+    def test_event_diagnostic_uses_debug(self):
+        window = SimpleNamespace(logger=mock.Mock())
+
+        with mock.patch("src.game_time_handler.time.monotonic", return_value=1.0):
+            _log_malwarfare_event_diagnostic(
+                window,
+                "state",
+                "normal state=%s",
+                "ready",
+            )
+
+        window.logger.debug.assert_called_once_with(
+            "[EventDiag] normal state=%s",
+            "ready",
+        )
+        window.logger.warning.assert_not_called()
+
+    def test_normal_map_signature_diagnostic_uses_debug(self):
+        players = [
+            {"id": 1, "name": "local", "type": "user"},
+            {"id": 3, "name": "Purifier Hologram", "type": "computer"},
+            {"id": 4, "name": "Purifier Hologram", "type": "computer"},
+            {"id": 5, "name": "Megalith", "type": "computer"},
+            {"id": 6, "name": "Neutral Reward", "type": "computer"},
+        ]
+
+        with mock.patch("src.map_handlers.IdentifyMap.logger") as logger:
+            self.assertEqual("净网行动", identify_map(players))
+
+        logger.debug.assert_called_once()
+        logger.warning.assert_not_called()
+
+    def test_normal_malwarfare_publish_diagnostic_uses_debug(self):
+        handler = MalwarfareMapHandler(ocr_processor=object())
+        handler.logger = mock.Mock()
+        handler._latest_count = 2
+        handler._latest_time = "135"
+        handler._latest_paused = False
+
+        handler._update_latest_result()
+
+        handler.logger.debug.assert_called_once_with(
+            "[PublishDiag] 最新状态已生成: %s",
+            {"lang": handler.lang, "n": 2, "time": "1:35", "is_paused": False},
+        )
+        handler.logger.warning.assert_not_called()
+
+    def test_normal_capture_pause_diagnostic_uses_debug(self):
+        game_state_service._capture_log_times.clear()
+        logger = mock.Mock()
+
+        with (
+            mock.patch.object(game_state_service, "logger", logger),
+            mock.patch.object(
+                game_state_service,
+                "is_game_active",
+                return_value=False,
+            ),
+        ):
+            game_state_service._capture_game_screen(mock.Mock())
+
+        logger.debug.assert_called_once()
+        logger.warning.assert_not_called()
+
+    def test_direct_normal_diagnostic_tags_are_not_warning_calls(self):
+        normal_tags = (
+            "RuntimeDiag",
+            "MapDiag",
+            "CaptureDiag",
+            "PublishDiag",
+            "EventDiag",
+        )
+        direct_warning = re.compile(
+            r"\.warning\s*\(\s*[\"']\[(?:"
+            + "|".join(normal_tags)
+            + r")\]",
+            re.MULTILINE,
+        )
+        dynamic_warning = re.compile(
+            r"_log_diagnostic\s*\(\s*[\"'][^\"']+[\"']\s*,\s*"
+            r"[\"']warning[\"']\s*,\s*[\"']\[(?:"
+            + "|".join(normal_tags)
+            + r")\]",
+            re.MULTILINE,
+        )
+
+        offenders = []
+        for path in (PROJECT_ROOT / "src").rglob("*.py"):
+            source = path.read_text(encoding="utf-8")
+            if direct_warning.search(source) or dynamic_warning.search(source):
+                offenders.append(str(path.relative_to(PROJECT_ROOT)))
+
+        self.assertEqual([], offenders)
 
 
 if __name__ == "__main__":

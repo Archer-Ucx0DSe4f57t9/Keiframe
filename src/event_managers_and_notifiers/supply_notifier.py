@@ -157,7 +157,7 @@ class SupplyNotifier:
         self._last_screen_shape = None
 
         self._hide_message()
-        self.logger.info("SupplyNotifier 状态已重置。")
+        self.logger.debug("SupplyNotifier 状态已重置。")
 
     def shutdown(self):
         self._hide_message()
@@ -284,7 +284,7 @@ class SupplyNotifier:
             self._condition_start_second = current_second
             self._last_condition_second = current_second
             self._sound_played_for_current_streak = False
-            self.logger.info(
+            self.logger.debug(
                 f"SupplyNotifier 进入提示条件: {result.get('raw')}, sec={current_second}"
             )
         else:
@@ -292,7 +292,7 @@ class SupplyNotifier:
             if self._last_condition_second is not None and current_second > self._last_condition_second + 2:
                 self._condition_start_second = current_second
                 self._sound_played_for_current_streak = False
-                self.logger.info(
+                self.logger.debug(
                     f"SupplyNotifier 检测到游戏秒跳变，重置本轮持续计时: sec={current_second}"
                 )
             self._last_condition_second = current_second
@@ -334,7 +334,7 @@ class SupplyNotifier:
 
     def _reset_condition_and_hide(self, reason: str = ""):
         if self._condition_active or self._current_overlay_visible:
-            self.logger.info(f"SupplyNotifier 取消提示: {reason}")
+            self.logger.debug(f"SupplyNotifier 取消提示: {reason}")
 
         self._condition_active = False
         self._condition_start_second = None

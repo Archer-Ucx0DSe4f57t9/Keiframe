@@ -48,7 +48,7 @@ def init_global_hotkeys(window):
                 if notifier and hasattr(notifier, 'request_force_recovery'):
                     notifier.request_force_recovery()
                     try:
-                        window.logger.info(f'检测到神器检测重置快捷键组合: {getattr(config, "ARTIFACT_FORCE_RECOVERY_SHORTCUT", "ctrl + r")}')
+                        window.logger.debug(f'检测到神器检测重置快捷键组合: {getattr(config, "ARTIFACT_FORCE_RECOVERY_SHORTCUT", "ctrl + r")}')
                     except Exception:
                         pass
                     return
@@ -56,7 +56,7 @@ def init_global_hotkeys(window):
                 if hasattr(window, 'request_force_recovery'):
                     window.request_force_recovery()
                     try:
-                        window.logger.info(f'检测到神器检测重置快捷键组合: {getattr(config, "ARTIFACT_FORCE_RECOVERY_SHORTCUT", "ctrl + r")}')
+                        window.logger.debug(f'检测到神器检测重置快捷键组合: {getattr(config, "ARTIFACT_FORCE_RECOVERY_SHORTCUT", "ctrl + r")}')
                     except Exception:
                         pass
                     return
@@ -110,7 +110,7 @@ def init_global_hotkeys(window):
         
 def handle_lock_shortcut(window):
     """处理锁定快捷键 (原 handle_lock_shortcut)"""
-    window.logger.info(f'检测到锁定快捷键组合: {config.LOCK_SHORTCUT}')
+    window.logger.debug(f'检测到锁定快捷键组合: {config.LOCK_SHORTCUT}')
     # 切换控制窗口的锁定状态
     window.control_window.is_locked = not window.control_window.is_locked
     window.control_window.update_icon()
@@ -119,10 +119,10 @@ def handle_lock_shortcut(window):
 
 def handle_map_switch_hotkey(window):
     """处理地图切换快捷键 (原 handle_map_switch_hotkey)"""
-    window.logger.info(f'检测到地图切换快捷键组合: {config.MAP_SHORTCUT}')
+    window.logger.debug(f'检测到地图切换快捷键组合: {config.MAP_SHORTCUT}')
     # 检查当前地图是否为A/B版本
     if window.map_version_group.isVisible():
-        window.logger.info('当前地图支持A/B版本切换')
+        window.logger.debug('当前地图支持A/B版本切换')
         
         current_btn = None
         for btn in window.version_buttons:
@@ -136,7 +136,7 @@ def handle_map_switch_hotkey(window):
             window.logger.info(f'从版本 {current_btn.text()} 切换到版本 {window.version_buttons[next_idx].text()}')
             window.version_buttons[next_idx].click()
     else:
-        window.logger.info('当前地图不支持A/B版本切换')
+        window.logger.debug('当前地图不支持A/B版本切换')
 
 def handle_memo_hotkey(window, mode):
     """处理 Memo 快捷键"""
