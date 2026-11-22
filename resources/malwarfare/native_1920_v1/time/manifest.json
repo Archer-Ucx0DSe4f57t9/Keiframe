@@ -1,0 +1,55 @@
+{
+  "candidate_version": "malwarfare_native_1920_time_candidate_v1",
+  "classifier": "template_bank_ncc",
+  "data_locks": {
+    "dataset_audit_sha256": "d159857aecac9b8322e178e5e532c1ee0d1a8cf02fdfde9c9713f95d9dbdbd7d",
+    "development_summary_sha256": "fba8aa43f5b0e37f69bbfdb44b80b7a6327133bc5c58f129d69b79cae9305bab",
+    "split_lock_sha256": "d159857aecac9b8322e178e5e532c1ee0d1a8cf02fdfde9c9713f95d9dbdbd7d"
+  },
+  "development_validation_source": "1920zerg02zweihaka",
+  "final_source_locked_not_inferred": "1920terran02_normal",
+  "max_shift": 1,
+  "model": {
+    "filename": "model.npz",
+    "sha256": "271021bfbb44ce4ca2a8084a8bb2363d150ab7bbb36963d8bce76b2b0cd945d6",
+    "size_bytes": 139385
+  },
+  "presence_thresholds": {
+    "core_active_pixel_minimum": 24,
+    "core_strip_left_active_pixel_minimum": 0,
+    "core_strip_middle_active_pixel_minimum": 10,
+    "core_strip_right_active_pixel_minimum": 10,
+    "yellow_peak_minimum": 207
+  },
+  "projection_version": "soft_yellow_projection_v1",
+  "schema_version": 1,
+  "selected_development_round": "round_04_template_bank_glyph_presence",
+  "slot_rects": [
+    {
+      "height": 11,
+      "width": 8,
+      "x": 15,
+      "y": 7
+    },
+    {
+      "height": 11,
+      "width": 8,
+      "x": 27,
+      "y": 7
+    },
+    {
+      "height": 11,
+      "width": 8,
+      "x": 35,
+      "y": 7
+    }
+  ],
+  "slot_score_minimums": [
+    0.8,
+    0.8,
+    0.8
+  ],
+  "status": "FROZEN_BEFORE_FINAL_INFERENCE",
+  "training_rule": "accepted, in-scope 000-259 only; no development/final pixels used for fitting",
+  "training_source": "1920protoss01_normal"
+}

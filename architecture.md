@@ -71,7 +71,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 线程安全规则：
 
 - `GlobalState.latest_screenshot`、时间戳和缩放信息在 `screenshot_lock` 下读写。
-- `GlobalState.latest_malwarfare_native_screenshot` 与标准帧在同一把锁、同一时间戳下交换；该字段只在 3840 开关开启且客户端区原生 shape 精确匹配时存在。
+- `GlobalState.latest_malwarfare_native_screenshot` 与标准帧在同一把锁、同一时间戳下交换；客户端区原生 shape 始终记录，精确 3840×2160 时保留原生帧。几何获取失败会更新截图状态时间戳，使 Handler 能清除旧结果。
 - 识别器应在锁内复制截图，随后释放锁再做耗时计算。
 - `EnemyCompositionRecognizer` 是被动 update 组件，由已有视觉识别循环中的 `EnemyCompositionScheduler` 调用；它不创建自己的后台线程，且只在 tooltip 连续确认后执行 OCR。
 - `EnemyCompositionScheduler` 只发出确认回调/Qt signal，不直接操作 `MessagePresenter`；`EnemyCompositionNotifier` 在 Qt 主线程拥有独立 presenter，按 catalog 和当前语言显示一次、持续 5 秒并在 reset/shutdown 时清理。
@@ -130,7 +130,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 `src/game_state_service.py` 包含单例 `GlobalState` 以及两个主要循环：
 
 - `process_game_data()` 请求 `/game/` 和 `/ui/`，更新游戏时间、游戏 ID 和是否在局内；新游戏时尝试从玩家列表识别地图。
-- `screenshot_scheduler()` 用 Win32 client rect 精确定位活动 SC2 客户端区，用 `mss` 截图并转换成 BGR；既有共享帧仍按宽度标准化到 1920 像素。3840 opt-in 开启且原生 shape 为 3840×2160 时，在缩放前另存原生帧。
+- `screenshot_scheduler()` 用 Win32 client rect 精确定位活动 SC2 客户端区，用 `mss` 截图并转换成 BGR；既有共享帧仍按宽度标准化到 1920 像素，同时记录原生 shape；原生 shape 为 3840×2160 时在缩放前另存原生帧。
 
 新游戏通过玩家列表的 JSON 哈希识别。检测到新局后，后台线程发出 `reset_game_info` 和可选的 `update_map` 信号，主线程负责清理与切换。
 
@@ -167,7 +167,7 @@ DPI 初始化顺序不可随意改变。主 UI 模块过早导入 PyQt，可能�
 `src/map_handlers/malwarfare_*`
 
 - 正式 Handler 把标准化完整帧传给 `src.malwarfare` production API，自身保留 UI profile/颜色探测、25 秒规则、暂停历史时间、单调保护和重定位状态机。
-- 开关关闭，或原生尺寸不是 3840×2160 时，上述既有路径不变。开关开启且原生尺寸精确匹配时，Handler 把原生帧交给 `MalwarfareRuntimeRouter`；Router 在内部 canonicalization 前确认分辨率并调用 3840 Bundle。
+- Handler 从同一截图事务的原生 shape 选择最近的 1920/2560/3840 Runtime；等距时选较小宽度。三套模型在 Handler 创建时加载并由 Router 缓存，切换分辨率只重置坐标及业务历史，不重复加载模型。旧 `enable_malwarfare_3840_runtime` 字段不再参与中文选型。
 - 3840 frozen Bundle 的正式验证范围仍只有 `Normal` UI profile；KeiFrame 非冻结适配层复用 2560 的六组纵向偏移，在 Canonical 帧上裁出与 Normal 完全同尺寸的 Count/Time/Paused ROI，再调用同一套冻结纯推理。Handler 的共享候选扫描先用 Green/Blue/Orange HSV 探针筛选，再以对应 Count Presence 唯一确认；低分 raw prediction 不算有效 Count，`Count=0` 保留合法语义，多颜色或多 Profile 歧义保持未知。逐 Profile 的 Count/Presence/score 和独立 Time/Paused 结果保存在诊断快照中，运行日志只输出限频摘要；确认后的结果继续进入同一个 25 秒、暂停历史、重定位和单调保护状态机。除 Normal 外均不得据此宣称冻结模型正式支持。
 - 开发诊断可在构造 Handler 时显式传入 `diagnostic_ui_profile_override="Normal"` 和 `diagnostic_count_color_override`；覆盖值只用于验证接入，不根据模型预测猜测颜色，也不会把 `Count=None` 发布为可信结果。
 - 3840 Runtime/manifest/model 初始化失败会明确报错；单帧执行失败会丢弃该帧，均不回退到 2560 模型。
@@ -296,8 +296,9 @@ mss 捕获 SC2 窗口
 ```text
 SC2 客户端区原生 BGR 帧
   -> 始终生成既有 1920×1080 标准共享帧
-  -> 开关关闭 / 非 3840：既有 2560 frozen OCR
-  -> 开关开启 + 原生 3840×2160：保留原生帧 -> Runtime Router -> 3840 Bundle
+  -> 原生 shape 宽度最近匹配 1920 / 2560 / 3840
+  -> Handler 等比适配到共享 1920×1080 坐标系
+  -> Runtime Router 调用对应缓存模型；精确 3840 继续保留原生帧诊断路径
   -> 最新节点 n、倒计时、暂停状态
   -> game_time_handler 每 200 ms 读取
   -> MapwarfareEventManager 按节点和剩余时间匹配事件

@@ -246,11 +246,11 @@ class RuntimeRouterTests(unittest.TestCase):
         )
         self.assertEqual(router.last_runtime_bundle_id, BUNDLE_ID_3840)
 
-    def test_unsupported_resolution_has_no_fallback(self) -> None:
+    def test_1920_shape_requires_the_1920_runtime_to_be_loaded(self) -> None:
         router = MalwarfareRuntimeRouter(
             runtime_2560=mock.Mock(), runtime_3840=mock.Mock(model_load_ms=0.0)
         )
-        with self.assertRaisesRegex(ValueError, "unsupported native"):
+        with self.assertRaisesRegex(RuntimeError, "1920 Runtime is not loaded"):
             router.process(
                 np.zeros((1080, 1920, 3), np.uint8),
                 ui_profile="Normal",

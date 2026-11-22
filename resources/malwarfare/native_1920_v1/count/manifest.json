@@ -1,0 +1,179 @@
+{
+  "candidate_version": "malwarfare_native_1920_count_candidate_v1",
+  "data_locks": {
+    "blue": {
+      "independent_validation": {
+        "dataset_file_aggregate_sha256": "742902dc84b922e43bdc6eba3c14315ec1d768da4873992e6722e34a05656f7a",
+        "dataset_file_sha256": {
+          "annotations": "d8d0c0ca9f1ca1adc971a6a6aa4f3b34ac68f6a3284de9b64070e8384c2727af",
+          "manifest": "8ab1a7bce87ed7d36b32599151d6515b5a3c1135b352b2f2845e291113ca8c2c",
+          "profile": "178300ad0a4dc825f4f1e8bb5bac9f54fd8c6bba7078ef35826b304dce4c0feb",
+          "source": "5c00ae1913b24d2664538b4962a29cffe8cc17c9e3fe7c11d949e259922fa598"
+        },
+        "source_filename": "1920protoss01_normal.mp4",
+        "source_mtime_ns": 1794137584564763500,
+        "source_size_bytes": 775338399,
+        "ui_profile": "Normal",
+        "video_id": "1920protoss01_normal"
+      },
+      "training": {
+        "dataset_file_aggregate_sha256": "22e84382d2f13ea699f45b7b13aac2b6e4c07b517441a607aa503b5afc0f9938",
+        "dataset_file_sha256": {
+          "annotations": "7d95c25dd60e886aa8f2883213d5ed4f91005dd1174bf069d116b05bd1cc1a32",
+          "manifest": "cf81f199b02a58e19e6c94555f7a0613fba7877c03029230526660ab84c0738a",
+          "profile": "178300ad0a4dc825f4f1e8bb5bac9f54fd8c6bba7078ef35826b304dce4c0feb",
+          "source": "c46fd8b0543f0a86abbf5148680f0c9235891c8ba7dcc82c11a747ba2a350745"
+        },
+        "source_filename": "1920protoss02_noraml.mp4",
+        "source_mtime_ns": 1794137799470940200,
+        "source_size_bytes": 795710253,
+        "ui_profile": "Normal",
+        "video_id": "1920protoss02_noraml"
+      }
+    },
+    "green": {
+      "independent_validation": {
+        "dataset_file_aggregate_sha256": "b5ff2b61d44fc6540e607552010c847934b371760de2dc6aae6ec259340ed0a4",
+        "dataset_file_sha256": {
+          "annotations": "d3221156fdcd3007d02f2642a559a7e3fc1b20cc06bf33a2f74b1624640d6471",
+          "manifest": "a8529c76b99235fe85a5cb3ab8b43829a57c0288f39becc76b6ba0e6c5400d95",
+          "profile": "4df67092ab3e4821123328ca633e10eebcec2c9dc2f42ea5fd649273af7a2a59",
+          "source": "8aa0dcbcfa5ba700682783e8d4882763729ef6959ff87cbed8c1bc6e86846d70"
+        },
+        "source_filename": "1920terran01_hero.mp4",
+        "source_mtime_ns": 1794136694819547400,
+        "source_size_bytes": 821305883,
+        "ui_profile": "Hero",
+        "video_id": "1920terran01_hero"
+      },
+      "training": {
+        "dataset_file_aggregate_sha256": "20950bf3d45ca59e660dc71fbba814b44697c2779199d3d6b581d047df602d80",
+        "dataset_file_sha256": {
+          "annotations": "69731fc272734b639876fbb275752c70c177fef818fb2c09e22aa7da7c69b040",
+          "manifest": "9f2339e21edd44794f63a7d0af3fdb7149e260f691f4a20acddd62f8b18a3597",
+          "profile": "178300ad0a4dc825f4f1e8bb5bac9f54fd8c6bba7078ef35826b304dce4c0feb",
+          "source": "e21be7fb420f5b0bd26131762ec09decb7319607b60ea35ffc502f751a97fdea"
+        },
+        "source_filename": "1920terran02_normal.mp4",
+        "source_mtime_ns": 1794136925726641500,
+        "source_size_bytes": 783926247,
+        "ui_profile": "Normal",
+        "video_id": "1920terran02_normal"
+      }
+    },
+    "orange": {
+      "independent_validation": {
+        "dataset_file_aggregate_sha256": "ad24b04276d389564f58fc2841ceafe82ced9c2191b97188a01e1f28c93c1e13",
+        "dataset_file_sha256": {
+          "annotations": "9198222efca1c722c6be8fdb0dbde508d863b7510b07f8e373ca7f58a18f8a27",
+          "manifest": "fb4f8ec666cfb0f7be541aa146232d24b730af9785e154d0dc47ff1a6ad218ca",
+          "profile": "c47ba3392600b0240588198fad16a28ea96ba3c1356f3351ac0cb44da7686836",
+          "source": "cb96fb91e9d295c9ea92d4f4edaf2d7442893a68b6ca7fc339546b031450a1ef"
+        },
+        "source_filename": "1920zerg02zweihaka.mp4",
+        "source_mtime_ns": 1794137367411002500,
+        "source_size_bytes": 864657545,
+        "ui_profile": "Zweihaka",
+        "video_id": "1920zerg02zweihaka"
+      },
+      "training": {
+        "dataset_file_aggregate_sha256": "dfbbc0c7bcf78ce5f658627eef5142da2b276a99144ea683046779bb5d15c1d4",
+        "dataset_file_sha256": {
+          "annotations": "61e19752e727aa768188414034e3500043b53abcc9e6a465e7b9270bd88785b4",
+          "manifest": "f5046a2bea9dbcaaf482b291b3e21a3bacab7f08c3ecc445b0f0d907bf8fbd4a",
+          "profile": "4df67092ab3e4821123328ca633e10eebcec2c9dc2f42ea5fd649273af7a2a59",
+          "source": "6be96a582e88cb7edc715d041d0fd28cf3d667758fac9dab5904a972457f9030"
+        },
+        "source_filename": "1920zerg01_hero.mp4",
+        "source_mtime_ns": 1794137159949582800,
+        "source_size_bytes": 872888235,
+        "ui_profile": "Hero",
+        "video_id": "1920zerg01_hero"
+      }
+    }
+  },
+  "models": {
+    "blue": {
+      "class_counts": {
+        "c0": 130,
+        "c1": 54,
+        "c2": 43,
+        "c3": 44,
+        "c4": 44
+      },
+      "filename": "blue/centroid_ncc_shift1.npz",
+      "presence_thresholds_inherited_from_2560": {
+        "best_score_minimum": 0.198723,
+        "projection_sum_minimum": 12.149592
+      },
+      "sha256": "ba631a3c7a7c64aa41a3e2603e1c02be841b2b9f61317b1dfd90c9738bd786c4",
+      "size_bytes": 5325,
+      "training_samples": 315,
+      "training_video": "1920protoss02_noraml"
+    },
+    "green": {
+      "class_counts": {
+        "c0": 131,
+        "c1": 58,
+        "c2": 44,
+        "c3": 44,
+        "c4": 43
+      },
+      "filename": "green/centroid_ncc_shift1.npz",
+      "presence_thresholds_inherited_from_2560": {
+        "best_score_minimum": 0.228908,
+        "projection_sum_minimum": 23.516688
+      },
+      "sha256": "79f9b5d01e4122ea0e21999c65d874159200f956f8546e9ccdf8c3275ba304b1",
+      "size_bytes": 5057,
+      "training_samples": 320,
+      "training_video": "1920terran02_normal"
+    },
+    "orange": {
+      "class_counts": {
+        "c0": 131,
+        "c1": 62,
+        "c2": 43,
+        "c3": 44,
+        "c4": 43
+      },
+      "filename": "orange/centroid_ncc_shift1.npz",
+      "presence_thresholds_inherited_from_2560": {
+        "best_score_minimum": 0.181485,
+        "projection_sum_minimum": 36.026504
+      },
+      "sha256": "9ac968d82eccb19f603dd06885780c221ef2fd9f7c019b524c3035fadaddea07",
+      "size_bytes": 25025,
+      "training_samples": 323,
+      "training_video": "1920zerg01_hero"
+    }
+  },
+  "presence_evidence_limit": "no human empty negatives; thresholds inherited, not tuned",
+  "production_runtime_modified": false,
+  "resolution": [
+    1920,
+    1080
+  ],
+  "roi_shape": [
+    31,
+    47,
+    3
+  ],
+  "schema_version": 1,
+  "splits": {
+    "blue": {
+      "independent_validation": "1920protoss01_normal",
+      "training": "1920protoss02_noraml"
+    },
+    "green": {
+      "independent_validation": "1920terran01_hero",
+      "training": "1920terran02_normal"
+    },
+    "orange": {
+      "independent_validation": "1920zerg02zweihaka",
+      "training": "1920zerg01_hero"
+    }
+  },
+  "status": "FROZEN_CANDIDATE_PENDING_INDEPENDENT_VALIDATION",
+  "task": "count"
+}

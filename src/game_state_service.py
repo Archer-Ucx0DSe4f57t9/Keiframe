@@ -55,6 +55,7 @@ class GlobalState:
         self.latest_malwarfare_native_screenshot = None
         self.latest_screenshot_native_shape = None
         self.screenshot_timestamp = 0
+        self.screenshot_status_timestamp = 0
         self.scale_factor = 1.0        # 基于1920宽度的缩放比例
         self.screenshot_lock = threading.Lock() # 用于保护截图数据的读写安全
         
@@ -240,6 +241,10 @@ def _capture_game_screen(sct):
         # 获取窗口几何信息
         sc2_rect = get_sc2_window_geometry()
         if not sc2_rect:
+            with state.screenshot_lock:
+                state.latest_screenshot_native_shape = None
+                state.latest_malwarfare_native_screenshot = None
+                state.screenshot_status_timestamp = time.perf_counter()
             _log_capture_diagnostic(
                 "missing_geometry",
                 "warning",
@@ -248,7 +253,17 @@ def _capture_game_screen(sct):
             return
             
         x, y, w, h = sc2_rect
-        if w == 0 or h == 0:
+        if w <= 0 or h <= 0:
+            with state.screenshot_lock:
+                state.latest_screenshot_native_shape = None
+                state.latest_malwarfare_native_screenshot = None
+                state.screenshot_status_timestamp = time.perf_counter()
+            _log_capture_diagnostic(
+                "invalid_geometry",
+                "warning",
+                "SC2 截图暂停: 客户端区尺寸无效 %r。",
+                sc2_rect,
+            )
             return
 
         monitor = {"top": y, "left": x, "width": w, "height": h}
@@ -263,13 +278,10 @@ def _capture_game_screen(sct):
         game_screen_bgr = cv2.cvtColor(img_array, cv2.COLOR_BGRA2BGR)
         native_frame_shape = tuple(game_screen_bgr.shape)
         
-        # 4. 在任何缩放发生前，按显式开关保留 3840 Runtime 所需原生帧。
-        # 其他原生尺寸不保留，由旧 1920 标准帧路径继续处理。
+        # 4. 在任何缩放发生前保留精确 3840 Runtime 所需原生帧。
+        # 中文 Runtime 已按客户端宽度自动路由；旧配置开关不再参与选型。
         malwarfare_native_bgr = None
-        if (
-            getattr(config, "enable_malwarfare_3840_runtime", False)
-            and game_screen_bgr.shape == (2160, 3840, 3)
-        ):
+        if game_screen_bgr.shape == (2160, 3840, 3):
             malwarfare_native_bgr = game_screen_bgr
 
         # 5. 重缩放图片大小（既有行为）
@@ -292,6 +304,7 @@ def _capture_game_screen(sct):
             state.scale_factor = current_scale
             state.screenshot_timestamp = time.perf_counter()
             updated_timestamp = state.screenshot_timestamp
+            state.screenshot_status_timestamp = updated_timestamp
         _log_capture_diagnostic(
             "capture_active",
             "warning",
